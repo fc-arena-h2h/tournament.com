@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock } from 'lucide-react';
+import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, Timestamp, arrayUnion, getDocs, deleteDoc, arrayRemove } from 'firebase/firestore';
@@ -113,6 +114,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const [selectedPlayerProfile, setSelectedPlayerProfile] = useState<UserProfile | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [reportingMatch, setReportingMatch] = useState<Match | null>(null);
+  const [reportFormData, setReportFormData] = useState({ home: 0, away: 0, screenshot: '' });
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [currentTournament, setCurrentTournament] = useState<any>(tournament);
@@ -394,7 +398,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       setActiveMenu(null);
     };
 
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-[5000] bg-white flex flex-col animate-in fade-in slide-in-from-right duration-500">
         <div className="p-8 pt-16 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
            <div className="flex flex-col">
@@ -561,7 +565,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
            )}
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-white pb-32">
+        <div className="p-6 border-t border-slate-200 bg-white pb-10">
           <div className="flex gap-3 nm-flat rounded-[2rem] p-2 bg-slate-50 border border-slate-300 shadow-md">
             <input 
               type="text"
@@ -580,7 +584,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
 
@@ -624,9 +629,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       setActiveMenu(null);
     };
 
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-[5000] bg-white flex flex-col animate-in fade-in slide-in-from-right duration-500">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc] pt-12">
            <div className="flex flex-col">
              <span className="text-[10px] font-black text-black uppercase tracking-widest">MATCH CHAT</span>
              <h3 className="text-sm font-black uppercase italic text-black">
@@ -784,7 +789,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
            )}
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-white pb-32">
+        <div className="p-6 border-t border-slate-200 bg-white pb-10">
           <div className="flex gap-3 nm-flat rounded-[2rem] p-2 bg-slate-50 border border-slate-300 shadow-md">
             <input 
               type="text"
@@ -803,7 +808,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
 
@@ -951,36 +957,146 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     });
   };
 
-  const handleUploadResult = async (match: Match) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = async (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
+  const handleUploadResult = (match: Match) => {
+    setReportingMatch(match);
+    setReportFormData({ home: 0, away: 0, screenshot: '' });
+  };
 
-      const homeScore = parseInt(prompt('Enter Home Score:') || '0');
-      const awayScore = parseInt(prompt('Enter Away Score:') || '0');
-      
-      try {
-        const compressedBase64 = await compressImage(file);
-        
-        await updateDoc(doc(db, 'matches', match.id), {
-          homeScore,
-          awayScore,
-          status: 'reported',
-          reporterId: auth.currentUser?.uid,
-          screenshotUrl: compressedBase64,
-          updatedAt: Timestamp.now()
-        });
-        alert('Result reported! Waiting for opponent to confirm.');
-      } catch (err) {
-        console.error(err);
-        alert('Error uploading result');
-      }
+  const submitFinalReport = async () => {
+    if (!reportingMatch) return;
+    if (!reportFormData.screenshot) return alert('Please upload match result screenshot');
+
+    setIsSubmittingReport(true);
+    try {
+      await updateDoc(doc(db, 'matches', reportingMatch.id), {
+        homeScore: reportFormData.home,
+        awayScore: reportFormData.away,
+        status: 'reported',
+        reporterId: auth.currentUser?.uid,
+        screenshotUrl: reportFormData.screenshot,
+        updatedAt: Timestamp.now()
+      });
+      alert('Result reported! Waiting for opponent to confirm.');
+      setReportingMatch(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error uploading result');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  const renderReportResultModal = () => {
+    if (!reportingMatch) return null;
+
+    const homeName = reportingMatch.homePlayerName;
+    const awayName = reportingMatch.awayPlayerName;
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const base64 = await compressImage(file);
+      setReportFormData({ ...reportFormData, screenshot: base64 });
     };
-    input.click();
+
+    return createPortal(
+      <div className="fixed inset-0 z-[8000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
+        <div className="w-full max-w-md bg-[#1a1f2e] rounded-[2.5rem] border-2 border-slate-800 overflow-hidden shadow-2xl relative">
+          {/* Header */}
+          <div className="p-8 flex items-center justify-between border-b border-white/5">
+             <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                   <Upload size={20} className="text-amber-500" />
+                </div>
+                <div>
+                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">REPORT RESULT</h3>
+                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Submit proof and final scoreline</p>
+                </div>
+             </div>
+             <button 
+               onClick={() => setReportingMatch(null)}
+               className="w-10 h-10 rounded-full bg-white/5 text-slate-400 flex items-center justify-center active:scale-95"
+             >
+               <X size={20} />
+             </button>
+          </div>
+
+          <div className="p-8 space-y-8">
+             {/* Scores */}
+             <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{homeName}</label>
+                   <input 
+                     type="number"
+                     value={reportFormData.home}
+                     onChange={(e) => setReportFormData({...reportFormData, home: parseInt(e.target.value) || 0})}
+                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                   />
+                </div>
+                <span className="text-xl font-black text-slate-700 italic pt-6">VS</span>
+                <div className="flex-1 space-y-3">
+                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{awayName}</label>
+                   <input 
+                     type="number"
+                     value={reportFormData.away}
+                     onChange={(e) => setReportFormData({...reportFormData, away: parseInt(e.target.value) || 0})}
+                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                   />
+                </div>
+             </div>
+
+             {/* Evidence */}
+             <div className="space-y-4">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Evidence Screenshot (HD AUTO-OPTIMIZATION)</label>
+                <div className="relative group">
+                   <input 
+                     type="file" 
+                     accept="image/*" 
+                     onChange={handleFile}
+                     className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
+                   />
+                   <div className={cn(
+                     "w-full aspect-video rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center transition-all relative overflow-hidden",
+                     reportFormData.screenshot ? "border-emerald-500 bg-emerald-500/5" : "border-slate-800 bg-slate-900/30 hover:border-indigo-500/50"
+                   )}>
+                      {reportFormData.screenshot ? (
+                        <>
+                          <img src={reportFormData.screenshot} className="w-full h-full object-cover opacity-40 blur-[2px]" alt="" />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3">
+                             <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <CheckCircle size={24} className="text-white" />
+                             </div>
+                             <span className="text-[10px] font-black text-white uppercase tracking-widest">IMAGE OPTIMIZED & SCANNED</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={32} className="text-slate-700 mb-4" />
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tap to upload proof</span>
+                        </>
+                      )}
+                   </div>
+                </div>
+             </div>
+
+             {/* Deploy Button */}
+             <button 
+               onClick={submitFinalReport}
+               disabled={isSubmittingReport || !reportFormData.screenshot}
+               className={cn(
+                 "w-full h-20 rounded-[2rem] flex items-center justify-center text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
+                 isSubmittingReport || !reportFormData.screenshot 
+                   ? "bg-slate-800 text-slate-600 grayscale cursor-not-allowed" 
+                   : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20"
+               )}
+             >
+                {isSubmittingReport ? 'DEPLOYING...' : 'DEPLOY FINAL RESULT'}
+             </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
   };
 
   const handleDisputeResult = async (match: Match) => {
@@ -1388,8 +1504,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const renderPlayerModal = () => {
     if (!selectedPlayerProfile) return null;
 
-    return (
-      <div className="fixed inset-0 z-[4000] bg-slate-900/20 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-slate-900/20 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
         <Card className="w-full max-w-sm p-0 overflow-hidden border-2 border-white shadow-2xl animate-in zoom-in-95 duration-300">
           <div className="relative h-32 bg-fc-dark overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
@@ -1449,7 +1565,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
           </div>
         </Card>
-      </div>
+      </div>,
+      document.body
     );
   };
 
@@ -1669,11 +1786,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
             {/* Score Box */}
             <div className="flex flex-col items-center gap-4 px-2">
-               {isCompleted ? (
+               {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
                  <div className="flex items-center gap-4">
-                    <span className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}>{match.homeScore}</span>
+                    <span className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}>{match.homeScore || 0}</span>
                     <div className="w-4 h-1 bg-slate-200 rounded-full" />
-                    <span className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}>{match.awayScore}</span>
+                    <span className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}>{match.awayScore || 0}</span>
                  </div>
                ) : (
                  <div className="w-14 h-14 rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-xl">
@@ -1721,8 +1838,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           {/* Action Buttons & Two-Step Verification */}
           <div className="flex flex-wrap gap-3 pt-4 relative z-10 border-t border-slate-50">
-            {/* Step 1: Upload Result (Participant can report) */}
-            {isParticipant && match.status === 'scheduled' && (
+            {/* Step 1: Upload Result (Only Home Player can report) */}
+            {isHome && match.status === 'scheduled' && (
               <button 
                 onClick={() => handleUploadResult(match)}
                 className="flex-1 min-w-[140px] h-12 rounded-xl bg-fc-green text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fc-green/20 active:scale-95 transition-transform"
@@ -1731,8 +1848,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </button>
             )}
             
-            {/* Step 2: Confirm or Dispute Result (For opponent or admin) */}
-            {match.status === 'reported' && (isParticipant || isAdminUser) && match.reporterId !== auth.currentUser?.uid && (
+            {/* Step 2: Confirm or Dispute Result (Only Away Player or Admin) */}
+            {match.status === 'reported' && (isAway || isAdminUser) && match.reporterId !== auth.currentUser?.uid && (
               <>
                 <button 
                   onClick={() => handleConfirmResult(match)}
@@ -2450,6 +2567,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   return (
     <div className="min-h-screen bg-soft-bg pb-32 relative animate-fade-in">
+      {renderReportResultModal()}
       {renderMatchChat()}
       {renderArenaChat()}
       {renderPlayerModal()}

@@ -59,6 +59,8 @@ export const AdminDashboard = ({ onCreateNew, onEnterTournament }: { onCreateNew
     const cQ = query(collection(db, 'challenges'));
     const unsubChallenges = onSnapshot(cQ, (snapshot) => {
       setChallenges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Challenge)));
+    }, (error) => {
+      console.error("Admin Challenges Error:", error);
     });
 
     const fetchProfile = async () => {
@@ -86,11 +88,17 @@ export const AdminDashboard = ({ onCreateNew, onEnterTournament }: { onCreateNew
             const unsubRegs = onSnapshot(rQ, (regSnap) => {
               setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
               setLoading(false);
+            }, (error) => {
+              console.error("Admin Regs Error:", error);
+              setLoading(false);
             });
             return () => unsubRegs();
           } else {
             setLoading(false);
           }
+        }, (error) => {
+          console.error("Admin Tournaments Error:", error);
+          setLoading(false);
         });
         return unsubTournaments;
       }

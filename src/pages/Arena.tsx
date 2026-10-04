@@ -127,17 +127,17 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
     const unsubM = onSnapshot(qMatches, (snap) => {
       cMatches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       computeAndSyncStats();
-    });
+    }, (err) => console.error("Firestore Matches Sync Error:", err));
 
     const unsubC = onSnapshot(qChallenges, (snap) => {
       cChallenges = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       computeAndSyncStats();
-    });
+    }, (err) => console.error("Firestore Challenges Sync Error:", err));
 
     const unsubU = onSnapshot(qUsers, (snap) => {
       allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       computeAndSyncStats();
-    });
+    }, (err) => console.error("Firestore Users Sync Error:", err));
 
     return () => {
       unsubM();
@@ -164,7 +164,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
     );
     const unsubMatches = onSnapshot(qMatches, (snapshot) => {
       setRecentResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.error("Firestore Recent Matches Error:", err));
 
     // Fetch featured/active tournaments for the user
     const qRegs = query(collection(db, 'registrations'), where('userId', '==', profile?.uid));
@@ -185,15 +185,15 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           const all = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
           const filtered = all.filter(t => allIds.includes(t.id) || t.status === 'open');
           setFeaturedTournaments(filtered.slice(0, 3));
-        });
+        }, (err) => console.error("Firestore Featured Tournaments Error:", err));
       } else {
         // Fallback to open tournaments
         const qOpen = query(collection(db, 'tournaments'), where('status', '==', 'open'), limit(3));
         onSnapshot(qOpen, (tSnap) => {
           setFeaturedTournaments(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
+        }, (err) => console.error("Firestore Open Tournaments Error:", err));
       }
-    });
+    }, (err) => console.error("Firestore Regs Error:", err));
 
     return () => {
       unsubMatches();

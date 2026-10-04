@@ -1,24 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X } from 'lucide-react';
+import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Reveal } from '@/src/components/ui/Reveal';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { GameLoader } from '@/src/components/ui/GameLoader';
 import { logPointTransaction } from '@/src/lib/points';
+import { motion, AnimatePresence } from 'framer-motion';
+import { formatMessageTimestamp, cleanupOldMessages } from '@/src/lib/chatUtils';
+
+const REACTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
+
+const BUBBLE_COLORS = [
+  'bg-emerald-500', 'bg-blue-500', 'bg-rose-500', 'bg-amber-500', 
+  'bg-violet-500', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500'
+];
+
+const getUserIdColor = (userId: string) => {
+  if (!userId) return BUBBLE_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return BUBBLE_COLORS[Math.abs(hash) % BUBBLE_COLORS.length];
+};
+
+const CountdownTimer = ({ targetTime }: { targetTime: Timestamp }) => {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const target = targetTime.toMillis();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        setTimeLeft('LIVE');
+        clearInterval(timer);
+        return;
+      }
+
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${h.toString().padStart(2, '0')} : ${m.toString().padStart(2, '0')} : ${s.toString().padStart(2, '0')}`);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [targetTime]);
+
+  return <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">{timeLeft}</span>;
+};
 
 interface Match {
   id: string;
   tournamentId: string;
   homePlayerId: string;
   awayPlayerId: string;
+  homePlayerName: string;
+  awayPlayerName: string;
   homeScore?: number;
   awayScore?: number;
-  status: 'scheduled' | 'reported' | 'completed';
-  proofUrl?: string;
+  status: 'scheduled' | 'reported' | 'completed' | 'disputed';
+  screenshotUrl?: string;
   reporterId?: string;
+  disputeReason?: string;
+  stage?: string;
+  groupId?: string;
+  scheduledTime?: Timestamp;
 }
 
 interface Challenge {
@@ -50,9 +102,17 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportingMatchId, setReportingMatchId] = useState<string | null>(null);
-  const [reportingChallengeId, setReportingChallengeId] = useState<string | null>(null);
-  const [reportData, setReportData] = useState({ home: 0, away: 0 });
+  const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+  const [tournaments, setTournaments] = useState<Record<string, any>>({});
+  const [activeMatchChat, setActiveMatchChat] = useState<Match | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [selectedPlayerProfile, setSelectedPlayerProfile] = useState<UserProfile | null>(null);
+  const [reportingMatch, setReportingMatch] = useState<Match | null>(null);
+  const [reportFormData, setReportFormData] = useState({ home: 0, away: 0, screenshot: '' });
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   
   const [nowTime, setNowTime] = useState<number>(Date.now());
   
@@ -280,16 +340,49 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    // Listen to tournament matches
-    const mq = query(
+    // Fetch personal tournament matches
+    const matchesQ = query(
       collection(db, 'matches'),
       where('participants', 'array-contains', auth.currentUser.uid)
     );
-
-    const unsubMatches = onSnapshot(mq, (snapshot) => {
-      const matchData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+    const unsubMatches = onSnapshot(matchesQ, async (snap) => {
+      const matchData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
       setMatches(matchData);
-      if (activeSubTab === 'matches') setLoading(false);
+
+      // Fetch tournament details
+      const tIds = Array.from(new Set(matchData.map(m => m.tournamentId)));
+      const tData = { ...tournaments };
+      let tChanged = false;
+      await Promise.all(tIds.map(async (tId) => {
+        if (!tData[tId]) {
+          const tSnap = await getDoc(doc(db, 'tournaments', tId));
+          if (tSnap.exists()) {
+            tData[tId] = { id: tSnap.id, ...tSnap.data() };
+            tChanged = true;
+          }
+        }
+      }));
+      if (tChanged) setTournaments(tData);
+
+      // Fetch player profiles
+      const uids = new Set<string>();
+      matchData.forEach(m => {
+        uids.add(m.homePlayerId);
+        uids.add(m.awayPlayerId);
+      });
+      const missing = Array.from(uids).filter(uid => !profiles[uid]);
+      if (missing.length > 0) {
+        const pData = { ...profiles };
+        let pChanged = false;
+        await Promise.all(missing.map(async (uid) => {
+          const pSnap = await getDoc(doc(db, 'users', uid));
+          if (pSnap.exists()) {
+            pData[uid] = pSnap.data() as UserProfile;
+            pChanged = true;
+          }
+        }));
+        if (pChanged) setProfiles(pData);
+      }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'matches');
     });
@@ -354,34 +447,760 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       unsubMatches();
       unsubChallenges();
     };
-  }, [activeSubTab]);
+  }, [activeSubTab, auth.currentUser?.uid]);
 
-  const handleReport = async (matchId: string) => {
+  // Chat Effect
+  useEffect(() => {
+    if (!activeMatchChat) return;
+
+    const q = query(
+      collection(db, 'messages'),
+      where('chatId', '==', activeMatchChat.id)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const sorted = msgs.sort((a: any, b: any) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+      setMessages(sorted);
+
+      // Seen status update
+      const currentUid = auth.currentUser?.uid;
+      if (currentUid) {
+        sorted.forEach(msg => {
+          if (msg.senderId !== currentUid && (!msg.seenBy || !msg.seenBy.includes(currentUid))) {
+            updateDoc(doc(db, 'messages', msg.id), {
+              seenBy: arrayUnion(currentUid)
+            }).catch(e => console.error("Seen update failed", e));
+          }
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [activeMatchChat]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeMatchChat) return;
+
     try {
-      const matchRef = doc(db, 'matches', matchId);
-      await updateDoc(matchRef, {
-        homeScore: reportData.home,
-        awayScore: reportData.away,
-        status: 'reported',
-        reporterId: auth.currentUser?.uid,
-        updatedAt: Timestamp.now()
+      await addDoc(collection(db, 'messages'), {
+        chatId: activeMatchChat.id,
+        tournamentId: activeMatchChat.tournamentId,
+        senderId: auth.currentUser?.uid || '',
+        senderName: profile?.inGameName || 'Player',
+        senderAvatar: profile?.avatar || '',
+        text: newMessage,
+        timestamp: Timestamp.now(),
+        reactions: {},
+        seenBy: [auth.currentUser?.uid]
       });
-      setReportingMatchId(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `matches/${matchId}`);
+      setNewMessage('');
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleConfirm = async (matchId: string) => {
+  const deleteMessage = async (msgId: string) => {
     try {
-      const matchRef = doc(db, 'matches', matchId);
-      await updateDoc(matchRef, {
+      await deleteDoc(doc(db, 'messages', msgId));
+      setActiveMenu(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `messages/${msgId}`);
+    }
+  };
+
+  const reactToMessage = async (msgId: string, emoji: string) => {
+    if (!auth.currentUser) return;
+    const msg = messages.find(m => m.id === msgId);
+    if (!msg) return;
+
+    const userReactions = msg.reactions?.[emoji] || [];
+    const hasReacted = userReactions.includes(auth.currentUser.uid);
+
+    try {
+      await updateDoc(doc(db, 'messages', msgId), {
+        [`reactions.${emoji}`]: hasReacted ? arrayRemove(auth.currentUser.uid) : arrayUnion(auth.currentUser.uid)
+      });
+      setActiveMenu(null);
+    } catch (error) {
+      console.error("Reaction failed", error);
+    }
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const max = 720;
+          if (width > height) {
+            if (width > max) {
+              height = Math.round((height * max) / width);
+              width = max;
+            }
+          } else {
+            if (height > max) {
+              width = Math.round((width * max) / height);
+              height = max;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+          resolve(canvas.toDataURL('image/jpeg', 0.5));
+        };
+      };
+    });
+  };
+
+  const handleUploadResult = (match: Match) => {
+    setReportingMatch(match);
+    setReportFormData({ home: 0, away: 0, screenshot: '' });
+  };
+
+  const submitFinalReport = async () => {
+    if (!reportingMatch) return;
+    if (!reportFormData.screenshot) return alert('Please upload match result screenshot');
+
+    setIsSubmittingReport(true);
+    try {
+      await updateDoc(doc(db, 'matches', reportingMatch.id), {
+        homeScore: reportFormData.home,
+        awayScore: reportFormData.away,
+        status: 'reported',
+        reporterId: auth.currentUser?.uid,
+        screenshotUrl: reportFormData.screenshot,
+        updatedAt: Timestamp.now()
+      });
+      alert('Result reported! Waiting for opponent to confirm.');
+      setReportingMatch(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error uploading result');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  const renderReportResultModal = () => {
+    if (!reportingMatch) return null;
+
+    const homeName = reportingMatch.homePlayerName;
+    const awayName = reportingMatch.awayPlayerName;
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const base64 = await compressImage(file);
+      setReportFormData({ ...reportFormData, screenshot: base64 });
+    };
+
+    return createPortal(
+      <div className="fixed inset-0 z-[8000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
+        <div className="w-full max-w-md bg-[#1a1f2e] rounded-[2.5rem] border-2 border-slate-800 overflow-hidden shadow-2xl relative">
+          <div className="p-8 flex items-center justify-between border-b border-white/5">
+             <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                   <Upload size={20} className="text-amber-500" />
+                </div>
+                <div>
+                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">REPORT RESULT</h3>
+                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Submit proof and final scoreline</p>
+                </div>
+             </div>
+             <button 
+               onClick={() => setReportingMatch(null)}
+               className="w-10 h-10 rounded-full bg-white/5 text-slate-400 flex items-center justify-center active:scale-95"
+             >
+               <X size={20} />
+             </button>
+          </div>
+
+          <div className="p-8 space-y-8">
+             <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{homeName}</label>
+                   <input 
+                     type="number"
+                     value={reportFormData.home}
+                     onChange={(e) => setReportFormData({...reportFormData, home: parseInt(e.target.value) || 0})}
+                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                   />
+                </div>
+                <span className="text-xl font-black text-slate-700 italic pt-6">VS</span>
+                <div className="flex-1 space-y-3">
+                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{awayName}</label>
+                   <input 
+                     type="number"
+                     value={reportFormData.away}
+                     onChange={(e) => setReportFormData({...reportFormData, away: parseInt(e.target.value) || 0})}
+                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                   />
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Evidence Screenshot (HD AUTO-OPTIMIZATION)</label>
+                <div className="relative group">
+                   <input 
+                     type="file" 
+                     accept="image/*" 
+                     onChange={handleFile}
+                     className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
+                   />
+                   <div className={cn(
+                     "w-full aspect-video rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center transition-all relative overflow-hidden",
+                     reportFormData.screenshot ? "border-emerald-500 bg-emerald-500/5" : "border-slate-800 bg-slate-900/30 hover:border-indigo-500/50"
+                   )}>
+                      {reportFormData.screenshot ? (
+                        <>
+                          <img src={reportFormData.screenshot} className="w-full h-full object-cover opacity-40 blur-[2px]" alt="" />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3">
+                             <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <CheckCircle size={24} className="text-white" />
+                             </div>
+                             <span className="text-[10px] font-black text-white uppercase tracking-widest">IMAGE OPTIMIZED & SCANNED</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={32} className="text-slate-700 mb-4" />
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tap to upload proof</span>
+                        </>
+                      )}
+                   </div>
+                </div>
+             </div>
+
+             <button 
+               onClick={submitFinalReport}
+               disabled={isSubmittingReport || !reportFormData.screenshot}
+               className={cn(
+                 "w-full h-20 rounded-[2rem] flex items-center justify-center text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
+                 isSubmittingReport || !reportFormData.screenshot 
+                   ? "bg-slate-800 text-slate-600 grayscale cursor-not-allowed" 
+                   : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20"
+               )}
+             >
+                {isSubmittingReport ? 'DEPLOYING...' : 'DEPLOY FINAL RESULT'}
+             </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  const handleDisputeResult = async (match: Match) => {
+    const reason = prompt('Why are you disputing this result? (Optional)');
+    try {
+      await updateDoc(doc(db, 'matches', match.id), {
+        status: 'disputed',
+        disputeReason: reason || 'Incorrect score reported',
+        updatedAt: Timestamp.now()
+      });
+      alert('Match disputed. An admin will review the result soon.');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleConfirmResult = async (match: Match) => {
+    try {
+      await updateDoc(doc(db, 'matches', match.id), {
         status: 'completed',
         updatedAt: Timestamp.now()
       });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `matches/${matchId}`);
+      
+      const homeScore = match.homeScore || 0;
+      const awayScore = match.awayScore || 0;
+      
+      if (homeScore > awayScore) {
+        await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 100 });
+      } else if (awayScore > homeScore) {
+        await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 100 });
+      } else {
+        await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 25 });
+        await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 25 });
+      }
+
+      alert('Result confirmed! Points updated.');
+    } catch (err) {
+      console.error(err);
     }
+  };
+
+  const renderPlayerModal = () => {
+    if (!selectedPlayerProfile) return null;
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <Card className="w-full max-w-sm p-0 overflow-hidden border-2 border-white shadow-2xl animate-in zoom-in-95 duration-300">
+          <div className="relative h-32 bg-fc-dark overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
+            <button 
+              onClick={() => setSelectedPlayerProfile(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-sm active:scale-95"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="px-8 pb-10 -mt-12 relative z-10">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white">
+                <img 
+                  src={selectedPlayerProfile.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+                  className="w-full h-full object-cover rounded-[1.8rem]" 
+                  alt="" 
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
+                  {selectedPlayerProfile.inGameName}
+                </h3>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+              </div>
+
+              <div className="w-full grid grid-cols-1 gap-3">
+                <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
+                    <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID}</span>
+                  </div>
+                </div>
+                <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">OVR Rating</span>
+                    <span className="text-xs font-black text-fc-green">{selectedPlayerProfile.ovr || 0}</span>
+                  </div>
+                </div>
+                
+                {selectedPlayerProfile.fbUrl && (
+                  <a href={selectedPlayerProfile.fbUrl} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                    <Facebook size={18} className="text-blue-600" />
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Facebook Profile</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>,
+      document.body
+    );
+  };
+
+  const renderMatchChat = () => {
+    if (!activeMatchChat) return null;
+
+    const copyMessage = (text: string) => {
+      navigator.clipboard.writeText(text);
+      setActiveMenu(null);
+    };
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9000] bg-white flex flex-col animate-in fade-in slide-in-from-right duration-500">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc] pt-12">
+           <div className="flex flex-col">
+             <span className="text-[10px] font-black text-black uppercase tracking-widest">MATCH CHAT</span>
+             <h3 className="text-sm font-black uppercase italic text-black truncate max-w-[200px]">
+               {activeMatchChat.homePlayerName} vs {activeMatchChat.awayPlayerName}
+             </h3>
+           </div>
+           <button 
+             onClick={() => { setActiveMatchChat(null); setActiveMenu(null); setMessages([]); }}
+             className="w-10 h-10 rounded-full nm-flat flex items-center justify-center text-slate-400"
+           >
+             <XCircle size={20} />
+           </button>
+        </div>
+
+        <div 
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-[#f8fafc] scroll-smooth"
+        >
+           {messages.length === 0 ? (
+             <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                <MessageSquare size={48} className="text-slate-300 mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">No messages yet</p>
+             </div>
+           ) : (
+             messages.map((m, idx) => {
+               const isMe = m.senderId === auth.currentUser?.uid;
+               const showMenu = activeMenu === m.id;
+               const seenCount = (m.seenBy?.length || 0) - (isMe ? 1 : 0);
+               const prevMsg = idx > 0 ? messages[idx - 1] : null;
+               const isFirstInGroup = !prevMsg || prevMsg.senderId !== m.senderId;
+
+               return (
+                <div key={m.id} className={cn(
+                  "flex gap-2 max-w-[92%] group relative",
+                  isMe ? "ml-auto flex-row-reverse" : "flex-row",
+                  isFirstInGroup ? "mt-4" : "mt-0.5"
+                )}>
+                  <div className="flex-shrink-0 w-8">
+                    {isFirstInGroup && (
+                      <button 
+                        onClick={() => !isMe && setSelectedPlayerProfile(profiles[m.senderId])}
+                        className="active:scale-90 transition-transform"
+                      >
+                        {m.senderAvatar ? (
+                          <img src={m.senderAvatar} className="w-8 h-8 rounded-full border-2 border-white shadow-md object-cover" alt="" />
+                        ) : (
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-black border-2 border-white shadow-md uppercase",
+                            getUserIdColor(m.senderId)
+                          )}>
+                            {m.senderName?.charAt(0) || '?'}
+                          </div>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                    {isFirstInGroup && (
+                      <span className="text-[8px] font-black text-black uppercase tracking-widest px-2 mb-1">
+                        {m.senderName}
+                      </span>
+                    )}
+
+                    <div className="relative group/bubble">
+                      <div 
+                        onClick={() => setActiveMenu(showMenu ? null : m.id)}
+                        className={cn(
+                          "px-4 py-2.5 rounded-2xl text-xs font-semibold leading-relaxed border transition-all break-all whitespace-pre-wrap cursor-pointer select-none shadow-sm",
+                          isMe 
+                            ? "bg-fc-dark text-white border-slate-700 rounded-tr-sm" 
+                            : cn("text-white border-transparent rounded-tl-sm", getUserIdColor(m.senderId))
+                        )}
+                      >
+                        {m.text}
+                      </div>
+
+                      {m.reactions && Object.entries(m.reactions).some(([_, users]) => (users as string[]).length > 0) && (
+                        <div className={cn(
+                          "absolute -bottom-2.5 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-full border border-slate-100 shadow-sm z-10",
+                          isMe ? "right-1" : "left-1"
+                        )}>
+                          {Object.entries(m.reactions).map(([emoji, users]) => {
+                            if ((users as string[]).length === 0) return null;
+                            return (
+                              <span key={emoji} className="text-[10px] flex items-center gap-0.5 leading-none">
+                                {emoji} <span className="text-[7px] font-black text-slate-400">{(users as string[]).length > 1 ? (users as string[]).length : ''}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {(idx === messages.length - 1 || messages[idx + 1].senderId !== m.senderId || showMenu) && (
+                      <div className="flex items-center gap-2 mt-1 px-1">
+                        <span className="text-[7px] text-black font-bold uppercase tracking-tighter">
+                          {formatMessageTimestamp(m.timestamp)}
+                        </span>
+                        {isMe && seenCount > 0 && (
+                          <span className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter">
+                            Seen by {seenCount}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <AnimatePresence>
+                      {showMenu && (
+                        <>
+                          <div className="fixed inset-0 z-[3200]" onClick={() => setActiveMenu(null)} />
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            className={cn(
+                              "absolute z-[3300] bottom-full mb-2 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 min-w-[160px]",
+                              isMe ? "right-0" : "left-0"
+                            )}
+                          >
+                            <div className="flex items-center justify-around pb-2 border-b border-slate-50 mb-2">
+                              {REACTIONS.map(emoji => (
+                                <button 
+                                  key={emoji} 
+                                  onClick={() => reactToMessage(m.id, emoji)}
+                                  className="text-lg hover:scale-125 transition-transform p-1"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="space-y-1">
+                              <button 
+                                onClick={() => copyMessage(m.text)}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-colors"
+                              >
+                                <Copy size={14} className="text-slate-400" /> Copy Text
+                              </button>
+                              {isMe && (
+                                <button 
+                                  onClick={() => deleteMessage(m.id)}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-rose-50 rounded-xl text-[10px] font-black text-rose-500 uppercase tracking-widest transition-colors"
+                                >
+                                  <Trash2 size={14} className="text-rose-400" /> Delete
+                                </button>
+                              )}
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+               );
+             })
+           )}
+        </div>
+
+        <div className="p-6 border-t border-slate-200 bg-white pb-10">
+          <div className="flex gap-3 nm-flat rounded-[2rem] p-2 bg-slate-50 border border-slate-300 shadow-md">
+            <input 
+              type="text"
+              placeholder="Type private message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              className="flex-1 h-14 rounded-[1.5rem] bg-white px-6 text-sm font-bold outline-none border border-slate-200 focus:border-indigo-500 transition-all text-slate-900"
+            />
+            <button 
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim()}
+              className="w-14 h-14 rounded-[1.5rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl active:scale-95 disabled:opacity-50 transition-transform shrink-0"
+            >
+              <Send size={24} />
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  const renderMatchCard = (match: Match) => {
+    const homeProfile = profiles[match.homePlayerId];
+    const awayProfile = profiles[match.awayPlayerId];
+    const isHome = auth.currentUser?.uid === match.homePlayerId;
+    const isAway = auth.currentUser?.uid === match.awayPlayerId;
+    const isParticipant = isHome || isAway;
+    const isAdminUser = profile?.role === 'admin';
+    const canAccessMatchChat = isParticipant || isAdminUser;
+
+    const homeWin = (match.homeScore || 0) > (match.awayScore || 0);
+    const awayWin = (match.awayScore || 0) > (match.homeScore || 0);
+    const isCompleted = match.status === 'completed';
+
+    const tournamentTitle = tournaments[match.tournamentId]?.title || 'Tournament';
+
+    const getStageLabel = () => {
+      if (match.stage === 'group') return `Group Stage · Group ${match.groupId}`;
+      if (match.stage === 'R16') return 'Knockout · Round of 16';
+      if (match.stage === 'QTR') return 'Knockout · Quarter Final';
+      if (match.stage === 'SEMI') return 'Knockout · Semi Final';
+      if (match.stage === 'FINAL') return 'Knockout · Grand Final';
+      if (match.stage === '3RD_PLACE') return 'Knockout · 3rd Place Match';
+      return match.stage || 'Match';
+    };
+
+    return (
+      <div key={match.id} className="nm-flat rounded-[2.5rem] p-0 border-2 border-white bg-white text-fc-dark space-y-0 relative overflow-hidden group transition-all hover:scale-[1.01] shadow-xl">
+        <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] grayscale pointer-events-none -mr-16 -mt-16">
+           <Trophy size={120} />
+        </div>
+
+        <div className="p-8 space-y-8 relative z-10">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">{tournamentTitle}</span>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-fc-green shadow-[0_0_10px_rgba(72,195,75,0.6)]" : "bg-amber-500 animate-pulse")} />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
+               </div>
+               {isCompleted && (
+                 <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] bg-fc-dark px-5 py-2 rounded-lg shadow-xl">RESULT FINAL</span>
+               )}
+               {match.status === 'reported' && (
+                 <span className="text-[9px] font-black text-amber-600 uppercase tracking-[0.2em] bg-amber-50 px-5 py-2 rounded-lg border border-amber-200">PENDING VERIFICATION</span>
+               )}
+               {match.status === 'disputed' && (
+                 <span className="text-[9px] font-black text-red-500 uppercase tracking-[0.2em] bg-red-50 px-5 py-2 rounded-lg border border-red-200 animate-pulse">DISPUTED</span>
+               )}
+            </div>
+          </div>
+
+          {match.screenshotUrl && (
+            <div className="px-0">
+              <div className="relative group/img aspect-video rounded-[2rem] overflow-hidden bg-fc-dark border border-slate-100 shadow-inner">
+                 <img src={match.screenshotUrl} alt="Match Proof" className="w-full h-full object-cover opacity-80 group-hover/img:opacity-100 transition-opacity" />
+                 <div className="absolute inset-0 bg-gradient-to-t from-fc-dark/80 to-transparent flex items-end p-6 pointer-events-none group-hover/img:opacity-0 transition-opacity">
+                    <div className="flex items-center gap-2">
+                      <Upload size={14} className="text-fc-green" />
+                      <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Match Evidence Attached</span>
+                    </div>
+                 </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between px-0 relative z-10 gap-2">
+            <div className="flex flex-col items-center gap-4 flex-1">
+              <div className="flex flex-col items-center gap-1.5 min-h-[32px]">
+                <span className={cn("text-[10px] font-black uppercase tracking-[0.25em]", homeWin ? "text-fc-green" : "text-slate-400")}>HOME</span>
+                {isCompleted && homeWin && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-fc-green/10 border border-fc-green/20 animate-in zoom-in-50 duration-500">
+                    <Trophy size={8} className="text-fc-green" fill="currentColor" />
+                    <span className="text-[7px] font-black text-fc-green uppercase">Winner</span>
+                  </div>
+                )}
+              </div>
+              <div className={cn(
+                "w-24 h-24 rounded-[2.5rem] bg-slate-50 border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-md",
+                isCompleted && homeWin ? "border-fc-green scale-105" : "border-white"
+              )}>
+                 {homeProfile?.avatar ? (
+                   <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
+                 ) : (
+                   <UserIcon size={32} className="text-slate-200" />
+                 )}
+              </div>
+              <div className="text-center">
+                <h5 className={cn("text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[80px]", homeWin ? "text-fc-dark" : "text-slate-400")}>
+                  {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
+                </h5>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{homeProfile?.ovr || 0} OVR</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 px-2">
+               {match.status !== 'scheduled' ? (
+                 <div className="flex items-center gap-4">
+                    <span className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}>{match.homeScore || 0}</span>
+                    <div className="w-4 h-1 bg-slate-200 rounded-full" />
+                    <span className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}>{match.awayScore || 0}</span>
+                 </div>
+               ) : (
+                 <div className="w-14 h-14 rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-xl">
+                   <span className="text-lg font-black text-white italic">VS</span>
+                 </div>
+               )}
+               <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                  {match.status === 'scheduled' && match.scheduledTime ? (
+                    <CountdownTimer targetTime={match.scheduledTime} />
+                  ) : (
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic tracking-[0.2em]">{match.status === 'reported' ? 'VERIFYING' : 'ARCHIVED'}</span>
+                  )}
+               </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 flex-1">
+              <div className="flex flex-col items-center gap-1.5 min-h-[32px]">
+                <span className={cn("text-[10px] font-black uppercase tracking-[0.25em]", awayWin ? "text-fc-green" : "text-slate-400")}>AWAY</span>
+                {isCompleted && awayWin && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-fc-green/10 border border-fc-green/20 animate-in zoom-in-50 duration-500">
+                    <Trophy size={8} className="text-fc-green" fill="currentColor" />
+                    <span className="text-[7px] font-black text-fc-green uppercase">Winner</span>
+                  </div>
+                )}
+              </div>
+              <div className={cn(
+                "w-24 h-24 rounded-[2.5rem] bg-slate-50 border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-md",
+                isCompleted && awayWin ? "border-fc-green scale-105" : "border-white"
+              )}>
+                 {awayProfile?.avatar ? (
+                   <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
+                 ) : (
+                   <UserIcon size={32} className="text-slate-200" />
+                 )}
+              </div>
+              <div className="text-center">
+                <h5 className={cn("text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[80px]", awayWin ? "text-fc-dark" : "text-slate-400")}>
+                  {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
+                </h5>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{awayProfile?.ovr || 0} OVR</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3 pt-4 relative z-10 border-t border-slate-50">
+            {isHome && match.status === 'scheduled' && (
+              <button 
+                onClick={() => handleUploadResult(match)}
+                className="flex-1 min-w-[140px] h-12 rounded-xl bg-fc-green text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fc-green/20 active:scale-95 transition-transform"
+              >
+                <Upload size={14} /> Step 1: Upload Score & Proof
+              </button>
+            )}
+            
+            {match.status === 'reported' && (isAway || isAdminUser) && match.reporterId !== auth.currentUser?.uid && (
+              <>
+                <button 
+                  onClick={() => handleConfirmResult(match)}
+                  className="flex-1 min-w-[120px] h-12 rounded-xl bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+                >
+                  <CheckCircle size={14} /> Step 2: Confirm Result
+                </button>
+                <button 
+                  onClick={() => handleDisputeResult(match)}
+                  className="flex-1 min-w-[100px] h-12 rounded-xl bg-rose-600 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+                >
+                  <XCircle size={14} /> Dispute
+                </button>
+              </>
+            )}
+
+            {isAdminUser && (match.status === 'reported' || match.status === 'disputed') && (
+              <div className="w-full flex flex-col gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest text-center">Admin Resolution</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleAdminResolve(match, 'approve')}
+                    className="flex-1 h-9 rounded-lg bg-fc-dark text-white text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle size={12} /> Confirm & Approve Result
+                  </button>
+                  <button 
+                    onClick={() => handleAdminResolve(match, 'reset')}
+                    className="flex-1 h-9 rounded-lg bg-white text-rose-600 border border-rose-200 text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle size={12} /> Reset Match
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {canAccessMatchChat && (
+              <button 
+                onClick={() => setActiveMatchChat(match)}
+                className="flex-1 min-w-[120px] h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 transition-transform"
+              >
+                <MessageSquare size={14} className="text-amber-300" />
+                <span>Match Room Chat</span>
+                <span className="text-[7px] bg-white/20 px-2 py-0.5 rounded-full font-bold">PRIVATE</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleCreateChallenge = async () => {
@@ -570,6 +1389,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
   return (
     <div className="space-y-8 pt-4">
+      {renderReportResultModal()}
+      {renderMatchChat()}
+      {renderPlayerModal()}
       <Reveal direction="left">
         <div className="flex flex-col gap-2 px-4">
           <h2 className="text-3xl font-black text-slate-900 uppercase italic leading-none">MY FIELD</h2>
@@ -611,126 +1433,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </Card>
             </Reveal>
           ) : (
-            matches.map((match, idx) => {
-              const isHome = match.homePlayerId === auth.currentUser?.uid;
-              const statusColors = {
-                scheduled: 'text-indigo-500',
-                reported: 'text-amber-500',
-                completed: 'text-emerald-500'
-              };
-
-              return (
-                <Reveal key={match.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
-                  <Card className="relative overflow-hidden group border-2 border-white shadow-2xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-900/5 -mr-16 -mt-16 rounded-full blur-2xl" />
-                    <div className="absolute top-4 right-4">
-                      <span className={cn(
-                        "px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest border border-white/50 bg-white shadow-sm",
-                        statusColors[match.status]
-                      )}>
-                        {match.status}
-                      </span>
-                    </div>
-
-                    <div className="space-y-8">
-                      <div className="flex items-center justify-between gap-4 px-2">
-                        <div className="flex flex-col items-center gap-3 flex-1">
-                          <div className="w-20 h-20 rounded-[2rem] nm-flat p-1 border-2 border-white overflow-hidden bg-slate-100 flex items-center justify-center">
-                            <User size={32} className="text-slate-300" />
-                          </div>
-                          <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">{isHome ? 'YOU' : 'OPPONENT'}</span>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-4">
-                          {match.status !== 'scheduled' ? (
-                            <div className="flex items-center gap-4">
-                               <div className="w-14 h-14 rounded-3xl nm-inset bg-white border border-slate-100 flex items-center justify-center text-2xl font-black text-slate-900">
-                                 {match.homeScore}
-                               </div>
-                               <span className="text-slate-300 font-black">:</span>
-                               <div className="w-14 h-14 rounded-3xl nm-inset bg-white border border-slate-100 flex items-center justify-center text-2xl font-black text-slate-900">
-                                 {match.awayScore}
-                               </div>
-                            </div>
-                          ) : (
-                            <div className="w-14 h-10 rounded-full nm-flat bg-white border border-slate-100 flex items-center justify-center text-xs font-black text-slate-400 italic">
-                              VS
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-center gap-3 flex-1">
-                          <div className="w-20 h-20 rounded-[2rem] nm-flat p-1 border-2 border-white overflow-hidden bg-slate-100 flex items-center justify-center">
-                            <User size={32} className="text-slate-300" />
-                          </div>
-                          <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">{!isHome ? 'YOU' : 'OPPONENT'}</span>
-                        </div>
-                      </div>
-
-                      {match.status === 'scheduled' && (
-                        reportingMatchId === match.id ? (
-                          <div className="space-y-6 pt-6 border-t border-slate-100">
-                            <div className="grid grid-cols-2 gap-4 px-4">
-                              <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-center">Your Score</label>
-                                <Input 
-                                  type="number" 
-                                  className="h-14 text-center text-xl font-black rounded-2xl"
-                                  value={isHome ? reportData.home : reportData.away}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    setReportData(isHome ? {...reportData, home: val} : {...reportData, away: val});
-                                  }}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-center">Opponent Score</label>
-                                <Input 
-                                  type="number" 
-                                  className="h-14 text-center text-xl font-black rounded-2xl"
-                                  value={!isHome ? reportData.home : reportData.away}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    setReportData(!isHome ? {...reportData, home: val} : {...reportData, away: val});
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-3 px-4">
-                              <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={() => setReportingMatchId(null)}>Cancel</Button>
-                              <Button className="flex-1 h-14 rounded-2xl bg-indigo-600 text-white" onClick={() => handleReport(match.id)}>Submit Result</Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="px-4">
-                            <Button className="w-full h-16 rounded-[2rem] bg-indigo-600 text-white shadow-xl shadow-indigo-100" onClick={() => {
-                              setReportingMatchId(match.id);
-                              setReportData({ home: 0, away: 0 });
-                            }}>
-                              Report Match Result
-                            </Button>
-                          </div>
-                        )
-                      )}
-
-                      {match.status === 'reported' && match.reporterId !== auth.currentUser?.uid && (
-                        <div className="space-y-6 pt-6 border-t border-slate-100 px-4">
-                          <div className="nm-inset p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-start gap-3">
-                            <AlertCircle className="text-amber-500 shrink-0" size={18} />
-                            <p className="text-[9px] text-slate-600 font-bold leading-relaxed uppercase">
-                              The result was reported by your opponent. Please verify if the score is correct.
-                            </p>
-                          </div>
-                          <Button className="w-full h-16 rounded-[2.5rem] bg-emerald-500 text-white shadow-xl shadow-emerald-100" onClick={() => handleConfirm(match.id)}>
-                            Verify & Finalize <CheckCircle size={18} className="ml-2" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                </Reveal>
-              );
-            })
+            <div className="space-y-6 px-2">
+              {matches.map(renderMatchCard)}
+            </div>
           )
         ) : (
           <div className="space-y-6 px-2 pb-10">
