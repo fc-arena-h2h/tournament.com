@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@theme {
+  --color-soft-bg: #f3f4f6;
+  --color-fc-green: #48c34b;
+  --color-fc-dark: #121826;
+  --color-fc-gold: #fbbf24;
+  --radius-soft: 2rem;
+}
+
+@layer base {
+  body {
+    color: #475569;
+    font-family: 'Inter', sans-serif;
+    background-color: #f0f1f5;
+  }
+}
+
+.app-fixed-bg {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+  background-color: #f8fafc;
+  background-image: url('/football_doodle_pattern.svg');
+  background-size: 380px 380px;
+  background-position: center center;
+  background-repeat: repeat;
+  opacity: 0.45;
+}
+
+@layer utilities {
+  .fc-card-bg {
+    background-image: url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000&auto=format&fit=crop');
+    background-size: cover;
+    background-position: center;
+    background-blend-mode: overlay;
+  }
+
+  .nm-flat {
+    background: #f0f0f3;
+    box-shadow: 10px 10px 20px #d1d1d6, -10px -10px 20px #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  
+  .nm-inset {
+    background: #f0f0f3;
+    box-shadow: inset 6px 6px 12px #d1d1d6, inset -6px -6px 12px #ffffff;
+  }
+
+  .fc-gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-fc-dark to-fc-green;
+  }
+
+  .fc-gold-border {
+    border: 2px solid #fbbf24;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+  }
+
+  .fc-pattern {
+    background-image: url('/football_doodle_pattern.svg');
+    background-size: 380px 380px;
+    background-repeat: repeat;
+  }
+
+  .nm-container {
+    background: #e0e0e9;
+    box-shadow: 20px 20px 60px #bebebe, -20px -20px 60px #ffffff;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-left {
+    animation: slideLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-right {
+    animation: slideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}

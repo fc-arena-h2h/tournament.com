@@ -1,0 +1,169 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .icon { fill: none; stroke: #94a3b8; stroke-width: 1.5; stroke-opacity: 0.16; stroke-linecap: round; stroke-linejoin: round; }
+    .icon-fill { fill: #94a3b8; fill-opacity: 0.12; stroke: none; }
+    .text-num { font-family: sans-serif; font-weight: 900; font-size: 13px; fill: #94a3b8; fill-opacity: 0.16; }
+  </style>
+
+  <!-- BACKGROUND BASE -->
+  <rect width="400" height="400" fill="#f8fafc" />
+
+  <!-- PATTERN GROUP 1: TOP LEFT -->
+  <!-- Soccer Ball -->
+  <g transform="translate(40, 40)">
+    <circle cx="20" cy="20" r="18" class="icon" />
+    <polygon points="20,12 26,16 24,23 16,23 14,16" class="icon" />
+    <line x1="20" y1="2" x2="20" y2="12" class="icon" />
+    <line x1="26" y1="16" x2="35" y2="12" class="icon" />
+    <line x1="24" y1="23" x2="31" y2="30" class="icon" />
+    <line x1="16" y1="23" x2="9" y2="30" class="icon" />
+    <line x1="14" y1="16" x2="5" y2="12" class="icon" />
+  </g>
+
+  <!-- Football Field -->
+  <g transform="translate(130, 20)">
+    <rect x="0" y="0" width="70" height="45" rx="4" class="icon" />
+    <line x1="35" y1="0" x2="35" y2="45" class="icon" />
+    <circle cx="35" cy="22.5" r="9" class="icon" />
+    <rect x="0" y="10" width="12" height="25" class="icon" />
+    <rect x="58" y="10" width="12" height="25" class="icon" />
+  </g>
+
+  <!-- Jersey #1 -->
+  <g transform="translate(250, 25)">
+    <path d="M15,0 L35,0 L42,10 L50,8 L42,28 L35,22 L35,50 L15,50 L15,22 L8,28 L0,8 L8,10 Z" class="icon" />
+    <text x="22" y="36" class="text-num">1</text>
+  </g>
+
+  <!-- Whistle -->
+  <g transform="translate(330, 30)">
+    <path d="M0,15 C0,8 8,0 18,0 C28,0 32,10 32,15 L32,25 L0,25 Z" class="icon" />
+    <rect x="32" y="15" width="18" height="10" rx="2" class="icon" />
+    <circle cx="10" cy="12" r="4" class="icon" />
+    <!-- Sound Waves -->
+    <path d="M42,5 Q48,0 52,5" class="icon" />
+    <path d="M45,2 Q52,-5 56,2" class="icon" />
+  </g>
+
+  <!-- Trophy Cup -->
+  <g transform="translate(330, 140)">
+    <path d="M10,0 L30,0 L30,25 C30,35 10,35 10,25 Z" class="icon" />
+    <path d="M10,8 C0,8 0,20 10,20" class="icon" />
+    <path d="M30,8 C40,8 40,20 30,20" class="icon" />
+    <line x1="20" y1="33" x2="20" y2="42" class="icon" />
+    <rect x="8" y="42" width="24" height="8" rx="2" class="icon" />
+  </g>
+
+  <!-- FIFA World Cup Trophy -->
+  <g transform="translate(180, 120)">
+    <circle cx="20" cy="12" r="12" class="icon" />
+    <path d="M12,22 C12,32 15,38 12,48 L28,48 C25,38 28,32 28,22" class="icon" />
+    <rect x="8" y="48" width="24" height="10" rx="2" class="icon" />
+  </g>
+
+  <!-- Cleat Boot -->
+  <g transform="translate(20, 160)">
+    <path d="M0,25 Q15,10 35,15 Q55,20 60,35 L0,35 Z" class="icon" />
+    <line x1="8" y1="35" x2="8" y2="40" class="icon" />
+    <line x1="20" y1="35" x2="20" y2="40" class="icon" />
+    <line x1="45" y1="35" x2="45" y2="40" class="icon" />
+    <line x1="55" y1="35" x2="55" y2="40" class="icon" />
+  </g>
+
+  <!-- Socks pair -->
+  <g transform="translate(100, 150)">
+    <rect x="0" y="0" width="14" height="35" rx="3" class="icon" />
+    <path d="M0,25 L18,25 C22,25 22,35 18,35 L0,35 Z" class="icon" />
+    <line x1="0" y1="6" x2="14" y2="6" class="icon" />
+    <line x1="0" y1="10" x2="14" y2="10" class="icon" />
+  </g>
+
+  <!-- Medal #1 -->
+  <g transform="translate(270, 160)">
+    <circle cx="20" cy="20" r="16" class="icon" />
+    <text x="16" y="25" class="text-num">1</text>
+    <path d="M10,0 L16,10 L4,10 Z" class="icon" />
+    <path d="M30,0 L36,10 L24,10 Z" class="icon" />
+  </g>
+
+  <!-- PATTERN GROUP 2: LOWER SECTION -->
+  <!-- Soccer Ball -->
+  <g transform="translate(230, 260)">
+    <circle cx="20" cy="20" r="18" class="icon" />
+    <polygon points="20,12 26,16 24,23 16,23 14,16" class="icon" />
+    <line x1="20" y1="2" x2="20" y2="12" class="icon" />
+    <line x1="26" y1="16" x2="35" y2="12" class="icon" />
+    <line x1="24" y1="23" x2="31" y2="30" class="icon" />
+    <line x1="16" y1="23" x2="9" y2="30" class="icon" />
+    <line x1="14" y1="16" x2="5" y2="12" class="icon" />
+  </g>
+
+  <!-- Football Field -->
+  <g transform="translate(30, 250)">
+    <rect x="0" y="0" width="70" height="45" rx="4" class="icon" />
+    <line x1="35" y1="0" x2="35" y2="45" class="icon" />
+    <circle cx="35" cy="22.5" r="9" class="icon" />
+    <rect x="0" y="10" width="12" height="25" class="icon" />
+    <rect x="58" y="10" width="12" height="25" class="icon" />
+  </g>
+
+  <!-- Jersey #1 -->
+  <g transform="translate(140, 260)">
+    <path d="M15,0 L35,0 L42,10 L50,8 L42,28 L35,22 L35,50 L15,50 L15,22 L8,28 L0,8 L8,10 Z" class="icon" />
+    <text x="22" y="36" class="text-num">1</text>
+  </g>
+
+  <!-- World Cup Trophy Lower -->
+  <g transform="translate(320, 260)">
+    <circle cx="20" cy="12" r="12" class="icon" />
+    <path d="M12,22 C12,32 15,38 12,48 L28,48 C25,38 28,32 28,22" class="icon" />
+    <rect x="8" y="48" width="24" height="10" rx="2" class="icon" />
+  </g>
+
+  <!-- Cleat Boot Lower -->
+  <g transform="translate(70, 330)">
+    <path d="M0,25 Q15,10 35,15 Q55,20 60,35 L0,35 Z" class="icon" />
+    <line x1="8" y1="35" x2="8" y2="40" class="icon" />
+    <line x1="20" y1="35" x2="20" y2="40" class="icon" />
+    <line x1="45" y1="35" x2="45" y2="40" class="icon" />
+    <line x1="55" y1="35" x2="55" y2="40" class="icon" />
+  </g>
+
+  <!-- Whistle Lower -->
+  <g transform="translate(220, 340)">
+    <path d="M0,15 C0,8 8,0 18,0 C28,0 32,10 32,15 L32,25 L0,25 Z" class="icon" />
+    <rect x="32" y="15" width="18" height="10" rx="2" class="icon" />
+    <circle cx="10" cy="12" r="4" class="icon" />
+  </g>
+
+  <!-- Socks Lower -->
+  <g transform="translate(320, 340)">
+    <rect x="0" y="0" width="14" height="35" rx="3" class="icon" />
+    <path d="M0,25 L18,25 C22,25 22,35 18,35 L0,35 Z" class="icon" />
+    <line x1="0" y1="6" x2="14" y2="6" class="icon" />
+  </g>
+
+  <!-- DOODLE DECORATIONS (Stars, Zigzags, Arrows, Circles, Pluses) -->
+  <path d="M10,105 L18,95 L26,105 L34,95" class="icon" />
+  <path d="M220,100 L228,90 L236,100 L244,90" class="icon" />
+  <path d="M300,230 L308,220 L316,230 L324,220" class="icon" />
+  <path d="M120,320 L128,310 L136,320 L144,310" class="icon" />
+
+  <path d="M110,80 L112,86 L118,86 L113,89 L115,95 L110,91 L105,95 L107,89 L102,86 L108,86 Z" fill="#94a3b8" fill-opacity="0.16" />
+  <path d="M290,80 L292,86 L298,86 L293,89 L295,95 L290,91 L285,95 L287,89 L282,86 L288,86 Z" fill="#94a3b8" fill-opacity="0.16" />
+  <path d="M190,230 L192,236 L198,236 L193,239 L195,245 L190,241 L185,245 L187,239 L182,236 L188,236 Z" fill="#94a3b8" fill-opacity="0.16" />
+
+  <path d="M80,120 Q95,125 90,140" class="icon" />
+  <path d="M250,210 Q265,215 260,230" class="icon" />
+
+  <circle cx="25" cy="130" r="3" class="icon-fill" />
+  <circle cx="310" cy="110" r="4" class="icon-fill" />
+  <circle cx="160" cy="210" r="3" class="icon-fill" />
+  <circle cx="370" cy="220" r="3" class="icon-fill" />
+  <circle cx="180" cy="330" r="4" class="icon-fill" />
+
+  <path d="M70,10 L70,20 M65,15 L75,15" class="icon" />
+  <path d="M220,20 L220,30 M215,25 L225,25" class="icon" />
+  <path d="M380,100 L380,110 M375,105 L385,105" class="icon" />
+  <path d="M20,220 L20,230 M15,225 L25,225" class="icon" />
+</svg>

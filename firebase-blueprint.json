@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile, stats, and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["player", "publisher", "admin"] },
+        "inGameName": { "type": "string", "maxLength": 50 },
+        "inGameUID": { "type": "string", "maxLength": 20 },
+        "leagueName": { "type": "string", "maxLength": 50 },
+        "ovr": { "type": "integer" },
+        "fbUrl": { "type": "string" },
+        "messengerLink": { "type": "string" },
+        "phone": { "type": "string" },
+        "avatar": { "type": "string", "description": "Base64 encoded avatar image" },
+        "eliteScore": { "type": "integer" },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "played": { "type": "integer" },
+            "won": { "type": "integer" },
+            "drawn": { "type": "integer" },
+            "lost": { "type": "integer" },
+            "goalsFor": { "type": "integer" },
+            "goalsAgainst": { "type": "integer" },
+            "globalRank": { "type": "integer" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Tournament configuration and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "publisherId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "format": { "type": "string", "enum": ["league", "knockout", "hybrid"] },
+        "entryType": { "type": "string", "enum": ["free", "paid"] },
+        "ovrLimit": { "type": "integer" },
+        "status": { "type": "string", "enum": ["open", "registration_closed", "ongoing", "finished"] },
+        "entryFee": { "type": "number" },
+        "prizePool": { "type": "string" },
+        "totalSlots": { "type": "integer" },
+        "filledSlots": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "publisherId", "title", "format", "status"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "User's request to join a tournament.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "gameName": { "type": "string" },
+        "gameUid": { "type": "string" },
+        "ovr": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tournamentId", "userId", "status"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A scheduled or completed game between players.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "homePlayerId": { "type": "string" },
+        "awayPlayerId": { "type": "string" },
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "homeScore": { "type": "integer" },
+        "awayScore": { "type": "integer" },
+        "status": { "type": "string", "enum": ["scheduled", "reported", "completed"] },
+        "stage": { "type": "string", "enum": ["group", "r16", "qtr", "semi", "final"] },
+        "scheduledTime": { "type": "string", "format": "date-time" },
+        "proofUrl": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "expiryTime": { "type": "string", "format": "date-time" },
+        "groupId": { "type": "string" },
+        "round": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tournamentId", "homePlayerId", "awayPlayerId", "status"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message for match or global arena.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string", "description": "matchId or 'global'" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "chatId", "senderId", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/tournaments/{id}": { "schema": "Tournament", "description": "Tournaments" },
+    "/registrations/{id}": { "schema": "Registration", "description": "Join requests" },
+    "/matches/{id}": { "schema": "Match", "description": "Match records" },
+    "/messages/{id}": { "schema": "Message", "description": "Chat messages" }
+  }
+}

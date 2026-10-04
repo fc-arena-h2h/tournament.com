@@ -1,0 +1,6 @@
+{
+  "name": "Fc Arena VS",
+  "description": "Tournament platform for Fc mobile game. Join and compete in cups and H2H matches.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
