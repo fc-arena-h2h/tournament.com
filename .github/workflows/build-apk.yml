@@ -16,7 +16,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -32,7 +32,16 @@ jobs:
 
       - name: Accept Android SDK Licenses
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
+          echo -e "\n84831b9409646a518e48669dd504dc16e7ea0c3b" >> "$ANDROID_HOME/licenses/android-sdk-preview-license" || true
+          echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license" || true
+          if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          elif [ -d "$ANDROID_HOME/tools/bin" ]; then
+            yes | "$ANDROID_HOME/tools/bin/sdkmanager" --licenses || true
+          fi
 
       - name: Install NPM Dependencies
         run: npm install --legacy-peer-deps
@@ -47,8 +56,13 @@ jobs:
           fi
           npx cap sync android
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x android/gradlew
+      - name: Fix gradlew permissions & line endings
+        run: |
+          if [ ! -f "android/gradlew" ]; then
+            gradle wrapper --project-dir android
+          fi
+          sed -i -e 's/\r$//' android/gradlew
+          chmod +x android/gradlew
 
       - name: Build Android Debug APK
         working-directory: android
@@ -58,6 +72,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FC-Arena-VS-Debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
