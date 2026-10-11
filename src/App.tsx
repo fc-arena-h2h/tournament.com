@@ -134,7 +134,7 @@ export default function App() {
       <div className="relative z-10">
         <Header title={getTitle()} profile={profile} />
 
-        <main className="max-w-lg mx-auto px-6 pt-44 pb-48 min-h-screen animate-slide-left" key={activeTab}>
+        <main className="max-w-lg mx-auto px-4 sm:px-6 pt-32 pb-36 min-h-screen animate-slide-left" key={activeTab}>
           {content}
         </main>
         <BottomNav 

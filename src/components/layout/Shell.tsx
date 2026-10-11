@@ -25,8 +25,8 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
   ];
 
   return (
-    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-lg px-2">
-      <div className="nm-flat rounded-[3rem] h-24 flex items-center justify-around border-2 border-white/50 px-4 shadow-2xl">
+    <nav className="fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-lg px-1 sm:px-2">
+      <div className="nm-flat rounded-[2.5rem] sm:rounded-[3rem] h-20 sm:h-24 flex items-center justify-around border-2 border-white/50 px-2 sm:px-4 shadow-2xl">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -77,10 +77,10 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
 
   return (
     <header className={cn(
-      "fixed top-0 left-0 right-0 px-6 py-8 transition-all duration-300",
+      "fixed top-0 left-0 right-0 px-3 sm:px-6 py-4 sm:py-6 transition-all duration-300",
       showMenu ? "z-[3000]" : "z-50"
     )}>
-      <div className="nm-flat rounded-full h-20 px-8 flex items-center justify-between border-2 border-white/50 relative">
+      <div className="nm-flat rounded-full h-18 sm:h-20 px-4 sm:px-8 flex items-center justify-between border-2 border-white/50 relative">
         <div className="flex items-center gap-4">
           {showBack ? (
             <button onClick={onBack} className="w-12 h-12 rounded-2xl nm-flat flex items-center justify-center text-slate-800 border border-white/40 active:nm-pressed">
