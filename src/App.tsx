@@ -10,6 +10,7 @@ import { GlobalChatPage } from '@/src/pages/GlobalChat';
 import { LeaderboardPage } from '@/src/pages/Leaderboard';
 import { ProfilePage } from '@/src/pages/Profile';
 import { ArenaDetail } from '@/src/pages/ArenaDetail';
+import { LeaguePage } from '@/src/pages/League';
 import { useAuth } from '@/src/hooks/useAuth';
 import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
 import { SetupProfile } from '@/src/components/auth/SetupProfile';
@@ -21,7 +22,7 @@ export default function App() {
   const { user, profile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
-  const [leagueSubTab, setLeagueSubTab] = useState<'leaderboard' | 'chat'>('leaderboard');
+  const [leagueSubTab, setLeagueSubTab] = useState<'league' | 'leaderboard' | 'chat'>('league');
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -60,34 +61,43 @@ export default function App() {
         return <ArenaPage profile={profile} onNavigate={setActiveTab} onEnterTournament={setSelectedTournament} />;
       case 'matches':
         if (profile?.role === 'publisher' || profile?.role === 'admin') {
-          if (isAdminCreating) return <CreateTournamentPage onBack={() => setIsAdminCreating(false)} />;
+          if (isAdminCreating) return <CreateTournamentPage profile={profile} onBack={() => setIsAdminCreating(false)} />;
           return <AdminDashboard onCreateNew={() => setIsAdminCreating(true)} onEnterTournament={setSelectedTournament} />;
         }
         return <MatchesPage profile={profile} />;
       case 'league':
         return (
           <div className="space-y-6 pt-4">
-            <div className="flex nm-inset p-2 rounded-full border-2 border-white/20 bg-[#e6e6e9] h-18">
+            <div className="flex nm-inset p-2 rounded-full border-2 border-white/20 bg-[#e6e6e9] h-18 mx-2 overflow-x-auto no-scrollbar">
+              <button 
+                onClick={() => setLeagueSubTab('league')}
+                className={cn(
+                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
+                  leagueSubTab === 'league' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
+                )}
+              >
+                Leagues
+              </button>
               <button 
                 onClick={() => setLeagueSubTab('leaderboard')}
                 className={cn(
-                  "flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-full transition-all",
+                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
                   leagueSubTab === 'leaderboard' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
                 )}
               >
-                Leaderboard
+                Top Rank
               </button>
               <button 
                 onClick={() => setLeagueSubTab('chat')}
                 className={cn(
-                  "flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-full transition-all",
+                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
                   leagueSubTab === 'chat' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
                 )}
               >
-                Social Feed
+                Global Chat
               </button>
             </div>
-            {leagueSubTab === 'leaderboard' ? <LeaderboardPage /> : <GlobalChatPage profile={profile} />}
+            {leagueSubTab === 'league' ? <LeaguePage profile={profile} /> : (leagueSubTab === 'leaderboard' ? <LeaderboardPage /> : <GlobalChatPage profile={profile} />)}
           </div>
         );
       case 'tournament':

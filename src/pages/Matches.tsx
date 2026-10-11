@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy } from 'lucide-react';
+import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Reveal } from '@/src/components/ui/Reveal';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -94,6 +94,8 @@ interface Challenge {
   homeScore?: number;
   awayScore?: number;
   screenshotUrl?: string;
+  penalizedCreatorId?: string;
+  pointsReclaimed?: boolean;
   timestamp: Timestamp;
 }
 
@@ -122,6 +124,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
   const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [reportingChallengeId, setReportingChallengeId] = useState<string | null>(null);
+  const [reportData, setReportData] = useState({ home: 0, away: 0 });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -245,20 +249,26 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       // Distribute pot (200 points)
       if (isDraw) {
         // Refund 100 to creator
-        const cRef = doc(db, 'users', challenge.creatorId);
-        const cSnap = await getDoc(cRef);
-        await updateDoc(cRef, { eliteScore: (cSnap.data()?.eliteScore || 0) + 100 });
+        if (challenge.creatorId) {
+          const cRef = doc(db, 'users', challenge.creatorId);
+          const cSnap = await getDoc(cRef);
+          await updateDoc(cRef, { eliteScore: (cSnap.data()?.eliteScore || 0) + 100 });
+          await logPointTransaction(challenge.creatorId, 'refunded', 100, 'Draw Match Refund', `100 points refunded for draw match (Room: ${challenge.matchId})`);
+        }
 
         // Refund 100 to opponent
         if (challenge.opponentId) {
           const oRef = doc(db, 'users', challenge.opponentId);
           const oSnap = await getDoc(oRef);
           await updateDoc(oRef, { eliteScore: (oSnap.data()?.eliteScore || 0) + 100 });
+          await logPointTransaction(challenge.opponentId, 'refunded', 100, 'Draw Match Refund', `100 points refunded for draw match (Room: ${challenge.matchId})`);
         }
-      } else if (winnerId) {
+      } else if (winnerId && winnerId !== 'draw') {
         const wRef = doc(db, 'users', winnerId);
         const wSnap = await getDoc(wRef);
-        await updateDoc(wRef, { eliteScore: (wSnap.data()?.eliteScore || 0) + (challenge.pot || 200) });
+        const potAmount = challenge.pot || 200;
+        await updateDoc(wRef, { eliteScore: (wSnap.data()?.eliteScore || 0) + potAmount });
+        await logPointTransaction(winnerId, 'earned', potAmount, '1v1 Match Victory', `Won 1v1 match battle (Room: ${challenge.matchId})`);
       }
 
       await updateDoc(doc(db, 'challenges', challenge.id), {
@@ -350,15 +360,20 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       setMatches(matchData);
 
       // Fetch tournament details
-      const tIds = Array.from(new Set(matchData.map(m => m.tournamentId)));
+      const tIds = Array.from(new Set(matchData.map(m => m.tournamentId))).filter(Boolean);
       const tData = { ...tournaments };
       let tChanged = false;
       await Promise.all(tIds.map(async (tId) => {
+        if (!tId || typeof tId !== 'string' || !tId.trim()) return;
         if (!tData[tId]) {
-          const tSnap = await getDoc(doc(db, 'tournaments', tId));
-          if (tSnap.exists()) {
-            tData[tId] = { id: tSnap.id, ...tSnap.data() };
-            tChanged = true;
+          try {
+            const tSnap = await getDoc(doc(db, 'tournaments', tId.trim()));
+            if (tSnap.exists()) {
+              tData[tId] = { id: tSnap.id, ...tSnap.data() };
+              tChanged = true;
+            }
+          } catch (e) {
+            console.error('Error fetching tournament', e);
           }
         }
       }));
@@ -367,18 +382,27 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       // Fetch player profiles
       const uids = new Set<string>();
       matchData.forEach(m => {
-        uids.add(m.homePlayerId);
-        uids.add(m.awayPlayerId);
+        if (m.homePlayerId && typeof m.homePlayerId === 'string' && m.homePlayerId.trim()) {
+          uids.add(m.homePlayerId.trim());
+        }
+        if (m.awayPlayerId && typeof m.awayPlayerId === 'string' && m.awayPlayerId.trim()) {
+          uids.add(m.awayPlayerId.trim());
+        }
       });
-      const missing = Array.from(uids).filter(uid => !profiles[uid]);
+      const missing = Array.from(uids).filter(uid => Boolean(uid) && !profiles[uid]);
       if (missing.length > 0) {
         const pData = { ...profiles };
         let pChanged = false;
         await Promise.all(missing.map(async (uid) => {
-          const pSnap = await getDoc(doc(db, 'users', uid));
-          if (pSnap.exists()) {
-            pData[uid] = pSnap.data() as UserProfile;
-            pChanged = true;
+          if (!uid || typeof uid !== 'string' || !uid.trim()) return;
+          try {
+            const pSnap = await getDoc(doc(db, 'users', uid.trim()));
+            if (pSnap.exists()) {
+              pData[uid] = pSnap.data() as UserProfile;
+              pChanged = true;
+            }
+          } catch (e) {
+            console.error('Error fetching profile', e);
           }
         }));
         if (pChanged) setProfiles(pData);
@@ -414,14 +438,18 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               expiredAt: Timestamp.now()
             }).then(async () => {
               if (data.creatorId) {
-                const cRef = doc(db, 'users', data.creatorId);
-                const cSnap = await getDoc(cRef);
-                if (cSnap.exists()) {
-                  await updateDoc(cRef, { eliteScore: (cSnap.data()?.eliteScore || 0) + 100 });
-                  await logPointTransaction(data.creatorId, 'refunded', 100, 'Expired Challenge Refund', '100 points entry fee refunded because no opponent joined in time');
+                try {
+                  const cRef = doc(db, 'users', data.creatorId);
+                  const cSnap = await getDoc(cRef);
+                  if (cSnap.exists()) {
+                    await updateDoc(cRef, { eliteScore: (cSnap.data()?.eliteScore || 0) + 100 });
+                    await logPointTransaction(data.creatorId, 'refunded', 100, 'Expired Challenge Refund', '100 points entry fee refunded because no opponent joined in time');
+                  }
+                } catch (refundErr) {
+                  console.warn("Notice during challenge refund:", refundErr);
                 }
               }
-            }).catch(err => console.error("Auto expire challenge error:", err));
+            }).catch(err => console.warn("Auto expire challenge notice:", err));
           }
         }
 
@@ -711,6 +739,26 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         updatedAt: Timestamp.now()
       });
       alert('Match disputed. An admin will review the result soon.');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminResolve = async (match: Match, action: 'approve' | 'reset') => {
+    try {
+      if (action === 'reset') {
+        await updateDoc(doc(db, 'matches', match.id), {
+          status: 'scheduled',
+          homeScore: deleteField(),
+          awayScore: deleteField(),
+          screenshotUrl: deleteField(),
+          reporterId: deleteField(),
+          updatedAt: Timestamp.now()
+        });
+        alert('Match has been reset to scheduled status.');
+      } else {
+        await handleConfirmResult(match);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -1093,9 +1141,25 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
             <div className="flex flex-col items-center gap-4 px-2">
                {match.status !== 'scheduled' ? (
                  <div className="flex items-center gap-4">
-                    <span className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}>{match.homeScore || 0}</span>
+                    <motion.span 
+                      key={`home-${match.homeScore}`}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                      className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}
+                    >
+                      {match.homeScore || 0}
+                    </motion.span>
                     <div className="w-4 h-1 bg-slate-200 rounded-full" />
-                    <span className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}>{match.awayScore || 0}</span>
+                    <motion.span 
+                      key={`away-${match.awayScore}`}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                      className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}
+                    >
+                      {match.awayScore || 0}
+                    </motion.span>
                  </div>
                ) : (
                  <div className="w-14 h-14 rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-xl">
@@ -1220,6 +1284,14 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       await updateDoc(doc(db, 'users', auth.currentUser!.uid), {
         eliteScore: (profile.eliteScore || 0) - 100
       });
+
+      await logPointTransaction(
+        auth.currentUser!.uid,
+        'spent',
+        100,
+        'Created 1v1 Challenge',
+        `Entry fee for 1v1 Battle (Room: ${formData.matchId})`
+      );
 
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + formData.duration);
@@ -1360,6 +1432,14 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       await updateDoc(winnerRef, {
         eliteScore: currentPoints + challenge.pot
       });
+
+      await logPointTransaction(
+        winnerId,
+        'earned',
+        challenge.pot,
+        '1v1 Victory Award',
+        `Won 1v1 battle (Pot prize: 200 Points)`
+      );
 
       // 2. Mark challenge as completed
       await updateDoc(doc(db, 'challenges', challenge.id), {
@@ -1909,9 +1989,25 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                              {c.status === 'completed' && (
                                 <div className="flex flex-col items-center gap-3 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100">
                                    <div className="flex items-center gap-4">
-                                      <div className={cn("text-xl font-black", c.winnerId === c.creatorId ? "text-emerald-600" : "text-slate-400")}>{c.homeScore}</div>
+                                      <motion.div 
+                                        key={`home-${c.homeScore}`}
+                                        initial={{ scale: 0.5, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                                        className={cn("text-xl font-black", c.winnerId === c.creatorId ? "text-emerald-600" : "text-slate-400")}
+                                      >
+                                        {c.homeScore}
+                                      </motion.div>
                                       <span className="text-slate-300 font-bold">-</span>
-                                      <div className={cn("text-xl font-black", c.winnerId === c.opponentId ? "text-emerald-600" : "text-slate-400")}>{c.awayScore}</div>
+                                      <motion.div 
+                                        key={`away-${c.awayScore}`}
+                                        initial={{ scale: 0.5, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                                        className={cn("text-xl font-black", c.winnerId === c.opponentId ? "text-emerald-600" : "text-slate-400")}
+                                      >
+                                        {c.awayScore}
+                                      </motion.div>
                                    </div>
 
                                    {c.screenshotUrl ? (

@@ -3,7 +3,7 @@ import { cn } from '@/src/lib/utils';
 
 interface RevealProps {
   children: React.ReactNode;
-  direction?: 'left' | 'right';
+  direction?: 'left' | 'right' | 'up' | 'down';
   delay?: number;
   className?: string;
 }
@@ -11,6 +11,17 @@ interface RevealProps {
 export const Reveal: React.FC<RevealProps> = ({ children, direction = 'left', delay = 0, className }) => {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const getAnimationClass = () => {
+    if (!isVisible) return '';
+    switch (direction) {
+      case 'left': return 'animate-slide-left';
+      case 'right': return 'animate-slide-right';
+      case 'up': return 'animate-slide-up';
+      case 'down': return 'animate-slide-down';
+      default: return 'animate-slide-left';
+    }
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -35,7 +46,7 @@ export const Reveal: React.FC<RevealProps> = ({ children, direction = 'left', de
       ref={ref}
       className={cn(
         'opacity-0',
-        isVisible && (direction === 'left' ? 'animate-slide-left' : 'animate-slide-right'),
+        getAnimationClass(),
         className
       )}
       style={{ animationDelay: `${delay}ms` }}

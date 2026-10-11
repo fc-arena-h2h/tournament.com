@@ -10,7 +10,7 @@ export const db = initializeFirestore(
   app,
   {
     experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() })
+    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
   },
   databaseId || undefined
 );

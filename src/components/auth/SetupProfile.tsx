@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { Shield, ArrowRight } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { db, auth } from '@/src/lib/firebase';
 import { cn } from '@/src/lib/utils';
+import { signOut } from 'firebase/auth';
 
 export const SetupProfile = ({ user }: { user: any }) => {
   const [role, setRole] = useState<'player' | 'publisher'>('player');
@@ -151,7 +152,10 @@ export const SetupProfile = ({ user }: { user: any }) => {
 
           <div className="text-center">
             <button 
-              onClick={() => import('firebase/auth').then(m => m.signOut(m.getAuth()))}
+              onClick={async () => {
+                await signOut(auth);
+                window.location.reload();
+              }}
               className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-500 transition-colors"
             >
               Cancel and Sign Out

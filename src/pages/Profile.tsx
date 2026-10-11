@@ -110,7 +110,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
       // 2. Create 32 Dummy Users and Registrations
       const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-      const dummyPlayers = [];
+      const dummyPlayers: any[] = [];
 
       for (let i = 0; i < 32; i++) {
         const dummyUid = `demo_user_${tid}_${i}`;
@@ -195,7 +195,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         { key: 'FINAL', count: 1 }
       ];
 
-      let currentStagePlayers = [];
+      let currentStagePlayers: any[] = [];
       // Initial R16 players (Top 2 from each group A-H)
       groups.forEach(g => {
         const playersInGroup = dummyPlayers.filter(p => p.group === g);
@@ -208,16 +208,16 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         const nextStagePlayers = [];
         const losers = [];
         for (let i = 0; i < stage.count; i++) {
-          const p1 = currentStagePlayers[i * 2];
-          const p2 = currentStagePlayers[i * 2 + 1];
+          const p1: any = currentStagePlayers[i * 2];
+          const p2: any = currentStagePlayers[i * 2 + 1];
           
           if (!p1 || !p2) continue;
 
           const hScore = Math.floor(Math.random() * 3) + 1;
           const aScore = Math.floor(Math.random() * 3);
           
-          const winner = hScore > aScore ? p1 : p2;
-          const loser = hScore > aScore ? p2 : p1;
+          const winner: any = hScore > aScore ? p1 : p2;
+          const loser: any = hScore > aScore ? p2 : p1;
           nextStagePlayers.push(winner);
           losers.push(loser);
 
@@ -335,7 +335,10 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             <Edit3 size={16} /> Edit Profile
           </button>
           <button 
-            onClick={() => signOut(auth)}
+            onClick={async () => {
+              await signOut(auth);
+              window.location.reload();
+            }}
             className="w-14 h-14 rounded-2xl nm-flat bg-white border border-white/40 text-rose-500 flex items-center justify-center transition-all active:nm-pressed"
           >
             <LogOut size={20} />

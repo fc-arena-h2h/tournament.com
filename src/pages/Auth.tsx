@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { Mail, Lock, Eye, EyeOff, Shield, Trophy, ChevronLeft, Globe } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Shield, Trophy, ChevronLeft, Globe, KeyRound, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { auth, db } from '@/src/lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendEmailVerification 
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 export const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [role, setRole] = useState<'player' | 'publisher'>('player');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,6 +30,34 @@ export const AuthPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setResetSuccessMessage('');
+    if (!formData.email) {
+      setError('Please provide your registered email address.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, formData.email.trim());
+      setResetSent(true);
+      setResetSuccessMessage(`Password reset link sent to ${formData.email}. Please check your inbox or spam folder.`);
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address format.');
+      } else {
+        setError(err.message || 'Failed to send password reset email.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,164 +125,267 @@ export const AuthPage = () => {
         </div>
 
         <Card className="p-8 space-y-8">
-          {/* Role Toggle - Neumorphic Inset */}
-          <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
-            <button
-              onClick={() => setRole('player')}
-              className={cn(
-                "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
-              )}
-            >
-              Player
-            </button>
-            <button
-              onClick={() => setRole('publisher')}
-              className={cn(
-                "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
-              )}
-            >
-              Host
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="nm-inset p-4 rounded-2xl border border-rose-200/50 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
-                {error}
+          {isForgotPassword ? (
+            /* Forgot Password Form */
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 mx-auto rounded-2xl nm-inset flex items-center justify-center text-indigo-500 mb-3">
+                  <KeyRound size={22} />
+                </div>
+                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">
+                  Reset Password
+                </h2>
+                <p className="text-[11px] font-medium text-slate-500">
+                  Enter your registered email and we'll send you a link to reset your password.
+                </p>
               </div>
-            )}
-            
-            <div className="space-y-3">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Email</label>
-              <Input 
-                type="email" 
-                placeholder="name@arena.com" 
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-              />
-            </div>
 
-            <div className="space-y-3">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Password</label>
-              <div className="relative">
-                <Input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="Secret key" 
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                />
-                <button 
+              {resetSent ? (
+                <div className="space-y-6">
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-start gap-3">
+                    <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <p className="text-xs font-semibold text-emerald-800 leading-relaxed">
+                      {resetSuccessMessage}
+                    </p>
+                  </div>
+
+                  <Button 
+                    type="button" 
+                    onClick={() => {
+                      setIsForgotPassword(false);
+                      setResetSent(false);
+                      setError('');
+                    }}
+                    className="w-full h-14 rounded-[2rem] text-[11px] font-black uppercase tracking-widest"
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-6">
+                  {error && (
+                    <div className="nm-inset p-4 rounded-2xl border border-rose-200/50 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Account Email</label>
+                    <Input 
+                      type="email" 
+                      placeholder="name@arena.com" 
+                      required
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full h-14 rounded-[2rem] text-[11px]"
+                    disabled={loading}
+                  >
+                    {loading ? 'Sending link...' : 'Send Reset Link'}
+                    <ArrowRight className="ml-2" />
+                  </Button>
+
+                  <div className="text-center pt-2">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setIsForgotPassword(false);
+                        setError('');
+                      }}
+                      className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                    >
+                      Return to Sign In
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ) : (
+            /* Regular Sign In / Sign Up Form */
+            <>
+              {/* Role Toggle - Neumorphic Inset */}
+              <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
+                <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300"
+                  onClick={() => setRole('player')}
+                  className={cn(
+                    "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
+                    role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
+                  )}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  Player
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('publisher')}
+                  className={cn(
+                    "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
+                    role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
+                  )}
+                >
+                  Host
                 </button>
               </div>
-            </div>
 
-            {isSignUp && (
-              <div className="space-y-3">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Confirm Password</label>
-                <Input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="Repeat key" 
-                  required
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                />
-              </div>
-            )}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="nm-inset p-4 rounded-2xl border border-rose-200/50 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
+                    {error}
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Email</label>
+                  <Input 
+                    type="email" 
+                    placeholder="name@arena.com" 
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
 
-            {isSignUp && (
-              <div className="space-y-6 pt-4 border-t border-white/20">
-                {role === 'player' ? (
-                  <>
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Game Name</label>
-                      <Input 
-                        placeholder="In-game Name"
-                        required
-                        value={formData.inGameName}
-                        onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook URL</label>
-                      <Input 
-                        placeholder="https://facebook.com/profile..."
-                        required
-                        value={formData.fbUrl}
-                        onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Phone / WhatsApp</label>
-                      <Input 
-                        placeholder="+880..."
-                        required
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
-                        <Input 
-                          placeholder="ID"
-                          required
-                          value={formData.inGameUID}
-                          onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">OVR</label>
-                        <Input 
-                          type="number"
-                          placeholder="104"
-                          required
-                          value={formData.ovr}
-                          onChange={(e) => setFormData({...formData, ovr: parseInt(e.target.value) || 0})}
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Organization</label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between ml-4 mr-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                    {!isSignUp && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setIsForgotPassword(true);
+                          setError('');
+                        }}
+                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-wider transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
                     <Input 
-                      placeholder="League Title"
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Secret key" 
                       required
-                      value={formData.leagueName}
-                      onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {isSignUp && (
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Confirm Password</label>
+                    <Input 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Repeat key" 
+                      required
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                     />
                   </div>
                 )}
+
+                {isSignUp && (
+                  <div className="space-y-6 pt-4 border-t border-white/20">
+                    {role === 'player' ? (
+                      <>
+                        <div className="space-y-3">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Game Name</label>
+                          <Input 
+                            placeholder="In-game Name"
+                            required
+                            value={formData.inGameName}
+                            onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook URL</label>
+                          <Input 
+                            placeholder="https://facebook.com/profile..."
+                            required
+                            value={formData.fbUrl}
+                            onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Phone / WhatsApp</label>
+                          <Input 
+                            placeholder="+880..."
+                            required
+                            value={formData.phone}
+                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
+                            <Input 
+                              placeholder="ID"
+                              required
+                              value={formData.inGameUID}
+                              onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">OVR</label>
+                            <Input 
+                              type="number"
+                              placeholder="104"
+                              required
+                              value={formData.ovr}
+                              onChange={(e) => setFormData({...formData, ovr: parseInt(e.target.value) || 0})}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Organization</label>
+                        <Input 
+                          placeholder="League Title"
+                          required
+                          value={formData.leagueName}
+                          onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-18 rounded-[2.5rem] mt-8 text-[11px]"
+                  disabled={loading}
+                >
+                  {loading ? 'Entering...' : (isSignUp ? 'Initialize Profile' : 'Access Arena')}
+                  <ArrowRight className="ml-2" />
+                </Button>
+              </form>
+
+              <div className="text-center">
+                <button 
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError('');
+                  }}
+                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                >
+                  {isSignUp ? 'Already verified? Sign In' : 'New recruit? Sign Up'}
+                </button>
               </div>
-            )}
-
-            <Button 
-              type="submit" 
-              className="w-full h-18 rounded-[2.5rem] mt-8 text-[11px]"
-              disabled={loading}
-            >
-              {loading ? 'Entering...' : (isSignUp ? 'Initialize Profile' : 'Access Arena')}
-              <ArrowRight className="ml-2" />
-            </Button>
-          </form>
-
-          <div className="text-center">
-            <button 
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
-            >
-              {isSignUp ? 'Already verified? Sign In' : 'New recruit? Sign Up'}
-            </button>
-          </div>
+            </>
+          )}
         </Card>
 
         <div className="flex items-center justify-center gap-2 opacity-30">

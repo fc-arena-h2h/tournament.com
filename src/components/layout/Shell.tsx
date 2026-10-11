@@ -1,11 +1,12 @@
-import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap } from 'lucide-react';
+import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { usePWAInstall } from '@/src/hooks/usePWAInstall';
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { db, auth } from '@/src/lib/firebase';
 import { Card } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
+import { signOut } from 'firebase/auth';
 
 export type NavTab = 'arena' | 'matches' | 'league' | 'tournament' | 'profile';
 
@@ -68,6 +69,8 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
       if (!snap.empty) {
         setHasNew(true);
       }
+    }, (err) => {
+      console.warn("Announcements notice:", err?.message || err);
     });
     return () => unsub();
   }, []);
@@ -272,11 +275,37 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
                  </div>
                  <div className="flex gap-4">
                     {[1, 2, 3].map(i => (
-                      <button key={i} className="flex-1 h-16 nm-flat bg-white rounded-2xl border border-white/50 flex items-center justify-center text-slate-400 hover:text-indigo-500 transition-colors">
+                      <button key={`soc-${i}`} className="flex-1 h-16 nm-flat bg-white rounded-2xl border border-white/50 flex items-center justify-center text-slate-400 hover:text-indigo-500 transition-colors">
                         <Users size={24} />
                       </button>
                     ))}
                  </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="space-y-4 pb-12">
+                <span className="text-[9px] font-black text-rose-500 uppercase tracking-[0.3em] ml-4">Account Security</span>
+                <button 
+                  onClick={async () => {
+                    try {
+                      console.log("Attempting sign out...");
+                      await signOut(auth);
+                      console.log("Sign out successful, reloading...");
+                      window.localStorage.clear(); // Clear any local state
+                      window.sessionStorage.clear();
+                      window.location.href = '/'; // Force redirect to home
+                    } catch (error) {
+                      console.error("Sign out failed", error);
+                      alert("Sign out failed. Please try again.");
+                    }
+                  }}
+                  className="w-full h-20 nm-flat bg-white rounded-3xl px-6 flex items-center gap-5 border border-rose-100/30 active:nm-pressed text-rose-500 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center transition-transform group-active:scale-95 bg-rose-50">
+                    <LogOut size={24} />
+                  </div>
+                  <span className="text-sm font-black uppercase italic">Sign Out of Arena</span>
+                </button>
               </div>
            </div>
         </div>

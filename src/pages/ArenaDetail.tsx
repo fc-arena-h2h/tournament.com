@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera } from 'lucide-react';
+import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, Timestamp, arrayUnion, getDocs, deleteDoc, arrayRemove } from 'firebase/firestore';
@@ -40,8 +40,12 @@ interface Tournament {
   totalSlots: number;
   rules?: string[];
   status?: string;
+  autoKnockout?: boolean;
   winnerText?: string;
   winnerId?: string;
+  organizerName?: string;
+  organizationName?: string;
+  publisherName?: string;
 }
 
 interface Match {
@@ -54,7 +58,7 @@ interface Match {
   awayPlayerName: string;
   homeScore?: number;
   awayScore?: number;
-  status: 'scheduled' | 'reported' | 'disputed' | 'completed';
+  status: 'scheduled' | 'reported' | 'disputed' | 'completed' | 'draft';
   reporterId?: string;
   screenshotUrl?: string;
   disputeReason?: string;
@@ -99,7 +103,8 @@ interface ArenaDetailProps {
 }
 
 export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) => {
-  const [activeTab, setActiveTab] = useState<ArenaTab>('group');
+  const isKnockoutOnly = ((tournament as any)?.format === 'knockout');
+  const [activeTab, setActiveTab] = useState<ArenaTab>(isKnockoutOnly ? 'knockout' : 'group');
   const [activeGroup, setActiveGroup] = useState('A');
   const [activeMatchChat, setActiveMatchChat] = useState<Match | null>(null);
   const [showArenaChat, setShowArenaChat] = useState(false);
@@ -126,6 +131,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   // Publisher 4 Deployment Modes State
   const [actionLoading, setActionLoading] = useState(false);
+  const [localGroupSetupDone, setLocalGroupSetupDone] = useState(false);
+  const [localMatchDeployDone, setLocalMatchDeployDone] = useState(false);
   const [showManualGroupModal, setShowManualGroupModal] = useState(false);
   const [showManualMatchModal, setShowManualMatchModal] = useState(false);
   const [manualMatchForm, setManualMatchForm] = useState({
@@ -140,25 +147,288 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const isPublisher = (currentTournament?.publisherId || tournament.publisherId) === auth.currentUser?.uid;
   const isAdminUser = profile?.role === 'admin' || isPublisher;
 
+  const approvedPlayersList = participants.filter(p => p.status === 'approved');
+  const distinctAssignedGroups = Array.from(new Set(approvedPlayersList.map(p => p.groupId).filter(Boolean)));
+  const isGroupsConfigured = (approvedPlayersList.length > 0 && approvedPlayersList.every(p => !!p.groupId)) || localGroupSetupDone || matches.length > 0;
+  const isMatchesDeployed = matches.length > 0 || localMatchDeployDone;
+
+  // Interactive Knockout Bracket Slot Assignment State
+  const [slotAssignModal, setSlotAssignModal] = useState<{
+    stage: string;
+    matchSlotId: string;
+    role: 'home' | 'away';
+    matchNumber: number;
+    existingMatch?: Match;
+  } | null>(null);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+  const [autoMatchToast, setAutoMatchToast] = useState<{ title: string; subtitle: string } | null>(null);
+
+  // Danger Zone / Tournament Reset & Delete States
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'reset' | 'delete';
+    title: string;
+    description: string;
+    confirmLabel: string;
+  } | null>(null);
+  const [isResettingTournament, setIsResettingTournament] = useState(false);
+  const [isDeletingTournament, setIsDeletingTournament] = useState(false);
+
+  useEffect(() => {
+    if (autoMatchToast) {
+      const timer = setTimeout(() => setAutoMatchToast(null), 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoMatchToast]);
+
+  const handleSlotClick = (matchSlotId: string, role: 'home' | 'away', matchNumber: number, existingMatch?: Match) => {
+    if (!isAdminUser) {
+      const playerId = role === 'home' ? existingMatch?.homePlayerId : existingMatch?.awayPlayerId;
+      if (playerId && profiles[playerId]) {
+        setSelectedPlayerProfile(profiles[playerId]);
+      }
+      return;
+    }
+
+    setSlotAssignModal({
+      stage: activeKnockoutStage,
+      matchSlotId,
+      role,
+      matchNumber,
+      existingMatch
+    });
+    setPlayerSearchQuery('');
+  };
+
+  const handleAssignPlayerToSlot = async (selectedPlayer: any) => {
+    if (!slotAssignModal) return;
+    const { stage, matchSlotId, role, matchNumber } = slotAssignModal;
+
+    setActionLoading(true);
+    try {
+      const pProfile = profiles[selectedPlayer.userId];
+      const playerName = pProfile?.inGameName || selectedPlayer.gameName || 'Player';
+      const playerUid = selectedPlayer.userId;
+
+      // Find existing match by matchSlotId or current match
+      const existingMatch = matches.find(m => m.matchId === matchSlotId || (slotAssignModal.existingMatch && m.id === slotAssignModal.existingMatch.id));
+
+      if (existingMatch) {
+        const newHomeId = role === 'home' ? playerUid : (existingMatch.homePlayerId || '');
+        const newHomeName = role === 'home' ? playerName : (existingMatch.homePlayerName || '');
+        const newAwayId = role === 'away' ? playerUid : (existingMatch.awayPlayerId || '');
+        const newAwayName = role === 'away' ? playerName : (existingMatch.awayPlayerName || '');
+
+        const hasBothPlayers = Boolean(newHomeId && newAwayId);
+
+        await updateDoc(doc(db, 'matches', existingMatch.id), {
+          matchId: matchSlotId,
+          stage: stage,
+          groupId: 'knockout',
+          homePlayerId: newHomeId,
+          homePlayerName: newHomeName,
+          awayPlayerId: newAwayId,
+          awayPlayerName: newAwayName,
+          participants: [newHomeId, newAwayId].filter(Boolean),
+          status: hasBothPlayers ? 'scheduled' : 'draft',
+          updatedAt: Timestamp.now()
+        });
+
+        if (hasBothPlayers) {
+          setAutoMatchToast({
+            title: 'AUTOMATIC MATCH CREATED!',
+            subtitle: `${newHomeName} (HOME) vs ${newAwayName} (AWAY) is now live in ${stage}!`
+          });
+          setSlotAssignModal(null);
+        } else {
+          // One player is assigned, switch modal to prompt for the other player
+          const nextRole: 'home' | 'away' = role === 'home' ? 'away' : 'home';
+          setSlotAssignModal({
+            stage,
+            matchSlotId,
+            role: nextRole,
+            matchNumber,
+            existingMatch: {
+              ...existingMatch,
+              homePlayerId: newHomeId,
+              homePlayerName: newHomeName,
+              awayPlayerId: newAwayId,
+              awayPlayerName: newAwayName,
+              status: 'draft'
+            }
+          });
+        }
+      } else {
+        const isHome = role === 'home';
+        const homeId = isHome ? playerUid : '';
+        const homeName = isHome ? playerName : '';
+        const awayId = !isHome ? playerUid : '';
+        const awayName = !isHome ? playerName : '';
+
+        const newDocRef = await addDoc(collection(db, 'matches'), {
+          tournamentId: tournament.id,
+          matchId: matchSlotId,
+          stage: stage,
+          groupId: 'knockout',
+          homePlayerId: homeId,
+          homePlayerName: homeName,
+          awayPlayerId: awayId,
+          awayPlayerName: awayName,
+          participants: [homeId, awayId].filter(Boolean),
+          status: 'draft',
+          scheduledTime: Timestamp.now(),
+          createdAt: Timestamp.now()
+        });
+
+        // Prompt to select the other player right away
+        const nextRole: 'home' | 'away' = role === 'home' ? 'away' : 'home';
+        setSlotAssignModal({
+          stage,
+          matchSlotId,
+          role: nextRole,
+          matchNumber,
+          existingMatch: {
+            id: newDocRef.id,
+            tournamentId: tournament.id,
+            matchId: matchSlotId,
+            stage,
+            groupId: 'knockout',
+            homePlayerId: homeId,
+            homePlayerName: homeName,
+            awayPlayerId: awayId,
+            awayPlayerName: awayName,
+            status: 'draft',
+            participants: [homeId, awayId].filter(Boolean)
+          } as Match
+        });
+      }
+    } catch (err) {
+      console.error('Error assigning player to slot:', err);
+      alert('Failed to assign player.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleClearSlotPlayer = async () => {
+    if (!slotAssignModal) return;
+    const { matchSlotId, role, existingMatch } = slotAssignModal;
+    const currentMatchDoc = matches.find(m => m.matchId === matchSlotId || (existingMatch && m.id === existingMatch.id));
+    if (!currentMatchDoc) {
+      setSlotAssignModal(null);
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const remainingId = role === 'home' ? currentMatchDoc.awayPlayerId : currentMatchDoc.homePlayerId;
+      if (!remainingId) {
+        await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+      } else {
+        await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
+          [role === 'home' ? 'homePlayerId' : 'awayPlayerId']: '',
+          [role === 'home' ? 'homePlayerName' : 'awayPlayerName']: '',
+          participants: [remainingId],
+          status: 'draft',
+          updatedAt: Timestamp.now()
+        });
+      }
+      setSlotAssignModal(null);
+    } catch (err) {
+      console.error('Error clearing slot:', err);
+      alert('Failed to clear player.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSwapHomeAway = async () => {
+    if (!slotAssignModal) return;
+    const { matchSlotId, existingMatch } = slotAssignModal;
+    const currentMatchDoc = matches.find(m => m.matchId === matchSlotId || (existingMatch && m.id === existingMatch.id));
+    if (!currentMatchDoc) return;
+
+    setActionLoading(true);
+    try {
+      await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
+        homePlayerId: currentMatchDoc.awayPlayerId || '',
+        homePlayerName: currentMatchDoc.awayPlayerName || '',
+        awayPlayerId: currentMatchDoc.homePlayerId || '',
+        awayPlayerName: currentMatchDoc.homePlayerName || '',
+        updatedAt: Timestamp.now()
+      });
+      setSlotAssignModal(null);
+    } catch (err) {
+      console.error('Error swapping players:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteMatchFixture = async () => {
+    if (!slotAssignModal) return;
+    const { matchSlotId, existingMatch } = slotAssignModal;
+    const currentMatchDoc = matches.find(m => m.matchId === matchSlotId || (existingMatch && m.id === existingMatch.id));
+    if (!currentMatchDoc) {
+      setSlotAssignModal(null);
+      return;
+    }
+    if (!confirm('Are you sure you want to remove this match fixture?')) return;
+
+    setActionLoading(true);
+    try {
+      await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+      setSlotAssignModal(null);
+    } catch (err) {
+      console.error('Error deleting fixture:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // 1. Automatic Group Setup
   const handleAutoGroupSetup = async () => {
+    if (matches.length > 0 || localMatchDeployDone) {
+      return alert('Matches have already been deployed for this tournament! Group assignments cannot be modified while matches are active. Please use Emergency Reset first if you want to rebuild the tournament.');
+    }
     const approved = participants.filter(p => p.status === 'approved');
     if (approved.length === 0) {
       return alert('Please approve at least 1 player registration before running auto group setup!');
     }
+    if (isGroupsConfigured) {
+      return alert('Group setup has already been completed! All approved players are already assigned to groups. It cannot be generated a second time. If you want to recreate groups, please use Emergency Reset first.');
+    }
     setActionLoading(true);
     try {
-      const groupNames = ['A', 'B', 'C', 'D'];
-      await Promise.all(approved.map((p, idx) => {
-        const assignedGroup = groupNames[idx % groupNames.length];
+      // Shuffle approved players for fair group draw
+      const shuffled = [...approved].sort(() => Math.random() - 0.5);
+
+      // Distribute 4 players per group:
+      // 32 players -> 8 groups (A, B, C, D, E, F, G, H), 4 players in each group
+      // 16 players -> 4 groups (A, B, C, D), 4 players in each group
+      const PLAYERS_PER_GROUP = 4;
+      const totalCapacity = currentTournament?.totalSlots || tournament.totalSlots || approved.length;
+      const neededGroups = Math.max(1, Math.min(26, Math.ceil(Math.max(approved.length, totalCapacity) / PLAYERS_PER_GROUP)));
+      const groupLetters = Array.from({ length: neededGroups }, (_, i) => String.fromCharCode(65 + i));
+
+      const assignedGroupsSet = new Set<string>();
+
+      await Promise.all(shuffled.map((p, idx) => {
+        const groupIdx = Math.min(Math.floor(idx / PLAYERS_PER_GROUP), groupLetters.length - 1);
+        const assignedGroup = groupLetters[groupIdx];
+        assignedGroupsSet.add(assignedGroup);
         return updateDoc(doc(db, 'registrations', p.id), {
-          groupId: assignedGroup
+          groupId: assignedGroup,
+          stage: 'group',
+          updatedAt: Timestamp.now()
         });
       }));
-      alert(`Automatic Group Setup Complete! ${approved.length} approved players distributed into Groups A, B, C, D.`);
+
+      setLocalGroupSetupDone(true);
+      const usedGroups = Array.from(assignedGroupsSet).sort();
+      alert(`Automatic Group Setup Complete!\n${approved.length} approved players distributed into ${usedGroups.length} groups (Groups ${usedGroups.join(', ')}) with 4 players per group.`);
     } catch (err) {
       console.error('Auto group setup error:', err);
-      alert('Automatic Group Setup failed.');
+      handleFirestoreError(err, OperationType.UPDATE, 'registrations');
     } finally {
       setActionLoading(false);
     }
@@ -166,40 +436,84 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   // 2. Automatic Match Deploy
   const handleAutoMatchDeploy = async () => {
+    if (matches.length > 0 || localMatchDeployDone) {
+      return alert('Matches have already been deployed for this tournament! Fixtures cannot be generated a second time to prevent duplicates. If you want to recreate fixtures, please use Emergency Reset first.');
+    }
     const approved = participants.filter(p => p.status === 'approved');
     if (approved.length < 2) {
       return alert('Need at least 2 approved players for automatic match deployment!');
     }
+    if (!isKnockoutOnly && approved.some(p => !p.groupId)) {
+      return alert('Please run Step 1 (Automatic Group Setup) first so all players are assigned to groups before deploying matches!');
+    }
     setActionLoading(true);
     try {
       const newMatches: any[] = [];
-      const groupNames = ['A', 'B', 'C', 'D'];
 
-      groupNames.forEach(gName => {
-        const gPlayers = approved.filter(p => p.groupId === gName || (!p.groupId && approved.length <= 4));
-        for (let i = 0; i < gPlayers.length; i++) {
-          for (let j = i + 1; j < gPlayers.length; j++) {
-            const p1 = gPlayers[i];
-            const p2 = gPlayers[j];
-            const p1Profile = profiles[p1.userId];
-            const p2Profile = profiles[p2.userId];
+      if (isKnockoutOnly) {
+        // Direct Knockout Bracket Deployment
+        let stage = 'R16';
+        if (approved.length <= 2) stage = 'FINAL';
+        else if (approved.length <= 4) stage = 'SEMI';
+        else if (approved.length <= 8) stage = 'QTR';
+        else stage = 'R16';
 
-            newMatches.push({
-              tournamentId: tournament.id,
-              homePlayerId: p1.userId,
-              awayPlayerId: p2.userId,
-              homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
-              awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
-              participants: [p1.userId, p2.userId],
-              status: 'scheduled',
-              stage: 'group',
-              groupId: gName,
-              scheduledTime: Timestamp.now(),
-              createdAt: Timestamp.now()
-            });
-          }
+        // Shuffle approved players for fair pairing
+        const shuffled = [...approved].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < shuffled.length - 1; i += 2) {
+          const p1 = shuffled[i];
+          const p2 = shuffled[i + 1];
+          const p1Profile = profiles[p1.userId];
+          const p2Profile = profiles[p2.userId];
+
+          newMatches.push({
+            tournamentId: tournament.id,
+            matchId: `${stage}_M${Math.floor(i / 2) + 1}`,
+            homePlayerId: p1.userId,
+            awayPlayerId: p2.userId,
+            homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
+            awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
+            participants: [p1.userId, p2.userId],
+            status: 'scheduled',
+            stage: stage,
+            groupId: 'knockout',
+            scheduledTime: Timestamp.now(),
+            createdAt: Timestamp.now()
+          });
         }
-      });
+      } else {
+        // Generate matches for each active group (A, B, C, D, E, F, G, H, etc.)
+        const distinctGroups = Array.from(new Set(
+          approved.map(p => p.groupId).filter(Boolean)
+        )) as string[];
+        const targetGroups = distinctGroups.length > 0 ? distinctGroups.sort() : groups;
+
+        targetGroups.forEach(gName => {
+          const gPlayers = approved.filter(p => p.groupId === gName || (!p.groupId && approved.length <= 4));
+          for (let i = 0; i < gPlayers.length; i++) {
+            for (let j = i + 1; j < gPlayers.length; j++) {
+              const p1 = gPlayers[i];
+              const p2 = gPlayers[j];
+              const p1Profile = profiles[p1.userId];
+              const p2Profile = profiles[p2.userId];
+
+              newMatches.push({
+                tournamentId: tournament.id,
+                homePlayerId: p1.userId,
+                awayPlayerId: p2.userId,
+                homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
+                awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
+                participants: [p1.userId, p2.userId],
+                status: 'scheduled',
+                stage: 'group',
+                groupId: gName,
+                scheduledTime: Timestamp.now(),
+                createdAt: Timestamp.now()
+              });
+            }
+          }
+        });
+      }
 
       if (newMatches.length === 0) {
         for (let i = 0; i < approved.length - 1; i += 2) {
@@ -224,6 +538,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       }
 
       await Promise.all(newMatches.map(m => addDoc(collection(db, 'matches'), m)));
+      setLocalMatchDeployDone(true);
       alert(`Automatic Match Deploy Complete! ${newMatches.length} match fixtures created and deployed.`);
     } catch (err) {
       console.error('Auto match deploy error:', err);
@@ -272,6 +587,28 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     } catch (err) {
       console.error('Manual match create error:', err);
       alert('Manual Match Deploy failed!');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleAutoKnockout = async () => {
+    setActionLoading(true);
+    try {
+      const nextVal = !(currentTournament?.autoKnockout ?? tournament.autoKnockout);
+      await updateDoc(doc(db, 'tournaments', tournament.id), {
+        autoKnockout: nextVal,
+        updatedAt: Timestamp.now()
+      });
+      setCurrentTournament((prev: any) => prev ? { ...prev, autoKnockout: nextVal } : prev);
+      if (nextVal) {
+        setTimeout(() => {
+          evaluateAutoProgression();
+        }, 200);
+      }
+    } catch (err) {
+      console.error('Error toggling auto knockout:', err);
+      handleFirestoreError(err, OperationType.UPDATE, 'tournaments');
     } finally {
       setActionLoading(false);
     }
@@ -842,6 +1179,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       setMatches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match)));
     });
 
+    // Fetch live tournament document
+    const unsubTournamentDoc = onSnapshot(doc(db, 'tournaments', tournament.id), (snap) => {
+      if (snap.exists()) {
+        setCurrentTournament({ id: snap.id, ...snap.data() } as Tournament);
+      }
+    });
+
     // Fetch all registrations (participants)
     const playersQ = query(
       collection(db, 'registrations'),
@@ -853,31 +1197,48 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     });
 
     return () => {
+      unsubTournamentDoc();
       unsubReg();
       unsubMatches();
       unsubPlayers();
     };
   }, [tournament.id, auth.currentUser?.uid]);
 
-  // Separate effect to fetch profiles for participants and matches
+  // Separate effect to fetch profiles for participants, publisher, and matches
   useEffect(() => {
     const fetchMissing = async () => {
       const uids = new Set<string>();
-      participants.forEach(p => uids.add(p.userId));
-      matches.forEach(m => {
-        uids.add(m.homePlayerId);
-        uids.add(m.awayPlayerId);
+      participants.forEach(p => {
+        if (p.userId && typeof p.userId === 'string' && p.userId.trim()) {
+          uids.add(p.userId.trim());
+        }
       });
+      matches.forEach(m => {
+        if (m.homePlayerId && typeof m.homePlayerId === 'string' && m.homePlayerId.trim()) {
+          uids.add(m.homePlayerId.trim());
+        }
+        if (m.awayPlayerId && typeof m.awayPlayerId === 'string' && m.awayPlayerId.trim()) {
+          uids.add(m.awayPlayerId.trim());
+        }
+      });
+      if (tournament.winnerId && typeof tournament.winnerId === 'string' && tournament.winnerId.trim()) {
+        uids.add(tournament.winnerId.trim());
+      }
+      const pubId = currentTournament?.publisherId || tournament.publisherId;
+      if (pubId && typeof pubId === 'string' && pubId.trim()) {
+        uids.add(pubId.trim());
+      }
 
-      const missing = Array.from(uids).filter(uid => !profiles[uid]);
+      const missing = Array.from(uids).filter(uid => Boolean(uid) && !profiles[uid]);
       if (missing.length === 0) return;
 
       const newProfiles = { ...profiles };
       let changed = false;
 
       await Promise.all(missing.map(async (uid) => {
+        if (!uid || typeof uid !== 'string' || !uid.trim()) return;
         try {
-          const userSnap = await getDoc(doc(db, 'users', uid));
+          const userSnap = await getDoc(doc(db, 'users', uid.trim()));
           if (userSnap.exists()) {
             newProfiles[uid] = userSnap.data() as UserProfile;
             changed = true;
@@ -891,7 +1252,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     };
 
     fetchMissing();
-  }, [participants, matches]);
+  }, [participants, matches, tournament.winnerId, tournament.publisherId, currentTournament?.publisherId]);
 
   const handleJoin = async () => {
     if (!profile) return alert('Please set up your profile first');
@@ -1133,6 +1494,400 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
+  // Group calculation & standings logic
+  const assignedGroupLetters = participants.map(p => p.groupId).filter(Boolean) as string[];
+  const maxAssignedGroupChar = assignedGroupLetters.reduce((max, g) => (g > max ? g : max), 'D');
+  const maxAssignedGroupCount = maxAssignedGroupChar.charCodeAt(0) - 64;
+  const slotsGroupCount = Math.ceil(((currentTournament?.totalSlots || tournament?.totalSlots || 16)) / 4);
+  const numGroups = Math.max(4, Math.min(26, Math.max(slotsGroupCount, maxAssignedGroupCount)));
+  const groups = Array.from({ length: numGroups }, (_, i) => String.fromCharCode(65 + i));
+  const knockoutStages = ['R16', 'QTR', 'SEMI', 'FINAL'];
+
+  const calculateGroupTable = (groupId: string, customMatches?: Match[], customParticipants?: any[]) => {
+    const pList = customParticipants || participants;
+    const mList = customMatches || matches;
+    const groupParticipants = pList.filter(p => p.groupId === groupId);
+    const groupMatches = mList.filter(m => m.groupId === groupId && m.status === 'completed');
+
+    const table = groupParticipants.map(p => {
+      const stats = {
+        userId: p.userId,
+        name: p.gameName,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        gd: 0,
+        pts: 0
+      };
+
+      groupMatches.forEach(m => {
+        if (m.homePlayerId === p.userId) {
+          stats.played++;
+          stats.goalsFor += (m.homeScore || 0);
+          stats.goalsAgainst += (m.awayScore || 0);
+          if ((m.homeScore || 0) > (m.awayScore || 0)) { stats.won++; stats.pts += 3; }
+          else if ((m.homeScore || 0) === (m.awayScore || 0)) { stats.drawn++; stats.pts += 1; }
+          else stats.lost++;
+        } else if (m.awayPlayerId === p.userId) {
+          stats.played++;
+          stats.goalsFor += (m.awayScore || 0);
+          stats.goalsAgainst += (m.homeScore || 0);
+          if ((m.awayScore || 0) > (m.homeScore || 0)) { stats.won++; stats.pts += 3; }
+          else if ((m.awayScore || 0) === (m.homeScore || 0)) { stats.drawn++; stats.pts += 1; }
+          else stats.lost++;
+        }
+      });
+
+      stats.gd = stats.goalsFor - stats.goalsAgainst;
+      return stats;
+    });
+
+    return table.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.gd !== a.gd) return b.gd - a.gd;
+      return b.goalsFor - a.goalsFor;
+    });
+  };
+
+  const getWinnerId = (m: Match): string | null => {
+    const hScore = m.homeScore ?? 0;
+    const aScore = m.awayScore ?? 0;
+    if (hScore > aScore) return m.homePlayerId;
+    if (aScore > hScore) return m.awayPlayerId;
+    return m.homePlayerId || m.awayPlayerId || null;
+  };
+
+  const getLoserId = (m: Match): string | null => {
+    const hScore = m.homeScore ?? 0;
+    const aScore = m.awayScore ?? 0;
+    if (hScore > aScore) return m.awayPlayerId;
+    if (aScore > hScore) return m.homePlayerId;
+    return m.awayPlayerId || m.homePlayerId || null;
+  };
+
+  const upsertStageMatch = async (
+    allActiveMatches: Match[],
+    matchId: string,
+    stage: string,
+    homePlayer: { userId: string, name: string },
+    awayPlayer: { userId: string, name: string }
+  ) => {
+    const existing = allActiveMatches.find(m => m.matchId === matchId || (m.stage === stage && m.matchId === matchId));
+    if (existing) {
+      await updateDoc(doc(db, 'matches', existing.id), {
+        homePlayerId: homePlayer.userId,
+        awayPlayerId: awayPlayer.userId,
+        homePlayerName: homePlayer.name,
+        awayPlayerName: awayPlayer.name,
+        participants: [homePlayer.userId, awayPlayer.userId],
+        status: 'scheduled',
+        stage: stage,
+        groupId: 'knockout',
+        updatedAt: Timestamp.now()
+      });
+    } else {
+      await addDoc(collection(db, 'matches'), {
+        tournamentId: tournament.id,
+        matchId: matchId,
+        homePlayerId: homePlayer.userId,
+        awayPlayerId: awayPlayer.userId,
+        homePlayerName: homePlayer.name,
+        awayPlayerName: awayPlayer.name,
+        participants: [homePlayer.userId, awayPlayer.userId],
+        status: 'scheduled',
+        stage: stage,
+        groupId: 'knockout',
+        scheduledTime: Timestamp.now(),
+        createdAt: Timestamp.now()
+      });
+    }
+  };
+
+  // World Cup Style Group -> Knockout Bracket Generator
+  const generateKnockoutMatches = async (currentMatchList?: Match[]) => {
+    if (deploying) return;
+    setDeploying(true);
+    try {
+      const allActiveMatches = currentMatchList || matches;
+      const groupRankings: Record<string, { rank1: { userId: string, name: string }, rank2: { userId: string, name: string } }> = {};
+
+      groups.forEach(gId => {
+        const table = calculateGroupTable(gId, allActiveMatches);
+        if (table.length >= 2) {
+          groupRankings[gId] = {
+            rank1: { userId: table[0].userId, name: table[0].name },
+            rank2: { userId: table[1].userId, name: table[1].name }
+          };
+        } else if (table.length === 1) {
+          groupRankings[gId] = {
+            rank1: { userId: table[0].userId, name: table[0].name },
+            rank2: { userId: table[0].userId, name: table[0].name }
+          };
+        }
+      });
+
+      const rankedGroupKeys = Object.keys(groupRankings).sort();
+      if (rankedGroupKeys.length < 2) {
+        throw new Error("Need at least 2 active groups with participants to generate knockout fixtures.");
+      }
+
+      let targetStage = 'R16';
+      let pairings: { matchId: string; home: { userId: string, name: string }; away: { userId: string, name: string } }[] = [];
+
+      // 8 Groups (A, B, C, D, E, F, G, H) -> FIFA World Cup Round of 16
+      if (rankedGroupKeys.length >= 8 && ['A','B','C','D','E','F','G','H'].every(k => groupRankings[k])) {
+        targetStage = 'R16';
+        const wc8 = [
+          { matchId: 'R16_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
+          { matchId: 'R16_M2', hG: 'C', hR: 1, aG: 'D', aR: 2 },
+          { matchId: 'R16_M3', hG: 'E', hR: 1, aG: 'F', aR: 2 },
+          { matchId: 'R16_M4', hG: 'G', hR: 1, aG: 'H', aR: 2 },
+          { matchId: 'R16_M5', hG: 'B', hR: 1, aG: 'A', aR: 2 },
+          { matchId: 'R16_M6', hG: 'D', hR: 1, aG: 'C', aR: 2 },
+          { matchId: 'R16_M7', hG: 'F', hR: 1, aG: 'E', aR: 2 },
+          { matchId: 'R16_M8', hG: 'H', hR: 1, aG: 'G', aR: 2 },
+        ];
+        pairings = wc8.map(p => ({
+          matchId: p.matchId,
+          home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
+          away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
+        }));
+      } else if (rankedGroupKeys.length >= 4 && ['A','B','C','D'].every(k => groupRankings[k])) {
+        // 4 Groups (A, B, C, D) -> Quarter Finals
+        targetStage = 'QTR';
+        const wc4 = [
+          { matchId: 'QTR_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
+          { matchId: 'QTR_M2', hG: 'C', hR: 1, aG: 'D', aR: 2 },
+          { matchId: 'QTR_M3', hG: 'B', hR: 1, aG: 'A', aR: 2 },
+          { matchId: 'QTR_M4', hG: 'D', hR: 1, aG: 'C', aR: 2 },
+        ];
+        pairings = wc4.map(p => ({
+          matchId: p.matchId,
+          home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
+          away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
+        }));
+      } else if (rankedGroupKeys.length >= 2 && ['A','B'].every(k => groupRankings[k])) {
+        // 2 Groups (A, B) -> Semi Finals
+        targetStage = 'SEMI';
+        const wc2 = [
+          { matchId: 'SEMI_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
+          { matchId: 'SEMI_M2', hG: 'B', hR: 1, aG: 'A', aR: 2 },
+        ];
+        pairings = wc2.map(p => ({
+          matchId: p.matchId,
+          home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
+          away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
+        }));
+      } else {
+        const totalQualifiers = rankedGroupKeys.length * 2;
+        targetStage = totalQualifiers <= 2 ? 'FINAL' : totalQualifiers <= 4 ? 'SEMI' : totalQualifiers <= 8 ? 'QTR' : 'R16';
+        for (let i = 0; i < rankedGroupKeys.length; i++) {
+          const g1 = rankedGroupKeys[i];
+          const g2 = rankedGroupKeys[(i + 1) % rankedGroupKeys.length];
+          pairings.push({
+            matchId: `${targetStage}_M${i + 1}`,
+            home: groupRankings[g1].rank1,
+            away: groupRankings[g2].rank2
+          });
+        }
+      }
+
+      await Promise.all(pairings.map(p => upsertStageMatch(allActiveMatches, p.matchId, targetStage, p.home, p.away)));
+
+      setActiveTab('knockout');
+      setActiveKnockoutStage(targetStage as any);
+      setAutoMatchToast({
+        title: 'KNOCKOUT BRACKET ACTIVATED',
+        subtitle: `Group stage concluded! Top 2 from each group advanced to ${targetStage} (World Cup format).`
+      });
+    } catch (err: any) {
+      console.error('Error generating knockout matches:', err);
+      handleFirestoreError(err, OperationType.WRITE, 'matches');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  // 1. Advance R16 -> QTR
+  const advanceR16ToQTR = async (r16Matches: Match[], allMatches: Match[]) => {
+    const getWinner = (mNumber: number) => {
+      const m = r16Matches.find(x => x.matchId === `R16_M${mNumber}`) || r16Matches[mNumber - 1];
+      if (!m) return null;
+      const wId = getWinnerId(m);
+      if (!wId) return null;
+      const name = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
+      return { userId: wId, name };
+    };
+
+    const q1H = getWinner(1);
+    const q1A = getWinner(2);
+    const q2H = getWinner(3);
+    const q2A = getWinner(4);
+    const q3H = getWinner(5);
+    const q3A = getWinner(6);
+    const q4H = getWinner(7);
+    const q4A = getWinner(8);
+
+    if (q1H && q1A && q2H && q2A && q3H && q3A && q4H && q4A) {
+      await Promise.all([
+        upsertStageMatch(allMatches, 'QTR_M1', 'QTR', q1H, q1A),
+        upsertStageMatch(allMatches, 'QTR_M2', 'QTR', q2H, q2A),
+        upsertStageMatch(allMatches, 'QTR_M3', 'QTR', q3H, q3A),
+        upsertStageMatch(allMatches, 'QTR_M4', 'QTR', q4H, q4A),
+      ]);
+      setActiveTab('knockout');
+      setActiveKnockoutStage('QTR');
+      setAutoMatchToast({
+        title: 'QUARTER-FINALS UNLOCKED',
+        subtitle: 'Round of 16 completed! Winners have advanced to Quarter-Finals.'
+      });
+    }
+  };
+
+  // 2. Advance QTR -> SEMI
+  const advanceQTRToSEMI = async (qtrMatches: Match[], allMatches: Match[]) => {
+    const getWinner = (mNumber: number) => {
+      const m = qtrMatches.find(x => x.matchId === `QTR_M${mNumber}`) || qtrMatches[mNumber - 1];
+      if (!m) return null;
+      const wId = getWinnerId(m);
+      if (!wId) return null;
+      const name = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
+      return { userId: wId, name };
+    };
+
+    const s1H = getWinner(1);
+    const s1A = getWinner(2);
+    const s2H = getWinner(3);
+    const s2A = getWinner(4);
+
+    if (s1H && s1A && s2H && s2A) {
+      await Promise.all([
+        upsertStageMatch(allMatches, 'SEMI_M1', 'SEMI', s1H, s1A),
+        upsertStageMatch(allMatches, 'SEMI_M2', 'SEMI', s2H, s2A),
+      ]);
+      setActiveTab('knockout');
+      setActiveKnockoutStage('SEMI');
+      setAutoMatchToast({
+        title: 'SEMI-FINALS UNLOCKED',
+        subtitle: 'Quarter-Finals completed! Winners have advanced to Semi-Finals.'
+      });
+    }
+  };
+
+  // 3. Advance SEMI -> FINAL & 3RD_PLACE
+  const advanceSEMIToFINAL = async (semiMatches: Match[], allMatches: Match[]) => {
+    const getWinnerAndLoser = (mNumber: number) => {
+      const m = semiMatches.find(x => x.matchId === `SEMI_M${mNumber}`) || semiMatches[mNumber - 1];
+      if (!m) return null;
+      const wId = getWinnerId(m);
+      const lId = getLoserId(m);
+      if (!wId) return null;
+      const wName = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
+      const lName = lId ? ((lId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[lId]?.inGameName || 'Player') : '';
+      return {
+        winner: { userId: wId, name: wName },
+        loser: lId ? { userId: lId, name: lName } : null
+      };
+    };
+
+    const s1 = getWinnerAndLoser(1);
+    const s2 = getWinnerAndLoser(2);
+
+    if (s1 && s2) {
+      const updates = [
+        upsertStageMatch(allMatches, 'FINAL_M1', 'FINAL', s1.winner, s2.winner)
+      ];
+      if (s1.loser && s2.loser) {
+        updates.push(
+          upsertStageMatch(allMatches, '3RD_PLACE_M1', '3RD_PLACE', s1.loser, s2.loser)
+        );
+      }
+      await Promise.all(updates);
+      setActiveTab('knockout');
+      setActiveKnockoutStage('FINAL');
+      setAutoMatchToast({
+        title: 'GRAND FINAL UNLOCKED',
+        subtitle: 'Semi-Finals completed! Finalists are set for the championship match.'
+      });
+    }
+  };
+
+  // Automated Progression Evaluator
+  const evaluateAutoProgression = async (providedMatches?: Match[]) => {
+    const isAuto = currentTournament?.autoKnockout ?? tournament.autoKnockout;
+    if (!isAuto) return;
+
+    const currentList = providedMatches || matches;
+    if (!currentList || currentList.length === 0) return;
+
+    // 1. Group Stage -> Knockout
+    const groupMatches = currentList.filter(m => m.stage === 'group');
+    const knockoutMatches = currentList.filter(m => m.stage !== 'group' && m.status !== 'draft');
+
+    if (groupMatches.length > 0 && groupMatches.every(m => m.status === 'completed')) {
+      if (knockoutMatches.length === 0) {
+        await generateKnockoutMatches(currentList);
+        return;
+      }
+    }
+
+    // 2. R16 -> QTR
+    const r16Matches = currentList.filter(m => m.stage === 'R16');
+    if (r16Matches.length > 0 && r16Matches.every(m => m.status === 'completed')) {
+      const qtrMatches = currentList.filter(m => m.stage === 'QTR');
+      const qtrNeedsUpdate = qtrMatches.length === 0 || qtrMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
+      if (qtrNeedsUpdate) {
+        await advanceR16ToQTR(r16Matches, currentList);
+        return;
+      }
+    }
+
+    // 3. QTR -> SEMI
+    const qtrMatches = currentList.filter(m => m.stage === 'QTR');
+    if (qtrMatches.length > 0 && qtrMatches.every(m => m.status === 'completed')) {
+      const semiMatches = currentList.filter(m => m.stage === 'SEMI');
+      const semiNeedsUpdate = semiMatches.length === 0 || semiMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
+      if (semiNeedsUpdate) {
+        await advanceQTRToSEMI(qtrMatches, currentList);
+        return;
+      }
+    }
+
+    // 4. SEMI -> FINAL
+    const semiMatches = currentList.filter(m => m.stage === 'SEMI');
+    if (semiMatches.length > 0 && semiMatches.every(m => m.status === 'completed')) {
+      const finalMatches = currentList.filter(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M1');
+      const finalNeedsUpdate = finalMatches.length === 0 || finalMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
+      if (finalNeedsUpdate) {
+        await advanceSEMIToFINAL(semiMatches, currentList);
+        return;
+      }
+    }
+
+    // 5. FINAL -> CHAMPION
+    const finalMatch = currentList.find(m => m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId));
+    if (finalMatch && finalMatch.status === 'completed') {
+      const champId = getWinnerId(finalMatch);
+      if (champId && (!currentTournament?.winnerId || currentTournament?.status !== 'finished')) {
+        const champProfile = profiles[champId];
+        const champName = champProfile?.inGameName || (champId === finalMatch.homePlayerId ? finalMatch.homePlayerName : finalMatch.awayPlayerName) || 'Champion';
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          status: 'finished',
+          winnerId: champId,
+          winnerText: champName,
+          updatedAt: Timestamp.now()
+        });
+        setAutoMatchToast({
+          title: 'TOURNAMENT CHAMPION CROWNED!',
+          subtitle: `${champName} is the Tournament Champion!`
+        });
+      }
+    }
+  };
+
   const handleConfirmResult = async (match: Match) => {
     try {
       await updateDoc(doc(db, 'matches', match.id), {
@@ -1140,25 +1895,36 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         updatedAt: Timestamp.now()
       });
       
-      // Basic points update logic (prototype)
       const homeScore = match.homeScore || 0;
       const awayScore = match.awayScore || 0;
       
       if (homeScore > awayScore) {
-        // Home wins: +100 pts
-        await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 100 });
+        if (match.homePlayerId) {
+          await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 100 });
+        }
       } else if (awayScore > homeScore) {
-        // Away wins: +100 pts
-        await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 100 });
+        if (match.awayPlayerId) {
+          await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 100 });
+        }
       } else {
-        // Draw: +25 pts each
-        await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 25 });
-        await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 25 });
+        if (match.homePlayerId) {
+          await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 25 });
+        }
+        if (match.awayPlayerId) {
+          await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 25 });
+        }
       }
+
+      // Updated match list with this match set to completed
+      const updatedMatches = matches.map(m => m.id === match.id ? { ...m, status: 'completed' as const } : m);
+
+      // Trigger automated progression
+      await evaluateAutoProgression(updatedMatches);
 
       alert('Result confirmed! Points updated.');
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, 'matches');
     }
   };
 
@@ -1182,6 +1948,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const handleAutoDeploy = async () => {
+    if (matches.length > 0) return alert('Matches have already been deployed for this tournament! If you wish to redeploy, please use Emergency Reset first.');
     const approvedPlayers = participants.filter(p => p.status === 'approved');
     if (approvedPlayers.length < 8) return alert('Need at least 8 approved players for auto-deploy');
     if (approvedPlayers.length % 4 !== 0) {
@@ -1266,17 +2033,49 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
-  const handleResetTournament = async () => {
-    if (!confirm('EXTREME DANGER: This will delete ALL matches and clear all group assignments. Continue?')) return;
-    
-    setDeploying(true);
+  const handleResetTournament = () => {
+    if (!isAdminUser) {
+      alert('Only tournament hosts and admins can reset this tournament.');
+      return;
+    }
+    setConfirmAction({
+      type: 'reset',
+      title: 'Confirm Tournament Reset',
+      description: 'Are you sure you want to reset this tournament? All played matches and fixtures will be deleted from the database, but all registered players will remain intact in the roster.',
+      confirmLabel: 'Yes, Reset Tournament'
+    });
+  };
+
+  const handleDeleteTournament = () => {
+    if (!isAdminUser) {
+      alert('Only tournament hosts and admins can delete this tournament.');
+      return;
+    }
+    setConfirmAction({
+      type: 'delete',
+      title: 'Permanently Delete Tournament',
+      description: 'Warning: Are you sure you want to completely delete this tournament? All fixtures, player registrations, and tournament data will be permanently removed from the database.',
+      confirmLabel: 'Yes, Delete Tournament'
+    });
+  };
+
+  const executeResetTournament = async () => {
+    setIsResettingTournament(true);
     try {
-      // 1. Delete all matches
+      // 1. Delete all matches of this tournament
       const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
       const matchSnap = await getDocs(matchQuery);
       await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
 
-      // 2. Clear group assignments
+      // 2. Clear match room chat messages
+      const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
+      const msgSnap = await getDocs(msgQuery);
+      const matchMsgDeletions = msgSnap.docs
+        .filter(d => d.data().chatId !== tournament.id)
+        .map(d => deleteDoc(doc(db, 'messages', d.id)));
+      await Promise.all(matchMsgDeletions);
+
+      // 3. Clear group & stage assignments from registrations, keeping players approved
       const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
       const regSnap = await getDocs(regQuery);
       await Promise.all(regSnap.docs.map(d => updateDoc(doc(db, 'registrations', d.id), { 
@@ -1284,19 +2083,60 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         stage: null 
       })));
 
-      // 3. Reset tournament status
+      // 4. Reset tournament status in Firestore
       await updateDoc(doc(db, 'tournaments', tournament.id), {
         status: 'open',
         winnerId: null,
-        winnerText: null
+        winnerText: null,
+        updatedAt: Timestamp.now()
       });
 
-      alert('Tournament reset successfully.');
+      // 5. Update local state
+      setMatches([]);
+      setLocalGroupSetupDone(false);
+      setLocalMatchDeployDone(false);
+      setSlotAssignModal(null);
+      setConfirmAction(null);
+      setAutoMatchToast({
+        title: 'TOURNAMENT RESET SUCCESSFUL',
+        subtitle: 'All fixtures and scores cleared. Player roster preserved for new matchups.'
+      });
     } catch (err) {
-      console.error(err);
-      alert('Reset failed');
+      console.error('Reset tournament error:', err);
+      handleFirestoreError(err, OperationType.DELETE, 'matches');
     } finally {
-      setDeploying(false);
+      setIsResettingTournament(false);
+    }
+  };
+
+  const executeDeleteTournament = async () => {
+    setIsDeletingTournament(true);
+    try {
+      // 1. Delete all matches of this tournament
+      const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
+      const matchSnap = await getDocs(matchQuery);
+      await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
+
+      // 2. Delete all player registrations
+      const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
+      const regSnap = await getDocs(regQuery);
+      await Promise.all(regSnap.docs.map(d => deleteDoc(doc(db, 'registrations', d.id))));
+
+      // 3. Delete all chat messages
+      const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
+      const msgSnap = await getDocs(msgQuery);
+      await Promise.all(msgSnap.docs.map(d => deleteDoc(doc(db, 'messages', d.id))));
+
+      // 4. Delete the tournament document itself
+      await deleteDoc(doc(db, 'tournaments', tournament.id));
+
+      setConfirmAction(null);
+      onBack();
+    } catch (err) {
+      console.error('Delete tournament error:', err);
+      handleFirestoreError(err, OperationType.DELETE, 'tournaments');
+    } finally {
+      setIsDeletingTournament(false);
     }
   };
 
@@ -1306,10 +2146,32 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const approved = participants.filter(p => p.status === 'approved');
     const pending = participants.filter(p => p.status === 'pending');
     const hasMatches = matches.length > 0;
-    const groupsList = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const groupsList = groups;
 
     return (
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Toggle Section */}
+        <div className="nm-flat rounded-[2.5rem] p-8 border-2 border-white flex items-center justify-between mx-2">
+           <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-black text-slate-800 uppercase italic">Automated Knockout Progression</span>
+              <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-widest">Auto-advance top 2 to knockout & progress each round</p>
+           </div>
+           <button 
+             onClick={handleToggleAutoKnockout}
+             disabled={actionLoading}
+             aria-label="Toggle Automated Knockout Progression"
+             className={cn(
+               "h-10 px-6 rounded-full font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2 border-2 shadow-md",
+               (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                 ? "bg-indigo-600 border-indigo-700 text-white shadow-indigo-600/25" 
+                 : "bg-slate-800 border-slate-900 text-slate-200 shadow-slate-900/20"
+             )}
+           >
+             <div className={cn("w-2 h-2 rounded-full", (currentTournament?.autoKnockout ?? tournament.autoKnockout) ? "bg-white animate-pulse" : "bg-slate-400")} />
+             {(currentTournament?.autoKnockout ?? tournament.autoKnockout) ? "ON" : "OFF"}
+           </button>
+        </div>
+
         <div className="flex flex-col items-center text-center space-y-3">
            <div className="w-16 h-16 rounded-[2rem] nm-flat flex items-center justify-center text-indigo-500 border border-white/50 mb-2">
              <Settings size={32} />
@@ -1438,22 +2300,95 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  </button>
                </div>
              )}
+
+             {/* Delete Tournament Option when no matches deployed yet */}
+             <div className="pt-4 border-t border-slate-200/80 space-y-2">
+                <div className="flex items-center gap-2 px-1 text-slate-400">
+                  <AlertTriangle size={13} className="text-rose-500" />
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Danger Zone</span>
+                </div>
+                <button 
+                  onClick={handleDeleteTournament}
+                  disabled={isDeletingTournament}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50"
+                >
+                  <Trash2 size={15} />
+                  <span>{isDeletingTournament ? 'Deleting...' : 'Delete Tournament'}</span>
+                </button>
+                <p className="text-[8px] font-bold text-slate-400 text-center uppercase tracking-wider">
+                  Permanently remove tournament and all registrations from database
+                </p>
+             </div>
           </Card>
         ) : (
-          <div className="nm-inset rounded-[2.5rem] p-10 border border-white/50 bg-indigo-50/30 flex flex-col items-center gap-4 text-center">
-             <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg">
-                <CheckCircle size={24} />
+          <div className="nm-flat rounded-[2.5rem] p-8 border-2 border-white bg-white/95 shadow-xl space-y-6">
+             <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+                   <CheckCircle size={26} />
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                   <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-black text-slate-900 uppercase italic">Tournament Deployed</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-wider">
+                        {matches.length} Matches Live
+                      </span>
+                   </div>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                     Active fixtures & live scoring enabled for all participants
+                   </p>
+                </div>
              </div>
-             <div className="space-y-1">
-                <span className="text-sm font-black text-slate-900 uppercase italic">Tournament Deployed</span>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active matches are now live for all players</p>
+
+             <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1 text-slate-400">
+                  <AlertTriangle size={14} className="text-amber-500" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Host / Admin Management Controls</span>
+                </div>
+
+                {/* 1. Emergency Reset Button */}
+                <button 
+                  onClick={handleResetTournament}
+                  disabled={isResettingTournament || isDeletingTournament}
+                  className="w-full py-4 px-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-black text-[11px] uppercase tracking-wider flex items-center justify-between shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                      <RotateCcw size={18} className={isResettingTournament ? "animate-spin" : ""} />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="leading-tight font-black">
+                        {isResettingTournament ? 'Resetting...' : 'Emergency Reset'}
+                      </div>
+                      <div className="text-[8px] font-semibold text-white/90 normal-case tracking-normal mt-0.5">
+                        Matches & scores will be cleared; player roster is preserved
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[9px] bg-white/20 px-3 py-1 rounded-full font-black shrink-0 ml-2">RESET</span>
+                </button>
+
+                {/* 2. Delete Tournament Button */}
+                <button 
+                  onClick={handleDeleteTournament}
+                  disabled={isResettingTournament || isDeletingTournament}
+                  className="w-full py-4 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-black text-[11px] uppercase tracking-wider flex items-center justify-between shadow-lg shadow-rose-600/25 transition-all disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                      <Trash2 size={18} className={isDeletingTournament ? "animate-bounce" : ""} />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="leading-tight font-black">
+                        {isDeletingTournament ? 'Deleting...' : 'Delete Tournament'}
+                      </div>
+                      <div className="text-[8px] font-semibold text-white/90 normal-case tracking-normal mt-0.5">
+                        Permanently removes tournament, fixtures & records from database
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[9px] bg-white/20 px-3 py-1 rounded-full font-black shrink-0 ml-2">DELETE</span>
+                </button>
              </div>
-             <button 
-              onClick={handleResetTournament}
-              className="mt-4 text-[8px] font-black text-rose-500 uppercase tracking-widest hover:underline"
-             >
-               Emergency Reset
-             </button>
           </div>
         )}
 
@@ -1571,64 +2506,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const tabs = [
-    { id: 'group' as ArenaTab, icon: LayoutGrid, label: 'Groups' },
+    ...(!isKnockoutOnly ? [{ id: 'group' as ArenaTab, icon: LayoutGrid, label: 'Groups' }] : []),
     { id: 'knockout' as ArenaTab, icon: GitPullRequest, label: 'Brackets' },
-    { id: 'ranking' as ArenaTab, icon: Trophy, label: 'Ranking' },
+    ...(!isKnockoutOnly ? [{ id: 'ranking' as ArenaTab, icon: Trophy, label: 'Ranking' }] : []),
     { id: 'players' as ArenaTab, icon: List, label: 'Players' },
     { id: 'rules' as ArenaTab, icon: FileText, label: 'Rules' },
     ...(isAdminUser ? [{ id: 'manage' as ArenaTab, icon: Settings, label: 'Manage' }] : []),
   ];
 
-  const numGroups = Math.max(4, Math.min(16, Math.ceil(((currentTournament?.totalSlots || tournament?.totalSlots || 16)) / 4)));
-  const groups = Array.from({ length: numGroups }, (_, i) => String.fromCharCode(65 + i));
-  const knockoutStages = ['R16', 'QTR', 'SEMI', 'FINAL'];
-
-  const calculateGroupTable = (groupId: string) => {
-    const groupParticipants = participants.filter(p => p.groupId === groupId);
-    const groupMatches = matches.filter(m => m.groupId === groupId && m.status === 'completed');
-
-    const table = groupParticipants.map(p => {
-      const stats = {
-        userId: p.userId,
-        name: p.gameName,
-        played: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        gd: 0,
-        pts: 0
-      };
-
-      groupMatches.forEach(m => {
-        if (m.homePlayerId === p.userId) {
-          stats.played++;
-          stats.goalsFor += (m.homeScore || 0);
-          stats.goalsAgainst += (m.awayScore || 0);
-          if ((m.homeScore || 0) > (m.awayScore || 0)) { stats.won++; stats.pts += 3; }
-          else if ((m.homeScore || 0) === (m.awayScore || 0)) { stats.drawn++; stats.pts += 1; }
-          else stats.lost++;
-        } else if (m.awayPlayerId === p.userId) {
-          stats.played++;
-          stats.goalsFor += (m.awayScore || 0);
-          stats.goalsAgainst += (m.homeScore || 0);
-          if ((m.awayScore || 0) > (m.homeScore || 0)) { stats.won++; stats.pts += 3; }
-          else if ((m.homeScore || 0) === (m.awayScore || 0)) { stats.drawn++; stats.pts += 1; }
-          else stats.lost++;
-        }
-      });
-
-      stats.gd = stats.goalsFor - stats.goalsAgainst;
-      return stats;
-    });
-
-    return table.sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.gd !== a.gd) return b.gd - a.gd;
-      return b.goalsFor - a.goalsFor;
-    });
-  };
 
   const calculateOverallRanking = () => {
     const table = participants.map(p => {
@@ -1788,9 +2673,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="flex flex-col items-center gap-4 px-2">
                {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
                  <div className="flex items-center gap-4">
-                    <span className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}>{match.homeScore || 0}</span>
+                    <motion.span 
+                      key={`home-${match.homeScore}`}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                      className={cn("text-5xl font-black italic tracking-tighter", homeWin ? "text-fc-dark" : "text-slate-300")}
+                    >
+                      {match.homeScore || 0}
+                    </motion.span>
                     <div className="w-4 h-1 bg-slate-200 rounded-full" />
-                    <span className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}>{match.awayScore || 0}</span>
+                    <motion.span 
+                      key={`away-${match.awayScore}`}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                      className={cn("text-5xl font-black italic tracking-tighter", awayWin ? "text-fc-dark" : "text-slate-300")}
+                    >
+                      {match.awayScore || 0}
+                    </motion.span>
                  </div>
                ) : (
                  <div className="w-14 h-14 rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-xl">
@@ -1838,8 +2739,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           {/* Action Buttons & Two-Step Verification */}
           <div className="flex flex-wrap gap-3 pt-4 relative z-10 border-t border-slate-50">
-            {/* Step 1: Upload Result (Only Home Player can report) */}
-            {isHome && match.status === 'scheduled' && (
+            {/* Step 1: Upload Result (Any Participant can report) */}
+            {isParticipant && match.status === 'scheduled' && (
               <button 
                 onClick={() => handleUploadResult(match)}
                 className="flex-1 min-w-[140px] h-12 rounded-xl bg-fc-green text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-fc-green/20 active:scale-95 transition-transform"
@@ -1848,8 +2749,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </button>
             )}
             
-            {/* Step 2: Confirm or Dispute Result (Only Away Player or Admin) */}
-            {match.status === 'reported' && (isAway || isAdminUser) && match.reporterId !== auth.currentUser?.uid && (
+            {/* Step 2: Confirm or Dispute Result (Other Participant or Admin) */}
+            {match.status === 'reported' && (isParticipant || isAdminUser) && match.reporterId !== auth.currentUser?.uid && (
               <>
                 <button 
                   onClick={() => handleConfirmResult(match)}
@@ -1919,95 +2820,226 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       <div className="flex-1 flex flex-col gap-10 justify-center">
         {[...Array(count)].map((_, matchIdx) => {
           const actualIdx = side === 'left' ? matchIdx : (matchIdx + count);
-          const match = stageMatches.find(m => m.matchId === `${activeKnockoutStage}_M${actualIdx + 1}`);
-          
+          const matchNumber = actualIdx + 1;
+          const matchSlotId = `${activeKnockoutStage}_M${matchNumber}`;
+          const match = stageMatches.find(m => m.matchId === matchSlotId) || 
+            stageMatches.find(m => !m.matchId && stageMatches.indexOf(m) === actualIdx);
+
+          const homeProfile = match?.homePlayerId ? profiles[match.homePlayerId] : null;
+          const awayProfile = match?.awayPlayerId ? profiles[match.awayPlayerId] : null;
+          const homePlayerName = homeProfile?.inGameName || match?.homePlayerName || '';
+          const awayPlayerName = awayProfile?.inGameName || match?.awayPlayerName || '';
+          const isCompleted = match?.status === 'completed';
+
           return (
-            <div key={matchIdx} className="space-y-1.5">
+            <div key={matchIdx} className="space-y-1.5 group/fixture relative">
               {/* Home Player Box */}
-              <div className={cn(
-                "w-full h-12 flex items-center justify-between border transition-all shadow-sm",
-                match ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200",
-                side === 'left' ? "rounded-l-full rounded-r-xl pr-1 pl-4" : "rounded-r-full rounded-l-xl pl-1 pr-4"
-              )}>
+              <div 
+                onClick={() => handleSlotClick(matchSlotId, 'home', matchNumber, match)}
+                title={isAdminUser ? "Click to assign or change Home Player" : undefined}
+                className={cn(
+                  "w-full h-12 flex items-center justify-between border transition-all shadow-sm select-none",
+                  isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
+                  match?.homePlayerId 
+                    ? "bg-slate-900 border-slate-800 text-white" 
+                    : (isAdminUser 
+                        ? "bg-emerald-50/70 border-dashed border-emerald-400 hover:border-emerald-600 hover:bg-emerald-100/70" 
+                        : "bg-slate-50 border-slate-200"),
+                  side === 'left' ? "rounded-l-full rounded-r-xl pr-1 pl-3" : "rounded-r-full rounded-l-xl pl-1 pr-3"
+                )}
+              >
                 {side === 'left' ? (
                   <>
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={cn("w-2 h-2 rounded-full shrink-0", match ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-slate-300")} />
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest italic truncate",
-                        match ? "text-white" : "text-slate-400"
-                      )}>
-                        {match?.homePlayerName || 'TBD'}
+                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                      <span className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                        HOME
                       </span>
+                      {match?.homePlayerId ? (
+                        <>
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 border border-white/20 shrink-0 flex items-center justify-center">
+                            {homeProfile?.avatar ? (
+                              <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] font-black uppercase tracking-wide italic truncate text-white">
+                              {homePlayerName}
+                            </span>
+                            {homeProfile?.ovr ? (
+                              <span className="text-[7px] font-bold text-slate-400">
+                                {homeProfile.ovr} OVR
+                              </span>
+                            ) : null}
+                          </div>
+                        </>
+                      ) : (
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
+                          isAdminUser ? "text-emerald-700 font-bold" : "text-slate-400"
+                        )}>
+                          {isAdminUser ? "+ Add Home Player" : "TBD"}
+                        </span>
+                      )}
                     </div>
                     <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic",
-                      match ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-300"
+                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic shrink-0",
+                      match?.homePlayerId ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-400"
                     )}>
-                      {match?.homeScore ?? '-'}
+                      {isCompleted || match?.homeScore !== undefined 
+                        ? (match?.homeScore ?? '-') 
+                        : (isAdminUser && !match?.homePlayerId ? <Plus size={14} className="text-emerald-600" /> : '-')}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic",
-                      match ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-300"
+                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic shrink-0",
+                      match?.homePlayerId ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-400"
                     )}>
-                      {match?.homeScore ?? '-'}
+                      {isCompleted || match?.homeScore !== undefined 
+                        ? (match?.homeScore ?? '-') 
+                        : (isAdminUser && !match?.homePlayerId ? <Plus size={14} className="text-emerald-600" /> : '-')}
                     </div>
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest italic truncate",
-                        match ? "text-white" : "text-slate-400"
-                      )}>
-                        {match?.homePlayerName || 'TBD'}
+                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 justify-end">
+                      {match?.homePlayerId ? (
+                        <>
+                          <div className="flex flex-col min-w-0 text-right">
+                            <span className="text-[10px] font-black uppercase tracking-wide italic truncate text-white">
+                              {homePlayerName}
+                            </span>
+                            {homeProfile?.ovr ? (
+                              <span className="text-[7px] font-bold text-slate-400">
+                                {homeProfile.ovr} OVR
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 border border-white/20 shrink-0 flex items-center justify-center">
+                            {homeProfile?.avatar ? (
+                              <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
+                          isAdminUser ? "text-emerald-700 font-bold" : "text-slate-400"
+                        )}>
+                          {isAdminUser ? "+ Add Home Player" : "TBD"}
+                        </span>
+                      )}
+                      <span className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                        HOME
                       </span>
-                      <div className={cn("w-2 h-2 rounded-full shrink-0", match ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-slate-300")} />
                     </div>
                   </>
                 )}
               </div>
 
               {/* Away Player Box */}
-              <div className={cn(
-                "w-full h-12 flex items-center justify-between border transition-all shadow-sm",
-                match ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200",
-                side === 'left' ? "rounded-l-full rounded-r-xl pr-1 pl-4" : "rounded-r-full rounded-l-xl pl-1 pr-4"
-              )}>
+              <div 
+                onClick={() => handleSlotClick(matchSlotId, 'away', matchNumber, match)}
+                title={isAdminUser ? "Click to assign or change Away Player" : undefined}
+                className={cn(
+                  "w-full h-12 flex items-center justify-between border transition-all shadow-sm select-none",
+                  isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
+                  match?.awayPlayerId 
+                    ? "bg-slate-900 border-slate-800 text-white" 
+                    : (isAdminUser 
+                        ? "bg-amber-50/70 border-dashed border-amber-400 hover:border-amber-600 hover:bg-amber-100/70" 
+                        : "bg-slate-50 border-slate-200"),
+                  side === 'left' ? "rounded-l-full rounded-r-xl pr-1 pl-3" : "rounded-r-full rounded-l-xl pl-1 pr-3"
+                )}
+              >
                 {side === 'left' ? (
                   <>
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={cn("w-2 h-2 rounded-full shrink-0", match ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-slate-300")} />
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest italic truncate",
-                        match ? "text-white" : "text-slate-400"
-                      )}>
-                        {match?.awayPlayerName || 'TBD'}
+                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                      <span className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                        AWAY
                       </span>
+                      {match?.awayPlayerId ? (
+                        <>
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 border border-white/20 shrink-0 flex items-center justify-center">
+                            {awayProfile?.avatar ? (
+                              <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] font-black uppercase tracking-wide italic truncate text-white">
+                              {awayPlayerName}
+                            </span>
+                            {awayProfile?.ovr ? (
+                              <span className="text-[7px] font-bold text-slate-400">
+                                {awayProfile.ovr} OVR
+                              </span>
+                            ) : null}
+                          </div>
+                        </>
+                      ) : (
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
+                          isAdminUser ? "text-amber-700 font-bold" : "text-slate-400"
+                        )}>
+                          {isAdminUser ? "+ Add Away Player" : "TBD"}
+                        </span>
+                      )}
                     </div>
                     <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic",
-                      match ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-300"
+                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic shrink-0",
+                      match?.awayPlayerId ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-400"
                     )}>
-                      {match?.awayScore ?? '-'}
+                      {isCompleted || match?.awayScore !== undefined 
+                        ? (match?.awayScore ?? '-') 
+                        : (isAdminUser && !match?.awayPlayerId ? <Plus size={14} className="text-amber-600" /> : '-')}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic",
-                      match ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-300"
+                      "w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-black italic shrink-0",
+                      match?.awayPlayerId ? "bg-slate-800 text-amber-400" : "bg-slate-100 text-slate-400"
                     )}>
-                      {match?.awayScore ?? '-'}
+                      {isCompleted || match?.awayScore !== undefined 
+                        ? (match?.awayScore ?? '-') 
+                        : (isAdminUser && !match?.awayPlayerId ? <Plus size={14} className="text-amber-600" /> : '-')}
                     </div>
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest italic truncate",
-                        match ? "text-white" : "text-slate-400"
-                      )}>
-                        {match?.awayPlayerName || 'TBD'}
+                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 justify-end">
+                      {match?.awayPlayerId ? (
+                        <>
+                          <div className="flex flex-col min-w-0 text-right">
+                            <span className="text-[10px] font-black uppercase tracking-wide italic truncate text-white">
+                              {awayPlayerName}
+                            </span>
+                            {awayProfile?.ovr ? (
+                              <span className="text-[7px] font-bold text-slate-400">
+                                {awayProfile.ovr} OVR
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 border border-white/20 shrink-0 flex items-center justify-center">
+                            {awayProfile?.avatar ? (
+                              <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
+                          isAdminUser ? "text-amber-700 font-bold" : "text-slate-400"
+                        )}>
+                          {isAdminUser ? "+ Add Away Player" : "TBD"}
+                        </span>
+                      )}
+                      <span className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                        AWAY
                       </span>
-                      <div className={cn("w-2 h-2 rounded-full shrink-0", match ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" : "bg-slate-300")} />
                     </div>
                   </>
                 )}
@@ -2016,6 +3048,408 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           );
         })}
       </div>
+    );
+  };
+
+  const renderSlotAssignModal = () => {
+    if (!slotAssignModal) return null;
+    const { stage, matchSlotId, role, matchNumber } = slotAssignModal;
+    const currentMatchDoc = matches.find(m => m.matchId === matchSlotId || (slotAssignModal.existingMatch && m.id === slotAssignModal.existingMatch.id)) || slotAssignModal.existingMatch;
+
+    const currentHome = currentMatchDoc?.homePlayerId ? {
+      id: currentMatchDoc.homePlayerId,
+      name: currentMatchDoc.homePlayerName,
+      profile: profiles[currentMatchDoc.homePlayerId]
+    } : null;
+
+    const currentAway = currentMatchDoc?.awayPlayerId ? {
+      id: currentMatchDoc.awayPlayerId,
+      name: currentMatchDoc.awayPlayerName,
+      profile: profiles[currentMatchDoc.awayPlayerId]
+    } : null;
+
+    const approvedPlayers = participants.filter(p => p.status === 'approved');
+    const filteredPlayers = approvedPlayers.filter(p => {
+      const prof = profiles[p.userId];
+      const name = (prof?.inGameName || p.gameName || '').toLowerCase();
+      const q = playerSearchQuery.toLowerCase().trim();
+      return !q || name.includes(q) || (prof?.inGameUID || '').toLowerCase().includes(q);
+    });
+
+    const stageLabel = stage === 'R16' ? 'Round of 16' : 
+                       stage === 'QTR' ? 'Quarter Final' : 
+                       stage === 'SEMI' ? 'Semi Final' : 
+                       stage === 'FINAL' ? 'Grand Final' : stage;
+
+    const hasBoth = Boolean(currentHome?.id && currentAway?.id);
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="w-full max-w-lg bg-white rounded-[2.5rem] p-6 space-y-5 max-h-[90vh] flex flex-col shadow-2xl border-2 border-white/40 overflow-hidden">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center shadow-md",
+                role === 'home' ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+              )}>
+                <UserPlus size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                    {stageLabel} · Fixture #{matchNumber}
+                  </span>
+                  <span className={cn(
+                    "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
+                    role === 'home' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                  )}>
+                    Assigning {role.toUpperCase()}
+                  </span>
+                </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase italic tracking-tight mt-0.5">
+                  Assign {role === 'home' ? 'Home Player' : 'Away Player'}
+                </h3>
+              </div>
+            </div>
+            <button 
+              onClick={() => setSlotAssignModal(null)}
+              className="w-9 h-9 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center hover:bg-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Current Matchup Status Preview */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between text-[8px] font-black uppercase text-slate-400 tracking-wider">
+              <span>Fixture Pairing</span>
+              {hasBoth ? (
+                <span className="text-emerald-600 flex items-center gap-1 font-black">
+                  <CheckCircle size={10} /> Auto-Match Scheduled
+                </span>
+              ) : (
+                <span className="text-indigo-600 font-bold">
+                  {currentHome || currentAway ? 'Add 2nd player to auto-create match' : 'Empty Fixture'}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Home Slot Summary */}
+              <button
+                type="button"
+                onClick={() => setSlotAssignModal({ ...slotAssignModal, role: 'home' })}
+                className={cn(
+                  "p-3 rounded-xl border text-left transition-all flex items-center gap-2.5",
+                  role === 'home' 
+                    ? "border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/20" 
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                )}
+              >
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                  {currentHome?.profile?.avatar ? (
+                    <img src={currentHome.profile.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    currentHome?.name?.charAt(0) || 'H'
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[7px] font-black uppercase text-emerald-600 tracking-wider block">Home Player</span>
+                  <span className="text-xs font-black uppercase italic text-slate-800 truncate block">
+                    {currentHome?.name || '+ Assign Home'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Away Slot Summary */}
+              <button
+                type="button"
+                onClick={() => setSlotAssignModal({ ...slotAssignModal, role: 'away' })}
+                className={cn(
+                  "p-3 rounded-xl border text-left transition-all flex items-center gap-2.5",
+                  role === 'away' 
+                    ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/20" 
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                )}
+              >
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                  {currentAway?.profile?.avatar ? (
+                    <img src={currentAway.profile.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    currentAway?.name?.charAt(0) || 'A'
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[7px] font-black uppercase text-amber-600 tracking-wider block">Away Player</span>
+                  <span className="text-xs font-black uppercase italic text-slate-800 truncate block">
+                    {currentAway?.name || '+ Assign Away'}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {hasBoth && (
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={handleSwapHomeAway}
+                  disabled={actionLoading}
+                  className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1.5"
+                >
+                  <ArrowLeftRight size={12} /> Swap Home & Away
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteMatchFixture}
+                  disabled={actionLoading}
+                  className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline flex items-center gap-1"
+                >
+                  <Trash2 size={12} /> Delete Match Fixture
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder={`Search approved players for ${role.toUpperCase()} slot...`}
+              value={playerSearchQuery}
+              onChange={(e) => setPlayerSearchQuery(e.target.value)}
+              className="w-full h-12 pl-11 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all"
+            />
+            {playerSearchQuery && (
+              <button 
+                onClick={() => setPlayerSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Approved Players List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[220px] max-h-[340px]">
+            {filteredPlayers.length === 0 ? (
+              <div className="text-center py-10 space-y-2">
+                <Users size={32} className="text-slate-300 mx-auto" />
+                <p className="text-xs font-black uppercase text-slate-400">No approved players found</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  Approve player registrations in the Manage tab first
+                </p>
+              </div>
+            ) : (
+              filteredPlayers.map((p) => {
+                const prof = profiles[p.userId];
+                const displayName = prof?.inGameName || p.gameName || 'Player';
+                const isSelectedForThisRole = (role === 'home' && currentHome?.id === p.userId) || 
+                                              (role === 'away' && currentAway?.id === p.userId);
+                const isSelectedForOtherRole = (role === 'home' && currentAway?.id === p.userId) || 
+                                               (role === 'away' && currentHome?.id === p.userId);
+
+                return (
+                  <div 
+                    key={p.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-2xl border transition-all",
+                      isSelectedForThisRole 
+                        ? (role === 'home' ? "bg-emerald-50 border-emerald-300" : "bg-amber-50 border-amber-300")
+                        : "bg-slate-50/70 border-slate-100 hover:bg-slate-100/70 hover:border-slate-200"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0 flex items-center justify-center">
+                        {prof?.avatar ? (
+                          <img src={prof.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs font-black text-slate-400">{displayName.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase italic text-slate-800 truncate">
+                            {displayName}
+                          </span>
+                          {prof?.ovr ? (
+                            <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
+                              {prof.ovr} OVR
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[8px] font-bold text-slate-400 uppercase">
+                            UID: {prof?.inGameUID || p.gameUid || '-'}
+                          </span>
+                          {isSelectedForOtherRole && (
+                            <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 shrink-0">
+                              Currently {role === 'home' ? 'Away' : 'Home'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAssignPlayerToSlot(p)}
+                      disabled={actionLoading || isSelectedForThisRole}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shrink-0 transition-all",
+                        isSelectedForThisRole 
+                          ? "bg-slate-200 text-slate-500 cursor-default"
+                          : (role === 'home' 
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 active:scale-95" 
+                              : "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 active:scale-95")
+                      )}
+                    >
+                      {isSelectedForThisRole ? 'Assigned' : `Select as ${role.toUpperCase()}`}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer Controls */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            {((role === 'home' && currentHome) || (role === 'away' && currentAway)) ? (
+              <button
+                type="button"
+                onClick={handleClearSlotPlayer}
+                disabled={actionLoading}
+                className="px-4 py-2.5 rounded-xl text-[9px] font-black text-rose-600 hover:bg-rose-50 border border-rose-200 uppercase tracking-widest transition-all"
+              >
+                Clear {role.toUpperCase()} Slot
+              </button>
+            ) : <div />}
+
+            <button
+              type="button"
+              onClick={() => setSlotAssignModal(null)}
+              className="px-6 py-2.5 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+            >
+              Done / Close
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  const renderAutoMatchToast = () => {
+    if (!autoMatchToast) return null;
+    return createPortal(
+      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[90%] max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-slate-900 border-2 border-emerald-500/80 rounded-3xl p-4 shadow-2xl flex items-center justify-between text-white">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/40">
+              <CheckCircle size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-400 block">
+                {autoMatchToast.title}
+              </span>
+              <p className="text-xs font-black uppercase italic text-white truncate">
+                {autoMatchToast.subtitle}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setAutoMatchToast(null)}
+            className="w-8 h-8 rounded-full bg-white/10 text-slate-300 hover:text-white flex items-center justify-center shrink-0 ml-2"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  const renderDangerConfirmModal = () => {
+    if (!confirmAction) return null;
+
+    const isDelete = confirmAction.type === 'delete';
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] p-7 space-y-6 shadow-2xl border-2 border-white/40 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg",
+              isDelete ? "bg-rose-600 shadow-rose-600/30" : "bg-amber-500 shadow-amber-500/30"
+            )}>
+              {isDelete ? <Trash2 size={26} /> : <RotateCcw size={26} />}
+            </div>
+            <div>
+              <span className={cn(
+                "text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider",
+                isDelete ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
+              )}>
+                {isDelete ? 'PERMANENT DELETION' : 'TOURNAMENT RESET'}
+              </span>
+              <h3 className="text-base font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                {confirmAction.title}
+              </h3>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-slate-600 text-xs font-semibold leading-relaxed">
+            <p>{confirmAction.description}</p>
+            {isDelete ? (
+              <ul className="text-[11px] space-y-1 text-slate-500 pt-2 border-t border-slate-200/60 list-disc list-inside">
+                <li>Tournament record will be completely deleted</li>
+                <li>All fixtures, matches and scores will be erased</li>
+                <li>Player registrations will be removed</li>
+                <li>Tournament room chat history will be cleared</li>
+              </ul>
+            ) : (
+              <ul className="text-[11px] space-y-1 text-slate-500 pt-2 border-t border-slate-200/60 list-disc list-inside">
+                <li>All scheduled/played fixtures and scores will be erased</li>
+                <li>Group or knockout player pairings will be reset</li>
+                <li><strong className="text-slate-800">Player roster is preserved</strong> and ready for new match generation</li>
+              </ul>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmAction(null)}
+              disabled={isResettingTournament || isDeletingTournament}
+              className="flex-1 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (isDelete) {
+                  await executeDeleteTournament();
+                } else {
+                  await executeResetTournament();
+                }
+              }}
+              disabled={isResettingTournament || isDeletingTournament}
+              className={cn(
+                "flex-1 py-3.5 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50",
+                isDelete ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/30" : "bg-amber-500 hover:bg-amber-600 shadow-amber-500/30"
+              )}
+            >
+              {(isResettingTournament || isDeletingTournament) ? (
+                <>Processing...</>
+              ) : (
+                <>{confirmAction.confirmLabel}</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
     );
   };
 
@@ -2168,19 +3602,19 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
 
             {/* Points Table */}
-            <div className="nm-flat rounded-[2.5rem] border-4 border-white/40 overflow-hidden">
-              <div className="bg-slate-50/50 px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="nm-flat rounded-[2.5rem] border-4 border-white/40 overflow-hidden bg-white">
+              <div className="bg-slate-50/50 px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">ELITE PLAYER</span>
-                <div className="flex gap-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="w-5 text-center">P</span>
-                  <span className="w-5 text-center">W</span>
-                  <span className="w-5 text-center">D</span>
-                  <span className="w-5 text-center">L</span>
-                  <span className="w-7 text-center">GD</span>
-                  <span className="w-9 text-center text-slate-800">PTS</span>
+                <div className="flex gap-6 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">
+                  <span className="w-6 text-center">P</span>
+                  <span className="w-6 text-center">W</span>
+                  <span className="w-6 text-center">D</span>
+                  <span className="w-6 text-center">L</span>
+                  <span className="w-8 text-center">GD</span>
+                  <span className="w-10 text-center text-slate-800 pr-1">PTS</span>
                 </div>
               </div>
-              <div className="p-8 space-y-2">
+              <div className="p-4 space-y-2">
                   {participants.filter(r => r.groupId === activeGroup).length === 0 ? (
                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.25em] italic leading-loose text-center py-8">
                       NO PARTICIPANTS IN THIS GROUP YET
@@ -2190,27 +3624,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       const p = profiles[row.userId];
                       return (
                         <div key={row.userId} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 rounded-xl transition-colors">
-                          <div className="flex items-center gap-3 flex-1">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
                             <span className={cn(
-                              "text-[10px] font-black",
+                              "text-[10px] font-black shrink-0",
                               i < 2 ? "text-indigo-500" : "text-slate-300"
                             )}>
                               {i < 9 ? `0${i+1}` : i+1}
                             </span>
-                            <div className="flex items-center gap-2">
-                               <div className="w-6 h-6 rounded-lg bg-slate-100 overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0">
+                               <div className="w-6 h-6 rounded-lg bg-slate-100 overflow-hidden shrink-0">
                                   {p?.avatar && <img src={p.avatar} alt="" className="w-full h-full object-cover" />}
                                </div>
-                               <span className="text-xs font-black text-slate-800 uppercase italic truncate max-w-[100px]">{p?.inGameName || row.name}</span>
+                               <span className="text-xs font-black text-slate-800 uppercase italic truncate">{p?.inGameName || row.name}</span>
                             </div>
                           </div>
-                          <div className="flex gap-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                            <span className="w-5 text-center">{row.played}</span>
-                            <span className="w-5 text-center">{row.won}</span>
-                            <span className="w-5 text-center">{row.drawn}</span>
-                            <span className="w-5 text-center">{row.lost}</span>
-                            <span className="w-7 text-center">{row.gd > 0 ? `+${row.gd}` : row.gd}</span>
-                            <span className="w-9 text-center text-slate-900">{row.pts}</span>
+                          <div className="flex gap-6 text-[9px] font-black text-slate-500 uppercase tracking-widest pr-4">
+                            <span className="w-6 text-center">{row.played}</span>
+                            <span className="w-6 text-center">{row.won}</span>
+                            <span className="w-6 text-center">{row.drawn}</span>
+                            <span className="w-6 text-center">{row.lost}</span>
+                            <span className="w-8 text-center">{row.gd > 0 ? `+${row.gd}` : row.gd}</span>
+                            <span className="w-10 text-center text-slate-900 pr-1">{row.pts}</span>
                           </div>
                         </div>
                       );
@@ -2320,6 +3754,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                </h4>
                <div className="space-y-6">
                   {matches.filter(m => {
+                    if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                     if (activeKnockoutStage === 'FINAL') {
                       return m.stage === 'FINAL'; // Only show Final in the bottom list if 3rd place has its own section
                     }
@@ -2330,6 +3765,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     </div>
                   ) : (
                     matches.filter(m => {
+                      if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                       if (activeKnockoutStage === 'FINAL') return m.stage === 'FINAL';
                       return m.stage === activeKnockoutStage;
                     }).map(m => renderMatchCard(m))
@@ -2355,10 +3791,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="nm-flat rounded-[2.5rem] border-4 border-white/40 overflow-hidden bg-white">
               <div className="bg-slate-50/50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">ELITE CONTENDER</span>
-                <div className="flex gap-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="w-12 text-center">RATING</span>
-                  <span className="w-10 text-center">W/L</span>
-                  <span className="w-10 text-center text-slate-800">POINTS</span>
+                <div className="flex gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">
+                  <span className="w-14 text-center">RATING</span>
+                  <span className="w-12 text-center">W/L</span>
+                  <span className="w-12 text-center text-slate-800">POINTS</span>
                 </div>
               </div>
               
@@ -2372,13 +3808,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     const p = profiles[row.userId];
                     const rank = i + 1;
                     return (
-                      <div key={row.userId} className={cn(
-                        "flex items-center justify-between px-6 py-5 rounded-[2rem] transition-all border",
+                      <div key={`rank-${row.userId}-${i}`} className={cn(
+                        "flex items-center justify-between px-4 py-5 rounded-[2rem] transition-all border",
                         rank === 1 ? "bg-slate-900 border-slate-800 shadow-xl scale-[1.02]" : "hover:bg-slate-50 border-transparent"
                       )}>
-                        <div className="flex items-center gap-5 flex-1">
+                        <div className="flex items-center gap-5 flex-1 overflow-hidden">
                           <div className={cn(
-                            "w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black italic",
+                            "w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black italic shrink-0",
                             rank === 1 ? "bg-amber-400 text-slate-900" :
                             rank === 2 ? "bg-slate-200 text-slate-600" :
                             rank === 3 ? "bg-orange-100 text-orange-600" :
@@ -2386,31 +3822,31 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                           )}>
                             {rank}
                           </div>
-                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-2xl nm-inset bg-white overflow-hidden border border-white/20">
+                          <div className="flex items-center gap-4 overflow-hidden">
+                             <div className="w-12 h-12 rounded-2xl nm-inset bg-white overflow-hidden border border-white/20 shrink-0">
                                 {p?.avatar && <img src={p.avatar} alt="" className="w-full h-full object-cover" />}
                              </div>
-                             <div className="flex flex-col">
+                             <div className="flex flex-col overflow-hidden">
                                <span className={cn(
-                                 "text-sm font-black uppercase italic tracking-tight",
+                                 "text-sm font-black uppercase italic tracking-tight transition-colors truncate",
                                  rank === 1 ? "text-white" : "text-slate-800"
                                )}>{p?.inGameName || row.name}</span>
                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">OVR {row.ovr}</span>
                              </div>
                           </div>
                         </div>
-                        <div className="flex gap-8 text-[11px] font-black uppercase tracking-tight">
+                        <div className="flex gap-4 text-[11px] font-black uppercase tracking-tight shrink-0 pr-4">
                           <div className={cn(
-                            "w-12 text-center flex flex-col items-center",
+                            "w-14 text-center flex flex-col items-center",
                             rank === 1 ? "text-amber-400" : "text-indigo-500"
                           )}>
                             <span>{row.rankPoints}</span>
                             <span className="text-[7px] opacity-60">PTS</span>
                           </div>
-                          <span className={cn("w-10 text-center", rank === 1 ? "text-slate-400" : "text-slate-400")}>
+                          <span className={cn("w-12 text-center", rank === 1 ? "text-slate-400" : "text-slate-400")}>
                             {row.won}/{row.lost}
                           </span>
-                          <span className={cn("w-10 text-center", rank === 1 ? "text-white" : "text-slate-900")}>
+                          <span className={cn("w-12 text-center", rank === 1 ? "text-white" : "text-slate-900")}>
                             {row.pts}
                           </span>
                         </div>
@@ -2455,7 +3891,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   Modify or add rules for this tournament:
                 </p>
                 {editableRules.map((rule, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+                  <div key={`rule-edit-${idx}`} className="flex items-center gap-2">
                     <span className="text-xs font-black text-indigo-500 w-6">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
@@ -2565,12 +4001,28 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     );
   };
 
+  const publisherId = currentTournament?.publisherId || tournament.publisherId;
+  const publisherProfile = publisherId ? profiles[publisherId] : null;
+  const organizerDisplayName = 
+    currentTournament?.organizerName || 
+    currentTournament?.organizationName || 
+    currentTournament?.publisherName || 
+    tournament.organizerName || 
+    tournament.organizationName || 
+    tournament.publisherName || 
+    publisherProfile?.inGameName || 
+    publisherProfile?.leagueName || 
+    'Official FC Host';
+
   return (
     <div className="min-h-screen bg-soft-bg pb-32 relative animate-fade-in">
       {renderReportResultModal()}
       {renderMatchChat()}
       {renderArenaChat()}
       {renderPlayerModal()}
+      {renderSlotAssignModal()}
+      {renderAutoMatchToast()}
+      {renderDangerConfirmModal()}
       
       {/* Professional Gaming Header */}
       <div className="flex items-center justify-between px-6 py-8">
@@ -2589,37 +4041,60 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       </div>
 
       <main className="max-w-lg mx-auto px-6 space-y-10">
-        {/* Tournament Identity Card */}
+        {/* Tournament Identity Card / Banner */}
         <div className="nm-flat rounded-[3rem] p-3 border-2 border-white shadow-2xl relative overflow-hidden group">
            <div className="absolute top-0 right-0 w-32 h-32 bg-fc-green/5 rounded-full -mr-16 -mt-16 blur-3xl" />
-           <div className="relative h-64 rounded-[2.5rem] overflow-hidden bg-fc-dark">
+           <div className="relative min-h-[17.5rem] rounded-[2.5rem] overflow-hidden bg-fc-dark flex flex-col justify-between p-7 sm:p-8">
               {/* Card background image */}
-              <div className="absolute inset-0 opacity-40 grayscale group-hover:scale-105 transition-transform duration-1000">
+              <div className="absolute inset-0 opacity-40 grayscale group-hover:scale-105 transition-transform duration-1000 pointer-events-none">
                  <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-fc-dark via-fc-dark/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-fc-dark via-fc-dark/50 to-transparent pointer-events-none" />
               
-              <button 
-                onClick={() => setShowArenaChat(true)}
-                className="absolute top-6 right-6 w-12 h-12 rounded-2xl bg-fc-green text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform z-20"
-              >
-                 <MessageSquare size={20} />
-              </button>
+              {/* Top Banner Row: Badges and Arena Chat button */}
+              <div className="relative z-10 flex items-start justify-between gap-3">
+                 <div className="flex flex-col gap-2.5">
+                   <div className="flex items-center gap-2 flex-wrap">
+                      {renderStatusBadge()}
+                      <div className="px-3 py-1 rounded-full bg-white/10 text-[7px] font-black text-white uppercase tracking-widest border border-white/20">
+                        ID: {tournament.id.slice(0, 8)}
+                      </div>
+                      <div className="px-3 py-1 rounded-full bg-white/10 text-[7px] font-black text-amber-300 uppercase tracking-widest border border-white/20">
+                        {isKnockoutOnly ? 'Knockout' : 'Group + Knockout'}
+                      </div>
+                   </div>
 
-              <div className="absolute bottom-8 left-8 right-8">
-                 <div className="flex items-center gap-3 mb-4">
-                    {renderStatusBadge()}
-                    <div className="px-3 py-1 rounded-full bg-white/10 text-[7px] font-black text-white uppercase tracking-widest border border-white/20">
-                      ID: {tournament.id.slice(0, 8)}
-                    </div>
+                   {/* ORGANIZER / CREATOR BADGE ON BANNER */}
+                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-lg w-fit">
+                     <div className="w-5 h-5 rounded-full bg-fc-green/20 border border-fc-green/40 flex items-center justify-center shrink-0">
+                       <Shield size={11} className="text-fc-green" />
+                     </div>
+                     <span className="text-[8px] font-black tracking-widest text-slate-300 uppercase shrink-0">ORGANIZER:</span>
+                     <span className="text-[10px] font-black text-fc-green uppercase tracking-wider truncate max-w-[180px] sm:max-w-xs">
+                       {organizerDisplayName}
+                     </span>
+                     <span className="w-1.5 h-1.5 rounded-full bg-fc-green animate-pulse shrink-0" />
+                   </div>
                  </div>
-                 <h1 className="text-4xl font-black text-white uppercase italic leading-none tracking-tighter mb-4">{tournament.title}</h1>
+
+                 <button 
+                   onClick={() => setShowArenaChat(true)}
+                   className="w-12 h-12 rounded-2xl bg-fc-green text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform shrink-0"
+                   title="Arena Chat"
+                 >
+                    <MessageSquare size={20} />
+                 </button>
+              </div>
+
+              {/* Bottom Banner Row: Title and Participants/Join */}
+              <div className="relative z-10 pt-4">
+                 <h1 className="text-3xl sm:text-4xl font-black text-white uppercase italic leading-none tracking-tighter mb-4">{currentTournament?.title || tournament.title}</h1>
                  <div className="flex items-center justify-between">
                     <div className="flex flex-col">
                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Participants</span>
                        <div className="flex items-center gap-2">
                           <Users size={12} className="text-fc-green" />
-                          <span className="text-lg font-black text-white">{tournament.filledSlots}/{tournament.totalSlots}</span>
+                          <span className="text-lg font-black text-white">{currentTournament?.filledSlots ?? tournament.filledSlots}/{currentTournament?.totalSlots ?? tournament.totalSlots}</span>
                        </div>
                     </div>
                     {registration ? (
@@ -2694,45 +4169,184 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              </div>
 
              <div className="space-y-3">
+                {/* Automated Knockout Toggle */}
+                <div className={cn(
+                   "p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between group",
+                   (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                     ? "bg-indigo-50/80 border-indigo-200 shadow-sm"
+                     : "bg-slate-100 border-slate-200/90 shadow-sm"
+                )}>
+                    <div className="flex items-center gap-3">
+                       <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm",
+                          (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                            ? "bg-indigo-600 text-white shadow-indigo-600/30"
+                            : "bg-white text-slate-700 border border-slate-200"
+                       )}>
+                          <Zap size={20} className={(currentTournament?.autoKnockout ?? tournament.autoKnockout) ? "animate-pulse text-white" : "text-slate-600"} />
+                       </div>
+                       <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-slate-900 uppercase italic tracking-tight">Automated Knockout Progression</span>
+                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-wider">Top 2 per group to knockout & auto-progress rounds</span>
+                       </div>
+                    </div>
+                    <button 
+                       onClick={handleToggleAutoKnockout}
+                       disabled={actionLoading}
+                       aria-label="Toggle Automated Knockout Progression"
+                       className={cn(
+                          "w-16 h-8 rounded-full relative transition-all duration-300 disabled:opacity-50 flex items-center px-1.5 cursor-pointer shadow-md select-none border-2",
+                          (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                            ? "bg-indigo-600 border-indigo-700 shadow-indigo-600/30"
+                            : "bg-slate-800 border-slate-900 shadow-slate-900/30"
+                       )}
+                    >
+                       <span className={cn(
+                          "text-[8px] font-black uppercase tracking-wider transition-all duration-300 pl-0.5",
+                          (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                            ? "text-white opacity-100"
+                            : "text-transparent opacity-0 pointer-events-none"
+                       )}>ON</span>
+                       <div className={cn(
+                          "absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md border border-slate-200 transition-all duration-300 z-10",
+                          (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                            ? "translate-x-8"
+                            : "translate-x-0"
+                       )} />
+                       <span className={cn(
+                          "text-[8px] font-black uppercase tracking-wider transition-all duration-300 ml-auto pr-0.5",
+                          (currentTournament?.autoKnockout ?? tournament.autoKnockout)
+                            ? "text-transparent opacity-0 pointer-events-none"
+                            : "text-slate-200 opacity-100"
+                       )}>OFF</span>
+                    </button>
+                </div>
+
                 {/* Mode 1: Automatic Group Setup */}
                 <button 
                   onClick={handleAutoGroupSetup}
-                  disabled={actionLoading}
-                  className="w-full py-4 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-between shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  disabled={actionLoading || isGroupsConfigured}
+                  className={cn(
+                    "w-full py-4 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-between transition-all",
+                    isGroupsConfigured
+                      ? "bg-slate-800 text-slate-300 border border-slate-700/80 cursor-not-allowed opacity-90 shadow-none"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg active:scale-95 disabled:opacity-50"
+                  )}
                 >
-                  <div className="flex items-center gap-3">
-                    <Zap size={16} className="text-amber-300 animate-pulse" />
-                    <span>1. AUTOMATIC GROUP SETUP</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {isGroupsConfigured ? (
+                      <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                    ) : (
+                      <Zap size={16} className="text-amber-300 animate-pulse shrink-0" />
+                    )}
+                    <div className="text-left min-w-0">
+                      <div className="leading-tight font-black flex items-center gap-2">
+                        <span>1. AUTOMATIC GROUP SETUP</span>
+                        {isGroupsConfigured && (
+                          <span className="text-[7.5px] font-bold text-emerald-400 normal-case tracking-normal">(Configured)</span>
+                        )}
+                      </div>
+                      <div className={cn(
+                        "text-[8px] font-semibold normal-case tracking-normal mt-0.5",
+                        isGroupsConfigured ? "text-slate-400" : "text-white/80"
+                      )}>
+                        {isGroupsConfigured
+                          ? `Group assignments completed (${distinctAssignedGroups.length || 'All'} Groups). Locked to prevent duplicate setup.`
+                          : "4 players per group (e.g. 32 players → 8 Groups A to H)"
+                        }
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[8px] bg-white/20 px-2.5 py-1 rounded-full font-black">RUN AUTO</span>
+                  {isGroupsConfigured ? (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-black shrink-0 ml-2 flex items-center gap-1">
+                      <Lock size={10} />
+                      DONE
+                    </span>
+                  ) : (
+                    <span className="text-[8px] bg-white/20 px-2.5 py-1 rounded-full font-black shrink-0 ml-2">RUN AUTO</span>
+                  )}
                 </button>
 
                 {/* Mode 2: Automatic Match Deploy */}
                 <button 
                   onClick={handleAutoMatchDeploy}
-                  disabled={actionLoading}
-                  className="w-full py-4 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-between shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  disabled={actionLoading || isMatchesDeployed}
+                  className={cn(
+                    "w-full py-4 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-between transition-all",
+                    isMatchesDeployed
+                      ? "bg-slate-800 text-slate-300 border border-slate-700/80 cursor-not-allowed opacity-90 shadow-none"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 disabled:opacity-50"
+                  )}
                 >
-                  <div className="flex items-center gap-3">
-                    <Trophy size={16} className="text-emerald-200" />
-                    <span>2. AUTOMATIC MATCH DEPLOY</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {isMatchesDeployed ? (
+                      <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                    ) : (
+                      <Trophy size={16} className="text-emerald-200 shrink-0" />
+                    )}
+                    <div className="text-left min-w-0">
+                      <div className="leading-tight font-black flex items-center gap-2">
+                        <span>2. AUTOMATIC MATCH DEPLOY</span>
+                        {isMatchesDeployed && (
+                          <span className="text-[7.5px] font-bold text-emerald-400 normal-case tracking-normal">({matches.length} Live)</span>
+                        )}
+                      </div>
+                      <div className={cn(
+                        "text-[8px] font-semibold normal-case tracking-normal mt-0.5",
+                        isMatchesDeployed ? "text-slate-400" : "text-white/80"
+                      )}>
+                        {isMatchesDeployed
+                          ? `${matches.length} fixtures live. Deployment locked to prevent duplicate matches.`
+                          : "Generates all group stage fixtures automatically"
+                        }
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[8px] bg-white/20 px-2.5 py-1 rounded-full font-black">DEPLOY</span>
+                  {isMatchesDeployed ? (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-black shrink-0 ml-2 flex items-center gap-1">
+                      <Lock size={10} />
+                      DEPLOYED
+                    </span>
+                  ) : (
+                    <span className="text-[8px] bg-white/20 px-2.5 py-1 rounded-full font-black">DEPLOY</span>
+                  )}
                 </button>
 
                 {/* Mode 3 & 4: Manual Controls */}
                 <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button 
-                    onClick={() => setShowManualGroupModal(true)}
-                    className="py-3.5 px-4 rounded-2xl nm-inset bg-slate-100 hover:bg-slate-200 text-slate-800 text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-slate-200 transition-all active:scale-95"
+                    onClick={() => {
+                      if (matches.length > 0) {
+                        return alert('Matches have already been deployed! Group assignments cannot be modified while matches exist. Please use Emergency Reset first.');
+                      }
+                      setShowManualGroupModal(true);
+                    }}
+                    disabled={matches.length > 0}
+                    className={cn(
+                      "py-3.5 px-4 rounded-2xl nm-inset text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border transition-all",
+                      matches.length > 0
+                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200 active:scale-95"
+                    )}
                   >
                     <Edit3 size={14} className="text-indigo-500" />
                     <span>3. MANUAL GROUP SETUP</span>
                   </button>
 
                   <button 
-                    onClick={() => setShowManualMatchModal(true)}
-                    className="py-3.5 px-4 rounded-2xl nm-inset bg-slate-100 hover:bg-slate-200 text-slate-800 text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-slate-200 transition-all active:scale-95"
+                    onClick={() => {
+                      if (matches.length > 0) {
+                        return alert('Matches have already been deployed! If you wish to recreate matches, please use Emergency Reset first.');
+                      }
+                      setShowManualMatchModal(true);
+                    }}
+                    disabled={matches.length > 0}
+                    className={cn(
+                      "py-3.5 px-4 rounded-2xl nm-inset text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border transition-all",
+                      matches.length > 0
+                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200 active:scale-95"
+                    )}
                   >
                     <Plus size={14} className="text-emerald-600" />
                     <span>4. MANUAL MATCH DEPLOY</span>
@@ -2776,7 +4390,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
                    <h3 className="text-sm font-black text-slate-900 uppercase italic">3. MANUAL GROUP SETUP</h3>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Assign players to Group A, B, C, D manually</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Assign players to groups manually</p>
                 </div>
                 <button onClick={() => setShowManualGroupModal(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors">
                   <X size={16} />

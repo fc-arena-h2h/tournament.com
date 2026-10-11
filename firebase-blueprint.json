@@ -50,6 +50,7 @@
         "prizePool": { "type": "string" },
         "totalSlots": { "type": "integer" },
         "filledSlots": { "type": "integer" },
+        "autoKnockout": { "type": "boolean", "default": false },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "publisherId", "title", "format", "status"]
@@ -110,6 +111,58 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "chatId", "senderId", "text", "timestamp"]
+    },
+    "League": {
+      "title": "League",
+      "description": "FC Mobile like league for team-based competition.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 200 },
+        "country": { "type": "string" },
+        "minOvr": { "type": "integer" },
+        "maxOvr": { "type": "integer" },
+        "creatorId": { "type": "string" },
+        "admins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of user IDs who are admins (creator + up to 3 others)"
+        },
+        "memberCount": { "type": "integer" },
+        "maxMembers": { "type": "integer", "description": "Maximum 100" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "country", "creatorId", "admins", "memberCount", "maxMembers"]
+    },
+    "LeagueMembership": {
+      "title": "League Membership",
+      "description": "User's membership in a league.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "leagueId_userId" },
+        "leagueId": { "type": "string" },
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin", "member"] },
+        "status": { "type": "string", "enum": ["pending", "approved"] },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "leagueId", "userId", "role", "status", "joinedAt"]
+    },
+    "PointTransaction": {
+      "title": "Point Transaction",
+      "description": "User point logs for earning, spending, or refunding points.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["earned", "spent", "refunded", "penalized"] },
+        "amount": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "title"]
     }
   },
   "firestore": {
@@ -117,6 +170,9 @@
     "/tournaments/{id}": { "schema": "Tournament", "description": "Tournaments" },
     "/registrations/{id}": { "schema": "Registration", "description": "Join requests" },
     "/matches/{id}": { "schema": "Match", "description": "Match records" },
-    "/messages/{id}": { "schema": "Message", "description": "Chat messages" }
+    "/messages/{id}": { "schema": "Message", "description": "Chat messages" },
+    "/leagues/{id}": { "schema": "League", "description": "Leagues" },
+    "/leagueMemberships/{id}": { "schema": "LeagueMembership", "description": "League memberships" },
+    "/point_transactions/{id}": { "schema": "PointTransaction", "description": "Points history and logs" }
   }
 }

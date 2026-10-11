@@ -18,6 +18,8 @@ export interface UserProfile {
   avatar?: string;
   wallet?: number;
   eliteScore?: number;
+  pointsGifted?: number;
+  createdAt?: any;
   stats?: {
     played: number;
     won: number;

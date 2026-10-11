@@ -1,28 +1,118 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getUserDoc() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    
+    function hasRole(role) {
+      return isSignedIn() && exists(getUserDoc()) && get(getUserDoc()).data.role == role;
+    }
+    
+    function isAdmin() {
+      return (isSignedIn() && request.auth.token.email == 'sperkplay@gmail.com') || hasRole('admin');
+    }
+    
+    function isPublisher() {
+      return hasRole('publisher') || isAdmin();
     }
 
+    // User profiles
     match /users/{uid} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
     }
 
-    match /matches/{id} {
-      allow read, write: if true;
-    }
-
+    // Tournaments
     match /tournaments/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    // Registrations
     match /registrations/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    // Matches
+    match /matches/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+    
+    // Challenges (1v1)
+    match /challenges/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Messages / Global Chat / Match Chat
     match /messages/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+    
+    // Announcements
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Point Transactions (Points history: earned, spent, refunded, penalized)
+    match /point_transactions/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+    
+    // Transactions / Logs
+    match /transactions/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Leagues
+    match /leagues/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // League Memberships
+    match /leagueMemberships/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // League Messages (Chat)
+    match /leagueMessages/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
     }
   }
 }

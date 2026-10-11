@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
-import { Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, Search, Hash, CheckCircle, History } from 'lucide-react';
+import { Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, Search, Hash, CheckCircle, History, Shield } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { collection, query, orderBy, limit, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
@@ -269,7 +269,11 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
                         </div>
                         <div className="space-y-1">
                           <span className="text-sm font-black text-slate-800 block uppercase italic leading-none">{t.title || 'Untitled Cup'}</span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                              <Shield size={10} />
+                              {t.organizerName || t.organizationName || t.publisherName || 'Official Host'}
+                            </span>
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-100">
                               ID: {t.id.slice(0, 8).toUpperCase()}
                             </span>
@@ -487,9 +491,19 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
                       </div>
                    </div>
                    
-                   <div className="relative z-10 mb-8">
+                   <div className="relative z-10 mb-8 space-y-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/90 shadow-sm max-w-full">
+                        <div className="w-4 h-4 rounded-md bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                          <Shield size={10} />
+                        </div>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
+                        <span className="text-[9px] font-black text-slate-800 uppercase tracking-tight truncate">
+                          {t.organizerName || t.organizationName || t.publisherName || 'Official FC Host'}
+                        </span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      </div>
                       <h4 className="text-3xl font-black text-slate-800 uppercase italic leading-tight group-hover:text-fc-green transition-colors">{t.title}</h4>
-                      <div className="w-12 h-1 bg-fc-green/20 mt-2" />
+                      <div className="w-12 h-1 bg-fc-green/20 mt-1" />
                    </div>
 
                    <div className="flex items-center justify-between relative z-10">

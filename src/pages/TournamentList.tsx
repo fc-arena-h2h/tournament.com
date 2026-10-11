@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { Trophy, Users, Shield, ArrowRight, Clock, Target, CheckCircle, Hash } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -13,7 +13,7 @@ interface Tournament {
   id: string;
   title: string;
   description: string;
-  format: 'league' | 'knockout' | 'hybrid';
+  format?: 'group_knockout' | 'knockout' | 'league' | 'hybrid' | string;
   entryType: 'free' | 'paid';
   ovrLimit: number;
   status: 'open' | 'registration_closed' | 'ongoing' | 'finished' | 'completed';
@@ -21,6 +21,9 @@ interface Tournament {
   totalSlots: number;
   filledSlots: number;
   publisherId?: string;
+  organizerName?: string;
+  organizationName?: string;
+  publisherName?: string;
 }
 
 interface Registration {
@@ -35,6 +38,7 @@ interface TournamentListPageProps {
 
 export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps) => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [publisherProfiles, setPublisherProfiles] = useState<Record<string, UserProfile>>({});
   const [userRegistrations, setUserRegistrations] = useState<Record<string, Registration>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'joined' | 'all'>('joined');
@@ -44,6 +48,20 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
       setTournaments(tData);
+
+      // Fetch publisher profiles for tournaments that have a publisherId
+      const pubIds = Array.from(new Set(tData.map(t => t.publisherId))).filter(Boolean) as string[];
+      pubIds.forEach(async (pId) => {
+        if (!pId || typeof pId !== 'string' || !pId.trim()) return;
+        try {
+          const uSnap = await getDoc(doc(db, 'users', pId.trim()));
+          if (uSnap.exists()) {
+            setPublisherProfiles(prev => ({ ...prev, [pId]: uSnap.data() as UserProfile }));
+          }
+        } catch (e) {
+          console.error("Error fetching publisher profile", e);
+        }
+      });
     });
 
     if (auth.currentUser) {
@@ -167,6 +185,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
           
           const isFinished = t.status === 'finished' || t.status === 'completed';
           const isLive = t.status === 'ongoing' || (isFull && !isFinished);
+          const organizerName = t.organizerName || t.organizationName || t.publisherName || (t.publisherId ? publisherProfiles[t.publisherId]?.inGameName : null) || 'Official FC Host';
 
           return (
             <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
@@ -193,16 +212,23 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                     </div>
                   )}
 
-                  <div className="bg-purple-50 rounded-full px-5 py-2 border border-purple-100 shadow-sm">
-                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-tight">
-                      {t.entryType === 'paid' ? 'Paid Entry' : 'Free Entry'}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="bg-slate-100 rounded-full px-3.5 py-1.5 border border-slate-200 shadow-sm">
+                      <span className="text-[9px] font-black text-slate-700 uppercase tracking-tight">
+                        {t.format === 'knockout' ? 'Knockout' : 'Group + Knockout'}
+                      </span>
+                    </div>
+                    <div className="bg-purple-50 rounded-full px-4 py-1.5 border border-purple-100 shadow-sm">
+                      <span className="text-[9px] font-black text-purple-600 uppercase tracking-tight">
+                        {t.entryType === 'paid' ? 'Paid Entry' : 'Free Entry'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-6">
-                  {/* Season and Title */}
-                  <div className="space-y-2">
+                  {/* Season, Organizer, and Title */}
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-slate-500">
                         <Trophy size={14} className="opacity-70" />
@@ -213,6 +239,21 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                         <span className="text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">{t.id.slice(0, 8)}</span>
                       </div>
                     </div>
+
+                    {/* Organizer / Organization Badge */}
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/90 shadow-sm max-w-full">
+                        <div className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Shield size={11} />
+                        </div>
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
+                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate">
+                          {organizerName}
+                        </span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Verified Organizer" />
+                      </div>
+                    </div>
+
                     <h3 className="text-4xl font-black text-slate-900 uppercase leading-none tracking-tight">
                       {t.title}
                     </h3>
@@ -254,7 +295,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                       {/* Dots indicator */}
                       <div className="flex items-center gap-1.5 py-1">
                          {[...Array(6)].map((_, i) => (
-                           <div key={i} className={cn(
+                           <div key={`dot-${t.id}-${i}`} className={cn(
                              "w-4 h-4 rounded-full transition-all",
                              i < (t.filledSlots / t.totalSlots * 6) 
                               ? "bg-[#2d3748] shadow-sm" 

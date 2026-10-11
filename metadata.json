@@ -1,6 +1,6 @@
 {
-  "name": "Fc Arena VS",
-  "description": "Tournament platform for Fc mobile game. Join and compete in cups and H2H matches.",
+  "name": "FC Arena VS – FC Mobile Tournament Platform",
+  "description": "Join the ultimate FC Mobile tournament arena. Compete in cups, 1v1 challenges, and rise through the leaderboard with FC Arena VS.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { Trophy, ArrowLeft } from 'lucide-react';
+import { Trophy, ArrowLeft, Shield } from 'lucide-react';
+import { UserProfile } from '@/src/hooks/useAuth';
 
-export const CreateTournamentPage = ({ onBack }: { onBack: () => void }) => {
+export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfile | null; onBack: () => void }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    format: 'league' as 'league' | 'knockout' | 'hybrid',
+    organizerName: profile?.inGameName || profile?.leagueName || '',
+    format: 'group_knockout' as 'group_knockout' | 'knockout',
     entryType: 'free' as 'free' | 'paid',
     ovrLimit: 100,
     entryFee: 0,
@@ -23,8 +25,13 @@ export const CreateTournamentPage = ({ onBack }: { onBack: () => void }) => {
     setLoading(true);
 
     try {
+      const finalOrganizer = formData.organizerName.trim() || profile?.inGameName || profile?.leagueName || 'Official Host';
+
       await addDoc(collection(db, 'tournaments'), {
         ...formData,
+        organizerName: finalOrganizer,
+        organizationName: finalOrganizer,
+        publisherName: finalOrganizer,
         publisherId: auth.currentUser.uid,
         status: 'open',
         filledSlots: 0,
@@ -63,6 +70,21 @@ export const CreateTournamentPage = ({ onBack }: { onBack: () => void }) => {
         </div>
 
         <div className="space-y-3">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+            <Shield size={12} className="text-indigo-500" />
+            Organizer / Organization Name
+          </label>
+          <Input 
+            placeholder="e.g. Sperk Esports, FC Arena Official..." 
+            value={formData.organizerName}
+            onChange={(e) => setFormData({...formData, organizerName: e.target.value})}
+          />
+          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+            This name will be proudly displayed on tournament cards and the arena banner
+          </p>
+        </div>
+
+        <div className="space-y-3">
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Description</label>
           <textarea 
             className="w-full p-6 nm-inset rounded-[2rem] text-slate-700 placeholder:text-slate-400 outline-none border border-white/20 min-h-[140px] text-sm font-medium leading-relaxed"
@@ -77,14 +99,16 @@ export const CreateTournamentPage = ({ onBack }: { onBack: () => void }) => {
           <div className="space-y-3">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Format</label>
             <select 
-              className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest"
+              className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
               value={formData.format}
-              onChange={(e) => setFormData({...formData, format: e.target.value as any})}
+              onChange={(e) => setFormData({...formData, format: e.target.value as 'group_knockout' | 'knockout'})}
             >
-              <option value="league">League</option>
+              <option value="group_knockout">Group + Knockout</option>
               <option value="knockout">Knockout</option>
-              <option value="hybrid">Hybrid</option>
             </select>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+              {formData.format === 'knockout' ? 'Single Elimination Bracket' : 'Group Stage + Knockout'}
+            </p>
           </div>
           <div className="space-y-3">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Entry Type</label>
