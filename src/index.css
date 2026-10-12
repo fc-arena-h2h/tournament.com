@@ -9,6 +9,14 @@
 }
 
 @layer base {
+  html {
+    font-size: 14px;
+  }
+  @media (max-width: 640px) {
+    html {
+      font-size: 13.5px;
+    }
+  }
   body {
     color: #475569;
     font-family: 'Inter', sans-serif;
