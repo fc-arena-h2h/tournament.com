@@ -189,7 +189,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
 
           return (
             <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
-              <Card className="relative group overflow-visible p-8">
+              <Card className="relative group overflow-visible p-5 sm:p-8">
                 {/* Top Bar: Status Badge and Entry Type */}
                 <div className="flex items-center justify-between mb-8">
                   {isFinished ? (
@@ -254,10 +254,10 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                       </div>
                     </div>
 
-                    <h3 className="text-4xl font-black text-slate-900 uppercase leading-none tracking-tight">
+                    <h3 className="text-xl sm:text-4xl font-black text-slate-900 uppercase leading-none tracking-tight truncate">
                       {t.title}
                     </h3>
-                    <p className="text-lg text-slate-400 font-medium tracking-tight">
+                    <p className="text-xs sm:text-lg text-slate-400 font-medium tracking-tight">
                       {t.description || 'Official FC Mobile H2H Tournament'}
                     </p>
                   </div>

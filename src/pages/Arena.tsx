@@ -295,25 +295,25 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         </Reveal>
       </div>
 
-      {/* Hero Banner - FC Mobile Styled */}
+            {/* Hero Banner - FC Mobile Styled */}
       <Reveal direction="right" delay={100}>
-        <div className="nm-flat rounded-[3rem] p-4 border-2 border-white">
-          <div className="relative h-56 rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
+        <div className="nm-flat rounded-[2.5rem] p-3 sm:p-4 border-2 border-white">
+          <div className="relative h-48 sm:h-56 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
             <div className="absolute inset-0 bg-gradient-to-r from-fc-dark via-fc-dark/60 to-transparent" />
             <div className="absolute top-0 right-0 w-1/2 h-full opacity-40 group-hover:scale-110 transition-transform duration-1000">
                <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
             </div>
-            <div className="absolute inset-0 border-2 border-white/10 rounded-[2.5rem] pointer-events-none" />
+            <div className="absolute inset-0 border-2 border-white/10 rounded-[2rem] sm:rounded-[2.5rem] pointer-events-none" />
             
-            <div className="absolute top-8 left-8">
-               <div className="flex items-center gap-2 mb-4">
+            <div className="absolute top-6 sm:top-8 left-6 sm:left-8">
+               <div className="flex items-center gap-2 mb-3 sm:mb-4">
                   <div className="w-2 h-2 rounded-full bg-fc-green animate-pulse" />
-                  <span className="text-[9px] font-black text-fc-green uppercase tracking-[0.3em]">Official Tournament Arena</span>
+                  <span className="text-[8px] sm:text-[9px] font-black text-fc-green uppercase tracking-[0.3em]">Official Tournament Arena</span>
                </div>
-               <h1 className="text-5xl font-black text-white uppercase italic leading-none tracking-tighter mb-2">
+               <h1 className="text-3xl sm:text-5xl font-black text-white uppercase italic leading-none tracking-tighter mb-2">
                  ELITE <br /><span className="text-fc-green">ARENA</span>
                </h1>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[180px] leading-relaxed">
+               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[180px] leading-relaxed">
                  The ultimate destination for FC Mobile pro players
                </p>
             </div>
@@ -323,109 +323,105 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
       {/* Profile Card - Screenshot Styled */}
       <Reveal direction="left" delay={200}>
-        <Card className="flex flex-col gap-8 bg-[#fdfdfd] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-10 rounded-[3rem] relative overflow-hidden">
+        <Card className="flex flex-col gap-6 sm:gap-8 bg-[#fdfdfd] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] relative overflow-hidden">
           {/* Top Header */}
           <div className="flex items-start justify-between relative z-10">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 sm:gap-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full p-1 bg-white shadow-xl border border-slate-100 overflow-hidden">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 bg-white shadow-xl border border-slate-100 overflow-hidden shrink-0">
                   <img 
                     src={profile?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
                     className="w-full h-full object-cover rounded-full" 
                     alt="Player Avatar" 
                   />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-10 h-10 rounded-2xl bg-[#2d3748] border-4 border-white flex items-center justify-center shadow-lg">
-                   <span className="text-[10px] font-black text-white italic">{profile?.ovr || 100}</span>
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-[#2d3748] border-4 border-white flex items-center justify-center shadow-lg">
+                   <span className="text-[9px] sm:text-[10px] font-black text-white italic">{profile?.ovr || 100}</span>
                 </div>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black text-[#1a1a1a] uppercase italic tracking-tight">{profile?.inGameName || 'Player Name'}</h2>
+                  <h2 className="text-lg sm:text-2xl font-black text-[#1a1a1a] uppercase italic tracking-tight truncate">{profile?.inGameName || 'Player Name'}</h2>
                   {profile?.inGameName && profile?.inGameUID && profile?.ovr && profile?.fbUrl && (
-                    <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm animate-in zoom-in duration-500">
-                      <CheckCircle size={12} fill="white" />
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                      <CheckCircle size={10} fill="white" />
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <div className="px-4 py-2 rounded-[1rem] bg-[#e6e9ff] text-[#5c6ac4] shadow-sm border border-white">
+                <div className="flex gap-2 flex-wrap">
+                  <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-[1rem] bg-[#e6e9ff] text-[#5c6ac4] shadow-sm border border-white">
                     <div className="flex flex-col leading-none">
-                      <span className="text-[8px] font-black uppercase opacity-60 mb-0.5">League</span>
-                      <span className="text-[10px] font-black uppercase italic">Elite</span>
+                      <span className="text-[7px] sm:text-[8px] font-black uppercase opacity-60 mb-0.5">League</span>
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase italic">Elite</span>
                     </div>
                   </div>
-                  <div className="px-4 py-2 rounded-[1rem] bg-[#f5e6ff] text-[#9a5cc4] shadow-sm border border-white flex items-center gap-2">
-                    <Activity size={12} className="opacity-40" />
+                  <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-[1rem] bg-[#f5e6ff] text-[#9a5cc4] shadow-sm border border-white flex items-center gap-1.5">
+                    <Activity size={10} className="opacity-40" />
                     <div className="flex flex-col leading-none">
-                      <span className="text-[8px] font-black uppercase opacity-60 mb-0.5">Arena</span>
-                      <span className="text-[10px] font-black uppercase italic">Pro</span>
+                      <span className="text-[7px] sm:text-[8px] font-black uppercase opacity-60 mb-0.5">Arena</span>
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase italic">Pro</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            {/* Notification icon removed as requested */}
           </div>
 
           {/* Center Stats - Inset Glass Style */}
-          <div className="nm-inset rounded-[2.5rem] bg-[#f8f9fa] p-10 grid grid-cols-3 divide-x divide-slate-200 border border-white/50">
-             <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Global Rank</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-slate-300 text-sm font-bold">#</span>
-                  <span className="text-3xl font-black text-[#2d3748] tracking-tighter">{liveStats.globalRank}</span>
+          <div className="nm-inset rounded-[2rem] sm:rounded-[2.5rem] bg-[#f8f9fa] p-5 sm:p-10 grid grid-cols-3 divide-x divide-slate-200 border border-white/50">
+             <div className="flex flex-col items-center gap-1 px-1">
+                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Global Rank</span>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-slate-300 text-xs font-bold">#</span>
+                  <span className="text-xl sm:text-3xl font-black text-[#2d3748] tracking-tighter">{liveStats.globalRank}</span>
                 </div>
              </div>
-             <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Win Rate</span>
+             <div className="flex flex-col items-center gap-1 px-1">
+                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Win Rate</span>
                 <div className="flex items-baseline gap-0.5">
-                  <span className="text-3xl font-black text-[#2d3748] tracking-tighter">
+                  <span className="text-xl sm:text-3xl font-black text-[#2d3748] tracking-tighter">
                     {liveStats.played > 0 ? ((liveStats.won / liveStats.played) * 100).toFixed(1) : '0.0'}
                   </span>
-                  <span className="text-slate-400 text-[10px] font-black">%</span>
+                  <span className="text-slate-400 text-[9px] font-black">%</span>
                 </div>
              </div>
-             <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Play</span>
-                <span className="text-3xl font-black text-[#2d3748] tracking-tighter">{liveStats.played}</span>
+             <div className="flex flex-col items-center gap-1 px-1">
+                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Total Play</span>
+                <span className="text-xl sm:text-3xl font-black text-[#2d3748] tracking-tighter">{liveStats.played}</span>
              </div>
           </div>
 
           {/* Bottom Quick Access */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
              <div 
                onClick={() => setShowPointsHistoryModal(true)}
-               className="flex-[1.2] h-20 nm-inset bg-[#f1f1f5] rounded-[2rem] flex items-center px-8 gap-4 border border-white cursor-pointer hover:bg-slate-200/60 active:scale-95 transition-all group"
+               className="flex-1 h-16 sm:h-20 nm-inset bg-[#f1f1f5] rounded-[1.8rem] sm:rounded-[2rem] flex items-center px-5 sm:px-8 gap-3 sm:gap-4 border border-white cursor-pointer hover:bg-slate-200/60 active:scale-95 transition-all group"
              >
-                <div className="w-10 h-10 rounded-xl bg-white shadow-md flex items-center justify-center text-slate-400 group-hover:text-amber-500 transition-colors">
-                  <Zap size={20} fill="currentColor" className="text-[#2d3748]" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white shadow-md flex items-center justify-center text-slate-400 group-hover:text-amber-500 transition-colors shrink-0">
+                  <Zap size={18} fill="currentColor" className="text-[#2d3748]" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Arena Points</span>
+                    <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">Arena Points</span>
                     <History size={10} className="text-indigo-500 animate-pulse" />
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[10px] font-black text-slate-800 uppercase italic">FP:</span>
-                    <span className="text-xl font-black text-slate-900 italic tracking-tight">
+                  <div className="flex items-baseline gap-1.5 truncate">
+                    <span className="text-[9px] sm:text-[10px] font-black text-slate-800 uppercase italic">FP:</span>
+                    <span className="text-lg sm:text-xl font-black text-slate-900 italic tracking-tight truncate">
                       {profile?.eliteScore?.toLocaleString() || '0'}
                     </span>
                   </div>
                 </div>
              </div>
-             <div className="flex-1 h-20 nm-inset bg-[#f1f1f5] rounded-[2rem] flex items-center px-8 gap-4 border border-white">
-                <span className="text-xl font-black text-[#2d3748] italic">$</span>
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Balance</span>
-                  <span className="text-xl font-black text-slate-900 italic tracking-tight">
+             <div className="flex-1 h-16 sm:h-20 nm-inset bg-[#f1f1f5] rounded-[1.8rem] sm:rounded-[2rem] flex items-center px-5 sm:px-8 gap-3 sm:gap-4 border border-white">
+                <span className="text-lg sm:text-xl font-black text-[#2d3748] italic shrink-0">$</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">Balance</span>
+                  <span className="text-lg sm:text-xl font-black text-slate-900 italic tracking-tight truncate">
                     {profile?.wallet?.toFixed(2) || '0.00'}
                   </span>
                 </div>
              </div>
-             <button className="w-20 h-20 rounded-[2rem] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-center text-slate-800 active:scale-90 transition-transform">
-                <Plus size={28} strokeWidth={3} />
-             </button>
           </div>
         </Card>
       </Reveal>
