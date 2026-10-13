@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X } from 'lucide-react';
+import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { doc, onSnapshot, updateDoc, setDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -11,9 +11,10 @@ import imageCompression from 'browser-image-compression';
 interface ProfileProps {
   user: any;
   profile: UserProfile | null;
+  onOpenWallet?: () => void;
 }
 
-export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => {
+export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: ProfileProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -387,6 +388,39 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
           <div className="space-y-1 pt-2">
             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">Current</span>
             <span className="text-xl font-black text-slate-800 italic">{profile?.eliteScore || 0} PTS</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Wallet Card */}
+      <div className="px-4">
+        <div 
+          onClick={() => onOpenWallet?.()}
+          className="nm-flat rounded-[2.5rem] p-6 border-2 border-white/60 bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 cursor-pointer active:scale-95 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <Wallet size={22} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Personal Balance</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-black text-emerald-600">৳</span>
+                  <span className="text-2xl font-black text-slate-900 font-mono">
+                    {profile?.wallet?.toFixed(2) || '0.00'}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">BDT</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 group-hover:bg-emerald-600 transition-colors">
+                <ArrowDownLeft size={12} />
+                <span>Wallet</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>

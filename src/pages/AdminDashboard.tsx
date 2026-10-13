@@ -3,7 +3,7 @@ import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, getDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { logPointTransaction } from '@/src/lib/points';
-import { Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, Camera, AlertCircle, Swords, X, Trash2, LayoutDashboard, Gamepad2, Clock } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, Camera, AlertCircle, Swords, X, Trash2, LayoutDashboard, Gamepad2, Clock, Wallet } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { MatchesPage } from '@/src/pages/Matches';
@@ -47,7 +47,15 @@ interface Challenge {
   timestamp: Timestamp;
 }
 
-export const AdminDashboard = ({ onCreateNew, onEnterTournament }: { onCreateNew: () => void; onEnterTournament: (t: any) => void }) => {
+export const AdminDashboard = ({ 
+  onCreateNew, 
+  onEnterTournament,
+  onOpenWallet
+}: { 
+  onCreateNew: () => void; 
+  onEnterTournament: (t: any) => void;
+  onOpenWallet?: () => void;
+}) => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [tournaments, setTournaments] = useState<Record<string, Tournament>>({});
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -316,6 +324,39 @@ export const AdminDashboard = ({ onCreateNew, onEnterTournament }: { onCreateNew
               <Plus size={24} />
             </button>
           </div>
+
+          {/* Wallet & Payment Requests Fast-Action Card (Admin Only) */}
+          {userProfile?.role === 'admin' && (
+            <div className="px-2">
+              <div 
+                onClick={() => onOpenWallet?.()}
+                className="nm-flat rounded-[2rem] p-5 border-2 border-emerald-100/70 bg-gradient-to-r from-emerald-50/60 via-white to-teal-50/40 flex items-center justify-between cursor-pointer active:scale-95 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                    <Wallet size={22} />
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-900 uppercase italic">Financials & Wallet Requests</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase">
+                        Admin Only
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Manage player cash-in deposits & withdrawal approvals
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider group-hover:bg-emerald-600 transition-colors">
+                    Review Requests
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Section 1: ACTIVE CUPS */}
           <section className="space-y-6">

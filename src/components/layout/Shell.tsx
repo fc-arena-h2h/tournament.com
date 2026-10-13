@@ -54,7 +54,23 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
   );
 };
 
-export const Header = ({ title, profile, showBack, onBack }: { title: string; profile?: UserProfile | null; showBack?: boolean; onBack?: () => void }) => {
+export const Header = ({ 
+  title, 
+  profile, 
+  showBack, 
+  onBack,
+  onOpenWallet,
+  onOpenNotifications,
+  unreadCount = 0
+}: { 
+  title: string; 
+  profile?: UserProfile | null; 
+  showBack?: boolean; 
+  onBack?: () => void;
+  onOpenWallet?: () => void;
+  onOpenNotifications?: () => void;
+  unreadCount?: number;
+}) => {
   const { isInstallable, install } = usePWAInstall();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -120,18 +136,39 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
           <div className="flex-1 h-[1px] bg-slate-200" />
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button 
+            onClick={() => onOpenWallet?.()}
+            className="h-11 sm:h-12 px-2.5 sm:px-3.5 rounded-2xl nm-flat text-emerald-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
+            title="Open Wallet"
+          >
+            <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-600">
+              <Wallet size={14} />
+            </div>
+            <span className="text-[11px] sm:text-xs font-black font-mono tracking-tight">
+              ৳{profile?.wallet?.toFixed(0) || '0'}
+            </span>
+          </button>
           <button 
             onClick={() => {
-              setShowNotifications(true);
-              setHasNew(false);
+              if (onOpenNotifications) {
+                onOpenNotifications();
+              } else {
+                setShowNotifications(true);
+                setHasNew(false);
+              }
             }}
-            className="w-12 h-12 rounded-2xl nm-flat text-slate-800 border border-white/40 flex items-center justify-center relative active:nm-pressed"
+            className="w-11 sm:w-12 h-11 sm:h-12 rounded-2xl nm-flat text-slate-800 border border-white/40 flex items-center justify-center relative active:nm-pressed"
+            title="Notifications"
           >
-            <Bell size={20} />
-            {hasNew && (
+            <Bell size={18} />
+            {unreadCount > 0 ? (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center shadow-md animate-pulse">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            ) : hasNew ? (
               <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white animate-pulse" />
-            )}
+            ) : null}
           </button>
           {isInstallable && (
             <button 
@@ -143,9 +180,9 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
           )}
           <button 
             onClick={() => setShowMenu(true)}
-            className="w-12 h-12 rounded-2xl nm-flat text-slate-800 border border-white/40 flex items-center justify-center active:nm-pressed shadow-sm"
+            className="w-11 sm:w-12 h-11 sm:h-12 rounded-2xl nm-flat text-slate-800 border border-white/40 flex items-center justify-center active:nm-pressed shadow-sm"
           >
-            <MoreVertical size={22} />
+            <MoreVertical size={20} />
           </button>
         </div>
       </div>
@@ -223,18 +260,46 @@ export const Header = ({ title, profile, showBack, onBack }: { title: string; pr
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">GENERAL SERVICES</span>
                 <div className="grid grid-cols-1 gap-3">
                   {[
-                    { label: 'My Wallet', icon: Wallet, color: 'text-emerald-500' },
-                    { label: 'Support Center', icon: HeartHandshake, color: 'text-indigo-500' },
-                    { label: 'About Arena', icon: Info, color: 'text-slate-800' }
+                    { 
+                      label: 'My Wallet', 
+                      icon: Wallet, 
+                      color: 'text-emerald-500', 
+                      badge: `৳${profile?.wallet?.toFixed(2) || '0.00'}`,
+                      sub: 'Add Money · Withdraw',
+                      onClick: () => {
+                        setShowMenu(false);
+                        onOpenWallet?.();
+                      }
+                    },
+                    { label: 'Support Center', icon: HeartHandshake, color: 'text-indigo-500', sub: '24/7 Player Assistance' },
+                    { label: 'About Arena', icon: Info, color: 'text-slate-800', sub: 'FC Mobile eSports Platform' }
                   ].map((item) => (
-                    <button key={item.label} className="w-full h-20 nm-flat bg-white rounded-3xl px-6 flex items-center justify-between border border-white/50 active:nm-pressed group">
-                      <div className="flex items-center gap-5">
-                        <div className={cn("w-12 h-12 rounded-2xl nm-inset flex items-center justify-center transition-transform group-active:scale-95", item.color)}>
+                    <button 
+                      key={item.label} 
+                      onClick={() => {
+                        if (item.onClick) {
+                          item.onClick();
+                        }
+                      }}
+                      className="w-full h-20 nm-flat bg-white rounded-3xl px-6 flex items-center justify-between border border-white/50 active:nm-pressed group transition-all"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-2xl nm-inset flex items-center justify-center transition-transform group-active:scale-95 shrink-0", item.color)}>
                           <item.icon size={24} />
                         </div>
-                        <span className="text-sm font-black text-slate-800 uppercase italic">{item.label}</span>
+                        <div className="flex flex-col text-left">
+                          <span className="text-sm font-black text-slate-800 uppercase italic leading-tight">{item.label}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{item.sub}</span>
+                        </div>
                       </div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
+                      <div className="flex items-center gap-2">
+                        {item.badge && (
+                          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black font-mono border border-emerald-200">
+                            {item.badge}
+                          </span>
+                        )}
+                        <div className="w-2.5 h-2.5 rounded-full bg-slate-200 group-hover:bg-slate-400 transition-colors" />
+                      </div>
                     </button>
                   ))}
                 </div>

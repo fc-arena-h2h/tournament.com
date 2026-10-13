@@ -11,6 +11,7 @@ import { GameLoader } from '@/src/components/ui/GameLoader';
 import { logPointTransaction } from '@/src/lib/points';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatMessageTimestamp, cleanupOldMessages } from '@/src/lib/chatUtils';
+import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 
 const REACTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
 
@@ -511,17 +512,37 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     if (!newMessage.trim() || !activeMatchChat) return;
 
     try {
+      const msgText = newMessage.trim();
       await addDoc(collection(db, 'messages'), {
         chatId: activeMatchChat.id,
         tournamentId: activeMatchChat.tournamentId,
         senderId: auth.currentUser?.uid || '',
         senderName: profile?.inGameName || 'Player',
         senderAvatar: profile?.avatar || '',
-        text: newMessage,
+        text: msgText,
         timestamp: Timestamp.now(),
         reactions: {},
         seenBy: [auth.currentUser?.uid]
       });
+
+      // Notify the opponent
+      const currentUid = auth.currentUser?.uid;
+      const opponentId = currentUid === activeMatchChat.homePlayerId 
+        ? activeMatchChat.awayPlayerId 
+        : activeMatchChat.homePlayerId;
+
+      if (opponentId && opponentId !== currentUid) {
+        sendAppNotification({
+          recipientId: opponentId,
+          title: `💬 অপনেন্টের মেসেজ (${profile?.inGameName || 'Opponent'})`,
+          message: msgText.length > 70 ? msgText.slice(0, 67) + '...' : msgText,
+          type: 'chat_message',
+          tournamentId: activeMatchChat.tournamentId,
+          matchId: activeMatchChat.id,
+          linkTab: 'matches'
+        }).catch(() => {});
+      }
+
       setNewMessage('');
     } catch (err) {
       console.error(err);
@@ -601,6 +622,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     if (!reportingMatch) return;
     if (!reportFormData.screenshot) return alert('Please upload match result screenshot');
 
+    // Knockout Stage: Draw is strictly prohibited
+    const isKnockout = reportingMatch.stage !== 'group' || reportingMatch.groupId === 'knockout';
+    if (isKnockout && reportFormData.home === reportFormData.away) {
+      alert('নকআউট স্টেজে কোন ম্যাচের রেজাল্ট ড্র হতে পারবে না! অতিরিক্ত সময় বা পেনাল্টি বিবেচনা করে একজন বিজয়ী নির্ধারণ করতে হবে। ড্র ফলাফল আপলোড করা যাবে না।');
+      return;
+    }
+
     setIsSubmittingReport(true);
     try {
       await updateDoc(doc(db, 'matches', reportingMatch.id), {
@@ -626,6 +654,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
     const homeName = reportingMatch.homePlayerName;
     const awayName = reportingMatch.awayPlayerName;
+    const isKnockout = reportingMatch.stage !== 'group' || reportingMatch.groupId === 'knockout';
+    const isDraw = reportFormData.home === reportFormData.away;
+    const isDrawBlocked = isKnockout && isDraw;
 
     const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -644,7 +675,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 </div>
                 <div>
                    <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">REPORT RESULT</h3>
-                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Submit proof and final scoreline</p>
+                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                     {isKnockout ? 'Knockout Stage · Decisive Winner Required' : 'Submit proof and final scoreline'}
+                   </p>
                 </div>
              </div>
              <button 
@@ -655,15 +688,41 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
              </button>
           </div>
 
-          <div className="p-8 space-y-8">
+          <div className="p-8 space-y-6">
+             {/* Knockout Stage Rule Banner */}
+             {isKnockout && (
+               <div className={cn(
+                 "p-3 rounded-2xl border text-center transition-all animate-in fade-in duration-300",
+                 isDraw 
+                   ? "bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]" 
+                   : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+               )}>
+                 <div className="flex items-center justify-center gap-2 mb-0.5">
+                   {isDraw ? <AlertCircle size={14} className="text-rose-400" /> : <Trophy size={14} className="text-amber-400" />}
+                   <span className="text-[9.5px] font-black uppercase tracking-wider">
+                     {isDraw ? "ড্র ফলাফল গ্রহণযোগ্য নয়!" : "নকআউট স্টেজ: একজন বিজয়ী আবশ্যক"}
+                   </span>
+                 </div>
+                 <p className="text-[8.5px] font-bold opacity-90 leading-relaxed">
+                   {isDraw 
+                     ? "নকআউট ম্যাচে ড্র ফলাফল আপলোড করা যাবে না। অতিরিক্ত সময় বা পেনাল্টি শ্যুটআউট স্কোর সহ জয়ী প্লেয়ারের পক্ষে স্কোর নির্ধারণ করুন।" 
+                     : "এই স্টেজে ম্যাচ ড্র হবে না, দুজনের মধ্যে যেকোনো একজনকে জয়ী হতে হবে।"}
+                 </p>
+               </div>
+             )}
+
              <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 space-y-3">
                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{homeName}</label>
                    <input 
                      type="number"
+                     min="0"
                      value={reportFormData.home}
-                     onChange={(e) => setReportFormData({...reportFormData, home: parseInt(e.target.value) || 0})}
-                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                     onChange={(e) => setReportFormData({...reportFormData, home: Math.max(0, parseInt(e.target.value) || 0)})}
+                     className={cn(
+                       "w-full h-20 rounded-3xl bg-slate-900/50 border-2 text-3xl font-black text-center text-white outline-none transition-all",
+                       isDrawBlocked ? "border-rose-500/40 focus:border-rose-500" : "border-white/5 focus:border-indigo-500"
+                     )}
                    />
                 </div>
                 <span className="text-xl font-black text-slate-700 italic pt-6">VS</span>
@@ -671,9 +730,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{awayName}</label>
                    <input 
                      type="number"
+                     min="0"
                      value={reportFormData.away}
-                     onChange={(e) => setReportFormData({...reportFormData, away: parseInt(e.target.value) || 0})}
-                     className="w-full h-20 rounded-3xl bg-slate-900/50 border-2 border-white/5 text-3xl font-black text-center text-white focus:border-indigo-500 outline-none transition-all"
+                     onChange={(e) => setReportFormData({...reportFormData, away: Math.max(0, parseInt(e.target.value) || 0)})}
+                     className={cn(
+                       "w-full h-20 rounded-3xl bg-slate-900/50 border-2 text-3xl font-black text-center text-white outline-none transition-all",
+                       isDrawBlocked ? "border-rose-500/40 focus:border-rose-500" : "border-white/5 focus:border-indigo-500"
+                     )}
                    />
                 </div>
              </div>
@@ -713,15 +776,19 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
              <button 
                onClick={submitFinalReport}
-               disabled={isSubmittingReport || !reportFormData.screenshot}
+               disabled={isSubmittingReport || !reportFormData.screenshot || isDrawBlocked}
                className={cn(
-                 "w-full h-20 rounded-[2rem] flex items-center justify-center text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
-                 isSubmittingReport || !reportFormData.screenshot 
-                   ? "bg-slate-800 text-slate-600 grayscale cursor-not-allowed" 
-                   : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20"
+                 "w-full h-16 sm:h-20 rounded-[2rem] flex items-center justify-center text-[11px] sm:text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
+                 isSubmittingReport || !reportFormData.screenshot || isDrawBlocked
+                   ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5" 
+                   : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20 hover:scale-[1.01]"
                )}
              >
-                {isSubmittingReport ? 'DEPLOYING...' : 'DEPLOY FINAL RESULT'}
+                {isSubmittingReport 
+                  ? 'DEPLOYING...' 
+                  : isDrawBlocked 
+                    ? 'ড্র ফলাফল গ্রহণযোগ্য নয় (উইনার আবশ্যক)' 
+                    : 'DEPLOY FINAL RESULT'}
              </button>
           </div>
         </div>
@@ -765,6 +832,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   };
 
   const handleConfirmResult = async (match: Match) => {
+    const isKnockout = match.stage !== 'group' || match.groupId === 'knockout';
+    const homeScore = match.homeScore || 0;
+    const awayScore = match.awayScore || 0;
+
+    if (isKnockout && homeScore === awayScore) {
+      alert('নকআউট স্টেজের কোনো ম্যাচ ড্র হতে পারে না! একজন খেলোয়াড়কে বিজয়ী হতে হবে।');
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'matches', match.id), {
         status: 'completed',
@@ -782,6 +858,23 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 25 });
         await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 25 });
       }
+
+      // Notify both participants
+      const winnerName = homeScore > awayScore 
+        ? match.homePlayerName 
+        : awayScore > homeScore 
+          ? match.awayPlayerName 
+          : 'ড্র (Draw)';
+
+      notifyMatchParticipants({
+        homePlayerId: match.homePlayerId,
+        awayPlayerId: match.awayPlayerId,
+        title: '🏆 ম্যাচ রেজাল্ট কনফার্ম হয়েছে!',
+        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}। বিজয়ী: ${winnerName}! ফলাফল চূড়ান্ত করা হয়েছে।`,
+        type: 'match_result',
+        tournamentId: match.tournamentId,
+        matchId: match.id
+      }).catch(() => {});
 
       alert('Result confirmed! Points updated.');
     } catch (err) {
@@ -1412,6 +1505,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         status: 'accepted',
         updatedAt: Timestamp.now()
       });
+
+      // Notify the challenge creator
+      sendAppNotification({
+        recipientId: challenge.creatorId,
+        title: '⚔️ আপনার চ্যালেঞ্জ গৃহীত হয়েছে!',
+        message: `${profile.inGameName || 'Player'} আপনার 1v1 চ্যালেঞ্জ গ্রহণ করেছেন! রুম আইডি: ${challenge.matchId || 'Battle'}।`,
+        type: 'challenge',
+        linkTab: 'matches'
+      }).catch(() => {});
     } catch (error: any) {
       console.error(error);
       setActionError(error?.message || 'Failed to accept challenge.');
@@ -1447,6 +1549,27 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         winnerId: winnerId,
         updatedAt: Timestamp.now()
       });
+
+      // Notify winner & opponent
+      const winnerName = winnerId === challenge.creatorId ? challenge.creatorName : (challenge.opponentName || 'Player');
+      sendAppNotification({
+        recipientId: winnerId,
+        title: '🏆 1v1 চ্যালেঞ্জ জয়ী!',
+        message: `অভিনন্দন! আপনি 1v1 চ্যালেঞ্জে বিজয়ী হয়ে ${challenge.pot} পয়েন্ট জিতেছেন!`,
+        type: 'match_result',
+        linkTab: 'matches'
+      }).catch(() => {});
+
+      const loserId = winnerId === challenge.creatorId ? challenge.opponentId : challenge.creatorId;
+      if (loserId) {
+        sendAppNotification({
+          recipientId: loserId,
+          title: '⚔️ 1v1 চ্যালেঞ্জ সমাপ্ত',
+          message: `1v1 চ্যালেঞ্জের ফলাফল চূড়ান্ত হয়েছে। বিজয়ী: ${winnerName}।`,
+          type: 'match_result',
+          linkTab: 'matches'
+        }).catch(() => {});
+      }
 
       alert('Challenge resolved and points awarded!');
     } catch (error) {
