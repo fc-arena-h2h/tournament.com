@@ -1,5 +1,7 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 export type NotificationType = 
   | 'match_scheduled'
@@ -73,7 +75,17 @@ export function playNotificationSound() {
  * Request system/phone notification permission from user's browser or device.
  */
 export async function requestPhoneNotificationPermission(): Promise<NotificationPermission> {
-  if (!('Notification' in window)) {
+  // If running in native Android/iOS Capacitor
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const perm = await LocalNotifications.requestPermissions();
+      return perm.display === 'granted' ? 'granted' : 'denied';
+    } catch (e) {
+      console.warn('Capacitor LocalNotifications permission error:', e);
+    }
+  }
+
+  if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'denied';
   }
   try {
@@ -86,38 +98,124 @@ export async function requestPhoneNotificationPermission(): Promise<Notification
 }
 
 /**
- * Show a native system/phone push notification with vibration support.
+ * Update the app icon unread badge count on home screen / device dock
  */
-export function showSystemNotification(title: string, options?: { body?: string; icon?: string; tag?: string }) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') {
+export function updateAppBadge(count: number) {
+  try {
+    if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
+      if (count > 0) {
+        (navigator as any).setAppBadge(count).catch(() => {});
+      } else {
+        (navigator as any).clearAppBadge().catch(() => {});
+      }
+    }
+  } catch {
+    // unsupported platform, ignore
+  }
+}
+
+/**
+ * Show a native system/phone push notification with vibration support.
+ * Uses ServiceWorker registration so it shows in the Android/mobile notification tray.
+ */
+export function showSystemNotification(title: string, options?: { body?: string; icon?: string; tag?: string; url?: string }) {
+  // If running on native Capacitor Android
+  if (Capacitor.isNativePlatform()) {
+    try {
+      LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 2147483647),
+            title,
+            body: options?.body || '',
+            schedule: { at: new Date(Date.now() + 100) },
+            extra: { url: options?.url || '/' }
+          }
+        ]
+      }).catch((e) => console.warn('Capacitor schedule error:', e));
+      return;
+    } catch (e) {
+      console.warn('Capacitor LocalNotifications failed:', e);
+    }
+  }
+
+  if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
     return;
   }
 
   const notificationOptions: NotificationOptions = {
     body: options?.body || '',
-    icon: options?.icon || '/fc_arena_icon.jpg',
+    icon: options?.icon || '/pwa-192x192.png',
     badge: '/fc_arena_icon.jpg',
-    tag: options?.tag || String(Date.now()),
+    tag: options?.tag || 'fc-arena-' + Date.now(),
+    renotify: true,
+    requireInteraction: false,
     ...({
-      vibrate: [200, 100, 200]
+      vibrate: [200, 100, 200, 100, 200],
+      data: { url: options?.url || '/' }
     } as any)
   };
 
   try {
-    // If ServiceWorker registration is available (PWA / Android), prefer registration.showNotification
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const userAgent = typeof window !== 'undefined' && window.navigator ? window.navigator.userAgent : '';
+    const isAndroid = /Android/i.test(userAgent);
+
+    // Android Chrome REQUIRES ServiceWorkerRegistration.showNotification.
+    // Directly calling `new Notification(...)` throws TypeError: Illegal constructor on Android.
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
-        registration.showNotification(title, notificationOptions).catch(() => {
-          new Notification(title, notificationOptions);
-        });
-      }).catch(() => {
-        new Notification(title, notificationOptions);
+        if (registration && registration.showNotification) {
+          return registration.showNotification(title, notificationOptions);
+        }
+      }).catch((swErr) => {
+        console.warn('Service worker notification failed:', swErr);
+        // Fallback for non-Android browsers only
+        if (!isAndroid && typeof Notification !== 'undefined') {
+          try {
+            new Notification(title, notificationOptions);
+          } catch {}
+        }
       });
-    } else {
+      return;
+    }
+
+    // Fallback for desktop non-Android browsers without service worker
+    if (!isAndroid && typeof Notification !== 'undefined') {
       new Notification(title, notificationOptions);
     }
   } catch (e) {
     console.warn('Native notification dispatch error:', e);
+  }
+}
+
+/**
+ * Dispatch an immediate test phone notification to confirm it shows in the device notification shade.
+ */
+export async function sendTestPhoneNotification(): Promise<{ success: boolean; message: string }> {
+  try {
+    const perm = await requestPhoneNotificationPermission();
+    if (perm !== 'granted') {
+      return {
+        success: false,
+        message: 'Notification permission not granted. Please allow notifications in browser settings.'
+      };
+    }
+
+    playNotificationSound();
+    showSystemNotification('FC Arena VS – Test Notification 🏆', {
+      body: 'Background notifications are successfully active on your device! Tournament & match updates will arrive directly.',
+      tag: 'test-phone-' + Date.now()
+    });
+
+    return {
+      success: true,
+      message: 'Test notification successfully sent to device notification bar!'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || 'Failed to send notification.'
+    };
   }
 }
 
