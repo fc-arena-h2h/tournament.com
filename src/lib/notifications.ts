@@ -230,12 +230,12 @@ export async function notifyAdminPaymentRequest({
 }) {
   const isDeposit = type === 'deposit';
   const title = isDeposit 
-    ? `💳 নতুন ডিপোজিট রিকোয়েস্ট (৳${amount})` 
-    : `💸 নতুন উইথড্র রিকোয়েস্ট (৳${amount})`;
+    ? `💳 New Deposit Request (৳${amount})` 
+    : `💸 New Withdrawal Request (৳${amount})`;
 
   const message = isDeposit
-    ? `${userName} ৳${amount} টাকা যোগ করার জন্য ${method.toUpperCase()} এ রিকোয়েস্ট করেছেন (TrxID: ${trxId || 'N/A'})। অনুমোদন বা যাচাই করুন।`
-    : `${userName} ৳${amount} টাকা উত্তোলনের জন্য ${method.toUpperCase()} একাউন্টে (${recipientAccount || 'N/A'}) রিকোয়েস্ট করেছেন।`;
+    ? `${userName} requested to deposit ৳${amount} via ${method.toUpperCase()} (TrxID: ${trxId || 'N/A'}). Please verify and approve.`
+    : `${userName} requested to withdraw ৳${amount} to ${method.toUpperCase()} account (${recipientAccount || 'N/A'}).`;
 
   await sendAppNotification({
     recipientId: 'admin',

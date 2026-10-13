@@ -62,7 +62,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/20 px-2 py-1 rounded-lg flex items-center gap-1">
-            দেখুন <ArrowRight size={10} />
+            View <ArrowRight size={10} />
           </span>
           <button
             onClick={(e) => {

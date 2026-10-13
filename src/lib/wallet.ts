@@ -30,7 +30,7 @@ export interface WalletTransaction {
 export const PAYMENT_CONFIG = {
   bkash: {
     id: 'bkash' as PaymentMethod,
-    name: 'bKash (বিকাশ)',
+    name: 'bKash',
     brandColor: '#E2136E',
     number: '01301833622',
     type: 'Personal / Send Money',
@@ -39,16 +39,16 @@ export const PAYMENT_CONFIG = {
     minWithdraw: 100,
     maxWithdraw: 25000,
     instructions: [
-      'আপনার বিকাশ অ্যাপে প্রবেশ করুন অথবা *247# ডায়াল করুন',
-      '"Send Money" (সেন্ড মানি) অপশনটি নির্বাচন করুন',
-      'প্রাপক নম্বর দিন: 01301833622',
-      'টাকা পাঠিয়ে ফিরতি এসএমএস থেকে Transaction ID (TrxID) কপি করুন',
-      'নিচের বক্সে আপনার প্রেরক নম্বর ও TrxID লিখে সাবমিট করুন'
+      'Open your bKash app or dial *247#',
+      'Select the "Send Money" option',
+      'Recipient number: 01301833622',
+      'After payment, copy the Transaction ID (TrxID) from the SMS',
+      'Submit your sender number and TrxID in the form below'
     ]
   },
   nagad: {
     id: 'nagad' as PaymentMethod,
-    name: 'Nagad (নগদ)',
+    name: 'Nagad',
     brandColor: '#F7931E',
     number: '01301833622',
     type: 'Personal / Send Money',
@@ -57,16 +57,16 @@ export const PAYMENT_CONFIG = {
     minWithdraw: 100,
     maxWithdraw: 25000,
     instructions: [
-      'আপনার নগদ অ্যাপে প্রবেশ করুন অথবা *167# ডায়াল করুন',
-      '"Send Money" (সেন্ড মানি) অপশনটি নির্বাচন করুন',
-      'প্রাপক নম্বর দিন: 01301833622',
-      'টাকা পাঠিয়ে ফিরতি এসএমএস থেকে Transaction ID (TrxID) কপি করুন',
-      'নিচের বক্সে আপনার প্রেরক নম্বর ও TrxID লিখে সাবমিট করুন'
+      'Open your Nagad app or dial *167#',
+      'Select the "Send Money" option',
+      'Recipient number: 01301833622',
+      'After payment, copy the Transaction ID (TrxID) from the SMS',
+      'Submit your sender number and TrxID in the form below'
     ]
   },
   bitcoin: {
     id: 'bitcoin' as PaymentMethod,
-    name: 'Bitcoin (বিটকয়েন - BTC)',
+    name: 'Bitcoin (BTC)',
     brandColor: '#F7931A',
     type: 'Crypto / BTC Network',
     address: 'bc1qarena72fc89btc9deposit9key9v2', // Placeholder / Configurable
@@ -77,10 +77,10 @@ export const PAYMENT_CONFIG = {
     minWithdraw: 250,
     maxWithdraw: 100000,
     instructions: [
-      'বিটকয়েন নেটওয়ার্ক (BTC Mainnet / SegWit) ব্যবহার করুন',
-      'বিটকয়েন অ্যাড্রেস শিগগিরই প্রদান করা হবে অথবা অ্যাডমিনের সাথে যোগাযোগ করুন',
-      'পেমেন্ট সম্পন্ন করার পর ব্লকচেইন Transaction Hash / TxID সংগ্রহ করুন',
-      'নিচে আপনার বিটকয়েন ওয়ালেট এবং TxID লিখে সাবমিট করুন'
+      'Use BTC Network (Mainnet / SegWit)',
+      'Official Bitcoin address will be provided shortly or contact Admin',
+      'Copy the Transaction Hash / TxID after payment is confirmed',
+      'Submit your sender wallet and TxID in the form below'
     ]
   }
 };
@@ -154,7 +154,7 @@ export async function submitWithdrawRequest(data: {
 
     const currentWallet = Number(userDoc.data().wallet || 0);
     if (currentWallet < amountToWithdraw) {
-      throw new Error(`অপর্যাপ্ত ব্যালেন্স! আপনার বর্তমান ব্যালেন্স ৳${currentWallet.toFixed(2)}`);
+      throw new Error(`Insufficient balance! Your current wallet balance is ৳${currentWallet.toFixed(2)}`);
     }
 
     // Deduct immediately to prevent double spending
@@ -227,8 +227,8 @@ export async function approveWalletTransaction(txId: string, tx: WalletTransacti
   // Notify user that transaction was approved
   sendAppNotification({
     recipientId: tx.userId,
-    title: '✅ টাকা অনুমোদন সফল!',
-    message: `আপনার ৳${tx.amount} এর ${tx.type === 'deposit' ? 'ডিপোজিট' : 'উইথড্র'} রিকোয়েস্ট অ্যাডমিন অনুমোদন করেছেন। আপনার ওয়ালেট ব্যালেন্স আপডেট হয়েছে।`,
+    title: '✅ Transaction Approved!',
+    message: `Your ৳${tx.amount} ${tx.type === 'deposit' ? 'deposit' : 'withdrawal'} request has been approved by Admin. Your wallet balance has been updated.`,
     type: 'payment_status',
     linkTab: 'profile',
     extra: { openWallet: true, txId, amount: tx.amount, type: tx.type }
@@ -268,8 +268,8 @@ export async function rejectWalletTransaction(txId: string, tx: WalletTransactio
   // Notify user that transaction was rejected
   sendAppNotification({
     recipientId: tx.userId,
-    title: '❌ পেমেন্ট রিকোয়েস্ট বাতিল',
-    message: `আপনার ৳${tx.amount} এর ${tx.type === 'deposit' ? 'ডিপোজিট' : 'উইথড্র'} বাতিল করা হয়েছে। কারণ: ${reason || 'যাচাইকরণ ব্যর্থ বা ত্রুটিপূর্ণ TrxID'}`,
+    title: '❌ Transaction Rejected',
+    message: `Your ৳${tx.amount} ${tx.type === 'deposit' ? 'deposit' : 'withdrawal'} was rejected. Reason: ${reason || 'Verification failed or invalid TrxID'}`,
     type: 'payment_status',
     linkTab: 'profile',
     extra: { openWallet: true, txId, amount: tx.amount, type: tx.type }

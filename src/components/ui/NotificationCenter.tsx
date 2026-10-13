@@ -212,8 +212,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 <Bell size={18} className="animate-pulse" />
               </div>
               <div>
-                <p className="text-xs font-black tracking-tight leading-tight">ফোনে পুশ নোটিফিকেশন চালু করুন</p>
-                <p className="text-[10px] text-white/80 font-medium">ম্যাচ শিডিউল, রেজাল্ট ও মেসেজের তাৎক্ষণিক অ্যালার্ট পান</p>
+                <p className="text-xs font-black tracking-tight leading-tight">Enable Push Notifications</p>
+                <p className="text-[10px] text-white/80 font-medium">Get instant alerts for match schedules, results, and messages</p>
               </div>
             </div>
             <button
@@ -221,7 +221,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               disabled={requestingPerm}
               className="px-3 py-1.5 rounded-xl bg-white text-indigo-700 text-xs font-black uppercase tracking-wider shrink-0 shadow-md active:scale-95 transition-transform"
             >
-              {requestingPerm ? 'অপেক্ষা...' : 'অনুমতি দিন'}
+              {requestingPerm ? 'Wait...' : 'Enable'}
             </button>
           </div>
         )}
@@ -238,7 +238,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   activeTab === 'all' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
                 )}
               >
-                সব ({notifications.length})
+                All ({notifications.length})
               </button>
               <button
                 onClick={() => setActiveTab('unread')}
@@ -247,7 +247,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   activeTab === 'unread' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
                 )}
               >
-                অপঠিত
+                Unread
                 {unreadCount > 0 && (
                   <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
                     {unreadCount}
@@ -261,7 +261,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   activeTab === 'announcements' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
                 )}
               >
-                ঘোষণা ({announcements.length})
+                Announcements ({announcements.length})
               </button>
             </div>
           </div>
@@ -269,7 +269,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           {/* Action Row */}
           {activeTab !== 'announcements' && notifications.length > 0 && (
             <div className="flex items-center justify-between px-1 text-[10px] font-bold text-slate-500">
-              <span>{filteredNotifications.length} নোটিফিকেশন</span>
+              <span>{filteredNotifications.length} Notifications</span>
               <div className="flex items-center gap-3">
                 {unreadCount > 0 && (
                   <button 
@@ -277,19 +277,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-black uppercase"
                   >
                     <CheckCheck size={12} />
-                    সব পঠিত করুন
+                    Mark all read
                   </button>
                 )}
                 <button 
                   onClick={() => {
-                    if (confirm('সব নোটিফিকেশন মুছে ফেলতে চান?')) {
+                    if (confirm('Are you sure you want to delete all notifications?')) {
                       clearAllNotifications(notifications);
                     }
                   }}
                   className="flex items-center gap-1 text-rose-500 hover:text-rose-600 font-black uppercase"
                 >
                   <Trash2 size={12} />
-                  সব মুছুন
+                  Clear all
                 </button>
               </div>
             </div>
@@ -303,7 +303,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             announcements.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center text-center opacity-40">
                 <Megaphone size={40} className="text-slate-400 mb-2" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-500">কোনো ঘোষণা নেই</p>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">No Announcements</p>
               </div>
             ) : (
               announcements.map((a) => (
@@ -316,7 +316,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
                         <Megaphone size={14} />
                       </div>
-                      <span className="text-xs font-black text-slate-800 uppercase">{a.senderName || 'অ্যাডমিন'}</span>
+                      <span className="text-xs font-black text-slate-800 uppercase">{a.senderName || 'Admin'}</span>
                     </div>
                     <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
                       <Clock size={10} />
@@ -335,7 +335,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <div className="h-64 flex flex-col items-center justify-center text-center opacity-40">
                 <Bell size={40} className="text-slate-400 mb-2" />
                 <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                  {activeTab === 'unread' ? 'কোনো নতুন অপঠিত নোটিফিকেশন নেই' : 'কোনো নোটিফিকেশন নেই'}
+                  {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                 </p>
               </div>
             ) : (
@@ -385,7 +385,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <div className="flex items-center gap-2">
                             {(n.linkTab || n.extra?.openWallet) && (
                               <span className="text-indigo-600 font-black flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                দেখুন <ArrowRight size={10} />
+                                View <ArrowRight size={10} />
                               </span>
                             )}
                             <button

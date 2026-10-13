@@ -123,7 +123,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     : tournaments;
 
   return (
-    <div className="space-y-10 pt-4">
+    <div className="space-y-5 sm:space-y-8 pt-2 sm:pt-4">
       <Reveal direction="left">
         <div className="flex flex-col gap-4 px-4">
           <div className="flex flex-col gap-1">
@@ -189,114 +189,114 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
 
           return (
             <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
-              <Card className="relative group overflow-visible p-5 sm:p-8">
+              <Card className="relative group overflow-visible p-4 sm:p-7 rounded-[1.8rem] sm:rounded-[2.5rem]">
                 {/* Top Bar: Status Badge and Entry Type */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
                   {isFinished ? (
-                    <div className="px-5 py-2 rounded-full bg-slate-100 text-slate-600 text-[9px] font-black uppercase tracking-widest border border-slate-200 flex items-center gap-2 shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    <div className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-slate-100 text-slate-600 text-[8px] sm:text-[9px] font-black uppercase tracking-widest border border-slate-200 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                       END
                     </div>
                   ) : isLive ? (
-                    <div className="px-5 py-2 rounded-full bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest border border-rose-200 flex items-center gap-2 shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
+                    <div className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-rose-50 text-rose-600 text-[8px] sm:text-[9px] font-black uppercase tracking-widest border border-rose-200 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
                       LIVE
                     </div>
                   ) : (
-                    <div className="px-5 py-2 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest border border-emerald-200 flex items-center gap-2 shadow-sm">
-                      <span className="relative flex h-2 w-2">
+                    <div className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] sm:text-[9px] font-black uppercase tracking-widest border border-emerald-200 flex items-center gap-1.5 shadow-sm">
+                      <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]"></span>
                       </span>
                       UPCOMING
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
-                    <div className="bg-slate-100 rounded-full px-3.5 py-1.5 border border-slate-200 shadow-sm">
-                      <span className="text-[9px] font-black text-slate-700 uppercase tracking-tight">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="bg-slate-100 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border border-slate-200 shadow-sm">
+                      <span className="text-[8px] sm:text-[9px] font-black text-slate-700 uppercase tracking-tight">
                         {t.format === 'knockout' ? 'Knockout' : 'Group + Knockout'}
                       </span>
                     </div>
-                    <div className="bg-purple-50 rounded-full px-4 py-1.5 border border-purple-100 shadow-sm">
-                      <span className="text-[9px] font-black text-purple-600 uppercase tracking-tight">
+                    <div className="bg-purple-50 rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 border border-purple-100 shadow-sm">
+                      <span className="text-[8px] sm:text-[9px] font-black text-purple-600 uppercase tracking-tight">
                         {t.entryType === 'paid' ? 'Paid Entry' : 'Free Entry'}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Season, Organizer, and Title */}
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-slate-500">
-                        <Trophy size={14} className="opacity-70" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">SEASON 27</span>
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <Trophy size={13} className="opacity-70 text-amber-500" />
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">SEASON 27</span>
                       </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 border border-white">
-                        <Hash size={10} className="opacity-70" />
-                        <span className="text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">{t.id.slice(0, 8)}</span>
+                      <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-white">
+                        <Hash size={9} className="opacity-70" />
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">{t.id.slice(0, 8)}</span>
                       </div>
                     </div>
 
                     {/* Organizer / Organization Badge */}
                     <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/90 shadow-sm max-w-full">
-                        <div className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                          <Shield size={11} />
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/90 border border-slate-200/90 shadow-sm max-w-full">
+                        <div className="w-4 h-4 rounded-md bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Shield size={10} />
                         </div>
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
-                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate">
+                        <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
+                        <span className="text-[9px] sm:text-[10px] font-black text-slate-800 uppercase tracking-tight truncate">
                           {organizerName}
                         </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Verified Organizer" />
                       </div>
                     </div>
 
-                    <h3 className="text-xl sm:text-4xl font-black text-slate-900 uppercase leading-none tracking-tight truncate">
+                    <h3 className="text-lg sm:text-2xl font-black text-slate-900 uppercase leading-snug tracking-tight truncate">
                       {t.title}
                     </h3>
-                    <p className="text-xs sm:text-lg text-slate-400 font-medium tracking-tight">
+                    <p className="text-[11px] sm:text-sm text-slate-400 font-medium tracking-tight line-clamp-2">
                       {t.description || 'Official FC Mobile H2H Tournament'}
                     </p>
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-6 pt-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-5 pt-1 sm:pt-2">
                     {/* Guaranteed Pool */}
-                    <div className="nm-flat rounded-[2.5rem] p-6 border border-white/40 space-y-4">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] block">
+                    <div className="nm-flat rounded-[1.6rem] sm:rounded-[2.2rem] p-3.5 sm:p-5 border border-white/40 space-y-2 sm:space-y-3">
+                      <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] block">
                         GUARANTEED POOL
                       </span>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-slate-900 tracking-tighter">{t.prizePool}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">USDT</span>
+                        <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tighter">{t.prizePool}</span>
+                        <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">USDT</span>
                       </div>
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-100/50">
-                        <div className="nm-inset w-5 h-5 rounded-full flex items-center justify-center border border-white/20">
-                          <CheckCircle size={10} className="text-slate-800" />
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100/70">
+                        <div className="nm-inset w-4 h-4 rounded-full flex items-center justify-center border border-white/20">
+                          <CheckCircle size={9} className="text-slate-800" />
                         </div>
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Top 3 Rewarded</span>
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-wider truncate">Top 3 Rewarded</span>
                       </div>
                     </div>
 
                     {/* Slots Info */}
-                    <div className="nm-flat rounded-[2.5rem] p-6 border border-white/40 space-y-4">
+                    <div className="nm-flat rounded-[1.6rem] sm:rounded-[2.2rem] p-3.5 sm:p-5 border border-white/40 space-y-2 sm:space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
                           SLOTS
                         </span>
-                        <span className="text-[11px] font-black text-slate-900 tracking-tight">
+                        <span className="text-[10px] sm:text-[11px] font-black text-slate-900 tracking-tight">
                           {t.filledSlots}/{t.totalSlots}
                         </span>
                       </div>
                       
                       {/* Dots indicator */}
-                      <div className="flex items-center gap-1.5 py-1">
+                      <div className="flex items-center gap-1 py-0.5">
                          {[...Array(6)].map((_, i) => (
                            <div key={`dot-${t.id}-${i}`} className={cn(
-                             "w-4 h-4 rounded-full transition-all",
+                             "w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full transition-all",
                              i < (t.filledSlots / t.totalSlots * 6) 
                               ? "bg-[#2d3748] shadow-sm" 
                               : "bg-slate-200"
@@ -304,8 +304,8 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                          ))}
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100/50">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <div className="pt-1.5 border-t border-slate-100/70">
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-wider block truncate">
                           {remainingSpots} spots remaining
                         </span>
                       </div>
@@ -313,19 +313,19 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                   </div>
 
                   {/* Main Action Button */}
-                  <div className="pt-6">
+                  <div className="pt-2 sm:pt-4">
                     <button 
                       disabled={!canEnter && (isFull && !reg)}
                       onClick={() => onEnter(t)}
                       className={cn(
-                        "w-full h-20 rounded-[2.5rem] text-sm font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-xl active:scale-[0.98]",
+                        "w-full h-13 sm:h-16 rounded-[1.6rem] sm:rounded-[2.2rem] text-xs sm:text-sm font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98]",
                         !canEnter
                           ? "bg-slate-200 text-slate-500 cursor-not-allowed" 
                           : "bg-[#00ff9d] text-black border-2 border-black hover:bg-[#00e68d]"
                       )}
                     >
                       {!canEnter ? (isFull ? 'CUP FULL' : 'LOCKED') : (
-                        <>ENTER ARENA <ArrowRight size={20} className="text-black" /></>
+                        <>ENTER ARENA <ArrowRight size={17} className="text-black" /></>
                       )}
                     </button>
                   </div>

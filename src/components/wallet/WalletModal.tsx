@@ -136,17 +136,17 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
     const amt = Number(depositAmount);
     if (isNaN(amt) || amt < PAYMENT_CONFIG[selectedMethod].minDeposit) {
-      setDepositError(`সর্বনিম্ন ডিপোজিট পরিমাণ ৳${PAYMENT_CONFIG[selectedMethod].minDeposit}`);
+      setDepositError(`Minimum deposit amount is ৳${PAYMENT_CONFIG[selectedMethod].minDeposit}`);
       return;
     }
 
     if (!senderAccount.trim()) {
-      setDepositError(selectedMethod === 'bitcoin' ? 'আপনার প্রেরক বিটকয়েন অ্যাড্রেস দিন' : 'আপনার প্রেরক বিকাশ/নগদ নম্বর দিন');
+      setDepositError(selectedMethod === 'bitcoin' ? 'Please enter your sender Bitcoin address' : 'Please enter your sender mobile banking number');
       return;
     }
 
     if (!trxId.trim()) {
-      setDepositError(selectedMethod === 'bitcoin' ? 'লেনদেনের Transaction Hash / TxID দিন' : 'লেনদেনের TrxID লিখুন');
+      setDepositError(selectedMethod === 'bitcoin' ? 'Please enter Transaction Hash / TxID' : 'Please enter Transaction ID (TrxID)');
       return;
     }
 
@@ -169,7 +169,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setDepositNote('');
     } catch (err: any) {
       console.error('Deposit error:', err);
-      setDepositError(err?.message || 'ডিপোজিট সাবমিট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      setDepositError(err?.message || 'Failed to submit deposit request. Please try again.');
     } finally {
       setIsDepositing(false);
     }
@@ -184,17 +184,17 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     const minW = PAYMENT_CONFIG[selectedMethod].minWithdraw;
 
     if (isNaN(amt) || amt < minW) {
-      setWithdrawError(`সর্বনিম্ন উত্তোলনের পরিমাণ ৳${minW}`);
+      setWithdrawError(`Minimum withdrawal amount is ৳${minW}`);
       return;
     }
 
     if (amt > currentWallet) {
-      setWithdrawError(`অপর্যাপ্ত ব্যালেন্স! আপনার বর্তমান ব্যালেন্স ৳${currentWallet.toFixed(2)}`);
+      setWithdrawError(`Insufficient balance! Your current wallet balance is ৳${currentWallet.toFixed(2)}`);
       return;
     }
 
     if (!recipientAccount.trim()) {
-      setWithdrawError(selectedMethod === 'bitcoin' ? 'আপনার বিটকয়েন ওয়ালেট অ্যাড্রেস দিন' : 'যে নম্বরে টাকা পাঠাতে হবে সেই নম্বর দিন');
+      setWithdrawError(selectedMethod === 'bitcoin' ? 'Please enter your Bitcoin wallet address' : 'Please enter recipient account number');
       return;
     }
 
@@ -214,7 +214,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setRecipientAccount('');
     } catch (err: any) {
       console.error('Withdrawal error:', err);
-      setWithdrawError(err?.message || 'উইথড্র রিকোয়েস্ট সাবমিট করতে সমস্যা হয়েছে।');
+      setWithdrawError(err?.message || 'Failed to submit withdrawal request.');
     } finally {
       setIsWithdrawing(false);
     }
@@ -223,7 +223,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   const handleAdminApprove = async (tx: WalletTransaction) => {
     if (!tx.id) return;
     if (profile?.role !== 'admin') {
-      alert('শুধুমাত্র অ্যাডমিনের টাকার রিকোয়েস্ট অনুমোদন করার অনুমতি আছে।');
+      alert('Only administrators have permission to approve transactions.');
       return;
     }
     setProcessingTxId(tx.id);
@@ -239,10 +239,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   const handleAdminReject = async (tx: WalletTransaction) => {
     if (!tx.id) return;
     if (profile?.role !== 'admin') {
-      alert('শুধুমাত্র অ্যাডমিনের টাকার রিকোয়েস্ট বাতিল করার অনুমতি আছে।');
+      alert('Only administrators have permission to reject transactions.');
       return;
     }
-    const reason = prompt('বাতিল করার কারণ লিখুন (ঐচ্ছিক):', 'Invalid details or unverified transaction');
+    const reason = prompt('Enter rejection reason (optional):', 'Invalid details or unverified transaction');
     if (reason === null) return;
 
     setProcessingTxId(tx.id);
@@ -419,7 +419,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3 cursor-pointer hover:border-[#E2136E] transition-all group active:scale-95"
                   >
                     <div className="w-10 h-10 rounded-xl bg-[#E2136E] text-white font-black flex items-center justify-center shrink-0 shadow-md">
-                      ব
+                      bK
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-black text-slate-900 group-hover:text-[#E2136E] transition-colors">bKash</span>
@@ -433,7 +433,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3 cursor-pointer hover:border-[#F7931E] transition-all group active:scale-95"
                   >
                     <div className="w-10 h-10 rounded-xl bg-[#F7931E] text-white font-black flex items-center justify-center shrink-0 shadow-md">
-                      ন
+                      NG
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-black text-slate-900 group-hover:text-[#F7931E] transition-colors">Nagad</span>
@@ -461,9 +461,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               <div className="rounded-2xl p-4 bg-emerald-50/70 border border-emerald-100 flex items-start gap-3 text-slate-700">
                 <ShieldCheck size={20} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div className="space-y-1 text-xs">
-                  <p className="font-bold text-slate-900">অফিসিয়াল ও নিরাপদ ওয়ালেট সিস্টেম</p>
+                  <p className="font-bold text-slate-900">Official & Secure Wallet System</p>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    বিকাশ এবং নগদ এ অ্যাডমানি করার একমাত্র অনুমোদিত নম্বর <span className="font-black text-slate-900 bg-white px-1.5 py-0.5 rounded border border-emerald-200">01301833622</span>। টাকা পাঠিয়ে সঠিক TrxID দিয়ে সাবমিট করলে দ্রুত ভেরিফাই করে ব্যালেন্স যোগ করা হবে।
+                    The only authorized number for bKash and Nagad deposits is <span className="font-black text-slate-900 bg-white px-1.5 py-0.5 rounded border border-emerald-200">01301833622</span>. Send money and submit the exact TrxID for prompt verification and balance credit.
                   </p>
                 </div>
               </div>
@@ -479,9 +479,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     <CheckCircle2 size={36} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-lg font-black text-slate-900 uppercase italic">ডিপোজিট রিকোয়েস্ট সফল!</h3>
+                    <h3 className="text-lg font-black text-slate-900 uppercase italic">Deposit Request Submitted!</h3>
                     <p className="text-xs text-slate-600">
-                      আপনার ৳{depositAmount} অ্যাড মানির অনুরোধ গৃহীত হয়েছে। অ্যাডমিন বা পাবলিশার যাচাই করে ৫-১০ মিনিটের মধ্যে ব্যালেন্স অ্যাকাউন্টে যুক্ত করবেন।
+                      Your deposit request for ৳{depositAmount} has been received. Admin will verify and credit your balance within 5-10 minutes.
                     </p>
                   </div>
                   <div className="pt-2 flex gap-3">
@@ -489,13 +489,13 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       onClick={() => setDepositSuccess(false)}
                       className="flex-1 py-3 px-4 rounded-xl bg-slate-100 text-slate-700 text-xs font-black uppercase hover:bg-slate-200 transition-colors"
                     >
-                      আরেকটি রিকোয়েস্ট
+                      Another Request
                     </button>
                     <button
                       onClick={() => setActiveTab('history')}
                       className="flex-1 py-3 px-4 rounded-xl bg-slate-900 text-white text-xs font-black uppercase hover:bg-slate-800 transition-colors"
                     >
-                      হিস্ট্রি দেখুন
+                      View History
                     </button>
                   </div>
                 </div>
@@ -504,7 +504,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {/* Step 1: Method Selector */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                      ১. পেমেন্ট মেথড নির্বাচন করুন
+                      1. Select Payment Method
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['bkash', 'nagad', 'bitcoin'] as PaymentMethod[]).map((m) => {
@@ -524,7 +524,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             )}
                           >
                             <span className="text-base font-black">
-                              {m === 'bkash' ? 'বিকাশ' : m === 'nagad' ? 'নগদ' : 'Bitcoin'}
+                              {m === 'bkash' ? 'bKash' : m === 'nagad' ? 'Nagad' : 'Bitcoin'}
                             </span>
                             <span className="text-[8px] font-bold uppercase tracking-wider opacity-70">
                               {m === 'bitcoin' ? 'BTC Crypto' : 'Send Money'}
@@ -539,7 +539,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        {selectedMethod === 'bitcoin' ? 'বিটকয়েন পেমেন্ট তথ্য' : 'পেমেন্ট পাঠানোর নম্বর'}
+                        {selectedMethod === 'bitcoin' ? 'Bitcoin Payment Details' : 'Payment Recipient Number'}
                       </span>
                       <span className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">
                         {PAYMENT_CONFIG[selectedMethod].type}
@@ -549,7 +549,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     {selectedMethod !== 'bitcoin' ? (
                       <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
                         <div className="flex flex-col">
-                          <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">অফিসিয়াল নম্বর</span>
+                          <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Official Number</span>
                           <span className="text-lg font-black tracking-wider text-slate-900 font-mono">
                             01301833622
                           </span>
@@ -560,15 +560,15 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                           className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center gap-1.5 active:scale-95 transition-all"
                         >
                           {copiedNumber ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                          {copiedNumber ? 'কপি হয়েছে!' : 'কপি করুন'}
+                          {copiedNumber ? 'Copied!' : 'Copy'}
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-amber-900 text-xs">
-                          <p className="font-bold">⚡ বিটকয়েন ডিপোজিট অ্যাড্রেস:</p>
+                          <p className="font-bold">⚡ Bitcoin Deposit Address:</p>
                           <p className="text-[11px] text-amber-800 mt-1">
-                            অ্যাড্রেস খুব দ্রুত অ্যাডমিন দ্বারা আপডেট করা হবে। আপনি সাপোর্ট সেন্টারে মেসেজ দিয়ে সরাসরি অফিসিয়াল BTC অ্যাড্রেসে পাঠাতে পারেন।
+                            Official BTC gateway address will be updated by Admin shortly. You can also contact support directly.
                           </p>
                         </div>
                         <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -584,7 +584,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black shrink-0 flex items-center gap-1 active:scale-95 transition-all"
                           >
                             {copiedBtc ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                            {copiedBtc ? 'কপি হয়েছে' : 'কপি'}
+                            {copiedBtc ? 'Copied!' : 'Copy'}
                           </button>
                         </div>
                       </div>
@@ -607,10 +607,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                        ২. টাকার পরিমাণ (Amount in BDT)
+                        2. Amount (in BDT)
                       </label>
                       <span className="text-[10px] font-bold text-slate-400">
-                        মিনিমাম ৳{PAYMENT_CONFIG[selectedMethod].minDeposit}
+                        Minimum ৳{PAYMENT_CONFIG[selectedMethod].minDeposit}
                       </span>
                     </div>
 
@@ -638,7 +638,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                         type="number"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
-                        placeholder="কাস্টম পরিমাণ লিখুন"
+                        placeholder="Enter custom amount"
                         className="pl-8 text-base font-black"
                         min={PAYMENT_CONFIG[selectedMethod].minDeposit}
                         required
@@ -649,12 +649,12 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {/* Step 4: Sender Number / Address & TrxID */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                      ৩. ভেরিফিকেশন তথ্য
+                      3. Verification Details
                     </label>
 
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700 ml-1">
-                        {selectedMethod === 'bitcoin' ? 'আপনার প্রেরক বিটকয়েন ওয়ালেট' : 'যে নম্বর থেকে টাকা পাঠিয়েছেন (Sender Number)'}
+                        {selectedMethod === 'bitcoin' ? 'Your Sender Bitcoin Wallet' : 'Sender Phone Number'}
                       </label>
                       <Input
                         type="text"
@@ -667,13 +667,13 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700 ml-1">
-                        {selectedMethod === 'bitcoin' ? 'Transaction Hash / TxID' : 'লেনদেনের Transaction ID (TrxID)'}
+                        {selectedMethod === 'bitcoin' ? 'Transaction Hash / TxID' : 'Transaction ID (TrxID)'}
                       </label>
                       <Input
                         type="text"
                         value={trxId}
                         onChange={(e) => setTrxId(e.target.value.toUpperCase())}
-                        placeholder={selectedMethod === 'bitcoin' ? 'Blockchain TxID / Hash' : 'যেমন: 9J4K2L99'}
+                        placeholder={selectedMethod === 'bitcoin' ? 'Blockchain TxID / Hash' : 'e.g. 9J4K2L99'}
                         required
                       />
                     </div>
@@ -695,10 +695,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     {isDepositing ? (
                       <span className="flex items-center justify-center gap-2">
                         <RefreshCw size={16} className="animate-spin" />
-                        সাবমিট হচ্ছে...
+                        Submitting...
                       </span>
                     ) : (
-                      'টাকা যোগ করার রিকোয়েস্ট পাঠান'
+                      'Submit Deposit Request'
                     )}
                   </Button>
                 </form>
@@ -715,9 +715,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     <CheckCircle2 size={36} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-lg font-black text-slate-900 uppercase italic">উইথড্র রিকোয়েস্ট সফল!</h3>
+                    <h3 className="text-lg font-black text-slate-900 uppercase italic">Withdrawal Request Submitted!</h3>
                     <p className="text-xs text-slate-600">
-                      আপনার ৳{withdrawAmount} উত্তোলনের অনুরোধ গৃহীত হয়েছে। অ্যাকাউন্ট যাচাই করে কিছুক্ষণের মধ্যে টাকা পাঠানো হবে।
+                      Your withdrawal request for ৳{withdrawAmount} has been received. Funds will be sent shortly after review.
                     </p>
                   </div>
                   <div className="pt-2 flex gap-3">
@@ -725,13 +725,13 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       onClick={() => setWithdrawSuccess(false)}
                       className="flex-1 py-3 px-4 rounded-xl bg-slate-100 text-slate-700 text-xs font-black uppercase hover:bg-slate-200 transition-colors"
                     >
-                      আরেকটি উত্তোলন
+                      New Withdrawal
                     </button>
                     <button
                       onClick={() => setActiveTab('history')}
                       className="flex-1 py-3 px-4 rounded-xl bg-slate-900 text-white text-xs font-black uppercase hover:bg-slate-800 transition-colors"
                     >
-                      হিস্ট্রি দেখুন
+                      View History
                     </button>
                   </div>
                 </div>
@@ -740,13 +740,13 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {/* Current Available Balance Bar */}
                   <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-indigo-600">উত্তোলনযোগ্য ব্যালেন্স</span>
+                      <span className="text-[9px] font-black uppercase tracking-wider text-indigo-600">Available Balance</span>
                       <span className="text-xl font-black text-slate-900 font-mono">
                         ৳{currentWallet.toFixed(2)}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">মিনিমাম উইথড্র</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Minimum Withdrawal</span>
                       <span className="text-xs font-black text-indigo-700 block">৳{PAYMENT_CONFIG[selectedMethod].minWithdraw}</span>
                     </div>
                   </div>
@@ -754,7 +754,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {/* Method Selector */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                      ১. উইথড্র মেথড নির্বাচন করুন
+                      1. Select Withdrawal Method
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['bkash', 'nagad', 'bitcoin'] as PaymentMethod[]).map((m) => {
@@ -774,7 +774,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             )}
                           >
                             <span className="text-base font-black">
-                              {m === 'bkash' ? 'বিকাশ' : m === 'nagad' ? 'নগদ' : 'Bitcoin'}
+                              {m === 'bkash' ? 'bKash' : m === 'nagad' ? 'Nagad' : 'Bitcoin'}
                             </span>
                             <span className="text-[8px] font-bold uppercase tracking-wider opacity-70">
                               {m === 'bitcoin' ? 'Crypto' : 'Mobile Banking'}
@@ -789,14 +789,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                        ২. উত্তোলনের পরিমাণ
+                        2. Withdrawal Amount
                       </label>
                       <button
                         type="button"
                         onClick={() => setWithdrawAmount(Math.floor(currentWallet).toString())}
                         className="text-[10px] font-black text-indigo-600 uppercase tracking-wider hover:underline"
                       >
-                        সব টাকা তুলুন (ALL)
+                        Withdraw All (ALL)
                       </button>
                     </div>
 
@@ -824,7 +824,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                         type="number"
                         value={withdrawAmount}
                         onChange={(e) => setWithdrawAmount(e.target.value)}
-                        placeholder="উত্তোলনের পরিমাণ লিখুন"
+                        placeholder="Enter withdrawal amount"
                         className="pl-8 text-base font-black"
                         min={PAYMENT_CONFIG[selectedMethod].minWithdraw}
                         max={currentWallet}
@@ -836,7 +836,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   {/* Account Details */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 ml-1">
-                      ৩. প্রাপক অ্যাকাউন্ট তথ্য
+                      3. Recipient Account Details
                     </label>
 
                     {selectedMethod !== 'bitcoin' && (
@@ -849,7 +849,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             accountType === 'personal' ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200"
                           )}
                         >
-                          পার্সোনাল (Personal)
+                          Personal
                         </button>
                         <button
                           type="button"
@@ -859,14 +859,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             accountType === 'agent' ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200"
                           )}
                         >
-                          এজেন্ট (Agent)
+                          Agent
                         </button>
                       </div>
                     )}
 
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700 ml-1">
-                        {selectedMethod === 'bitcoin' ? 'আপনার বিটকয়েন (BTC) রিসিভ অ্যাড্রেস' : 'যে নম্বরে টাকা নিতে চান (Account Number)'}
+                        {selectedMethod === 'bitcoin' ? 'Your Bitcoin (BTC) Receiving Address' : 'Account Number to Receive Funds'}
                       </label>
                       <Input
                         type="text"
@@ -893,10 +893,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     {isWithdrawing ? (
                       <span className="flex items-center justify-center gap-2">
                         <RefreshCw size={16} className="animate-spin" />
-                        প্রসেসিং হচ্ছে...
+                        Processing...
                       </span>
                     ) : (
-                      'উইথড্র রিকোয়েস্ট নিশ্চিত করুন'
+                      'Confirm Withdrawal Request'
                     )}
                   </Button>
                 </form>
@@ -920,7 +920,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                         : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
                     )}
                   >
-                    {f === 'all' ? 'সব লেনদেন' : f === 'deposit' ? 'ডিপোজিট (+)' : 'উইথড্র (-)'}
+                    {f === 'all' ? 'All' : f === 'deposit' ? 'Deposits (+)' : 'Withdrawals (-)'}
                   </button>
                 ))}
               </div>
@@ -928,7 +928,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               {filteredTransactions.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 space-y-2">
                   <Clock size={32} className="mx-auto text-slate-300" />
-                  <p className="text-xs font-black uppercase tracking-wider">কোনো লেনদেন রেকর্ড পাওয়া যায়নি</p>
+                  <p className="text-xs font-black uppercase tracking-wider">No transaction records found</p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -946,7 +946,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                               : tx.method === 'nagad' ? "bg-[#F7931E]"
                               : "bg-[#F7931A]"
                           )}>
-                            {tx.method === 'bkash' ? 'ব' : tx.method === 'nagad' ? 'ন' : '₿'}
+                            {tx.method === 'bkash' ? 'bK' : tx.method === 'nagad' ? 'NG' : '₿'}
                           </div>
 
                           <div className="flex flex-col min-w-0">
@@ -961,7 +961,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                                   : tx.status === 'rejected' ? "bg-rose-100 text-rose-700"
                                   : "bg-amber-100 text-amber-700 animate-pulse"
                               )}>
-                                {tx.status === 'approved' ? 'সফল' : tx.status === 'rejected' ? 'বাতিল' : 'পেন্ডিং'}
+                                {tx.status === 'approved' ? 'Approved' : tx.status === 'rejected' ? 'Rejected' : 'Pending'}
                               </span>
                             </div>
 
@@ -999,18 +999,18 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="flex items-center justify-between px-1">
                 <div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">পেন্ডিং ওয়ালেট রিকোয়েস্টসমূহ (অ্যাডমিন কন্ট্রোল)</h3>
-                  <span className="text-[10px] text-slate-500">শুধুমাত্র অ্যাডমিন ইউজারদের জমা ও উত্তোলন অনুমোদন করতে পারবেন</span>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Pending Wallet Requests (Admin Control)</h3>
+                  <span className="text-[10px] text-slate-500">Only admin users can review and approve deposits and withdrawals</span>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black">
-                  মোট: {adminPendingTxs.length}
+                  Total: {adminPendingTxs.length}
                 </span>
               </div>
 
               {adminPendingTxs.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 space-y-2">
                   <CheckCircle size={32} className="mx-auto text-emerald-500" />
-                  <p className="text-xs font-black uppercase tracking-wider">কোনো পেন্ডিং রিকোয়েস্ট নেই</p>
+                  <p className="text-xs font-black uppercase tracking-wider">No pending requests</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1020,7 +1020,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
                     return (
                       <div 
-                        key={tx.id}
+                        key={tx.id} 
                         className="p-4 rounded-2xl bg-white border border-amber-200/80 shadow-md space-y-3"
                       >
                         <div className="flex items-start justify-between">
@@ -1031,7 +1031,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                                 : tx.method === 'nagad' ? "bg-[#F7931E]"
                                 : "bg-[#F7931A]"
                             )}>
-                              {tx.method === 'bkash' ? 'ব' : tx.method === 'nagad' ? 'ন' : '₿'}
+                              {tx.method === 'bkash' ? 'bK' : tx.method === 'nagad' ? 'NG' : '₿'}
                             </div>
                             <div className="flex flex-col">
                               <span className="text-xs font-black text-slate-900">
@@ -1082,7 +1082,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50"
                           >
                             <CheckCircle2 size={14} />
-                            অনুমোদন করুন (Approve)
+                            Approve
                           </button>
                           <button
                             disabled={isProcessing}
@@ -1090,7 +1090,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                             className="py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50"
                           >
                             <XCircle size={14} />
-                            বাতিল (Reject)
+                            Reject
                           </button>
                         </div>
                       </div>

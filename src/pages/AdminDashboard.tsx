@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, getDoc, deleteDoc, deleteField } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, getDoc, deleteDoc, deleteField, limit } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { logPointTransaction } from '@/src/lib/points';
-import { Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, Camera, AlertCircle, Swords, X, Trash2, LayoutDashboard, Gamepad2, Clock, Wallet } from 'lucide-react';
+import { 
+  Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
+  Camera, AlertCircle, Swords, X, Trash2, LayoutDashboard, 
+  Gamepad2, Clock, Wallet, ArrowDownLeft, ArrowUpRight, Filter, CheckCheck, RefreshCw 
+} from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { MatchesPage } from '@/src/pages/Matches';
 import { GameLoader } from '@/src/components/ui/GameLoader';
+import { 
+  WalletTransaction, approveWalletTransaction, rejectWalletTransaction, PAYMENT_CONFIG 
+} from '@/src/lib/wallet';
 
 interface Registration {
   id: string;
@@ -64,7 +71,11 @@ export const AdminDashboard = ({
   const [announcement, setAnnouncement] = useState('');
   const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
   const [adminViewMode, setAdminViewMode] = useState<'dashboard' | 'matches'>('dashboard');
-  const [activeAdminSection, setActiveAdminSection] = useState<'cups' | 'access' | '1v1'>('cups');
+  type AdminSectionTab = 'tournaments' | 'access' | '1v1' | 'wallet';
+  const [activeSection, setActiveSection] = useState<AdminSectionTab>('tournaments');
+  const [regFilter, setRegFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
+  const [pendingWalletTxs, setPendingWalletTxs] = useState<WalletTransaction[]>([]);
+  const [processingTxId, setProcessingTxId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -124,6 +135,60 @@ export const AdminDashboard = ({
       unsubProfile.then(unsub => unsub?.());
     };
   }, []);
+
+  // Listen to pending wallet transactions for real-time finance moderation
+  useEffect(() => {
+    if (!auth.currentUser || userProfile?.role !== 'admin') return;
+
+    const q = query(
+      collection(db, 'transactions'),
+      where('status', '==', 'pending'),
+      limit(50)
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const txs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
+      txs.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return timeB - timeA;
+      });
+      setPendingWalletTxs(txs);
+    }, (error) => {
+      console.warn("Admin wallet transactions listener:", error);
+    });
+
+    return () => unsub();
+  }, [userProfile?.role]);
+
+  const handleApproveTransaction = async (tx: WalletTransaction) => {
+    if (!tx.id) return;
+    setProcessingTxId(tx.id);
+    try {
+      await approveWalletTransaction(tx.id, tx);
+      alert('Transaction approved successfully!');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to approve transaction.');
+    } finally {
+      setProcessingTxId(null);
+    }
+  };
+
+  const handleRejectTransaction = async (tx: WalletTransaction) => {
+    if (!tx.id) return;
+    const reason = window.prompt('Enter reason for rejection (optional):') || 'Rejected by Admin';
+    setProcessingTxId(tx.id);
+    try {
+      await rejectWalletTransaction(tx.id, tx, reason);
+      alert('Transaction rejected and recorded.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to reject transaction.');
+    } finally {
+      setProcessingTxId(null);
+    }
+  };
 
   const handleAdminResolveWinner = async (challenge: Challenge, winnerId: string) => {
     if (!winnerId || typeof winnerId !== 'string' || !winnerId.trim()) return;
@@ -325,163 +390,315 @@ export const AdminDashboard = ({
             </button>
           </div>
 
-          {/* Wallet & Payment Requests Fast-Action Card (Admin Only) */}
-          {userProfile?.role === 'admin' && (
-            <div className="px-2">
-              <div 
-                onClick={() => onOpenWallet?.()}
-                className="nm-flat rounded-[2rem] p-5 border-2 border-emerald-100/70 bg-gradient-to-r from-emerald-50/60 via-white to-teal-50/40 flex items-center justify-between cursor-pointer active:scale-95 transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                    <Wallet size={22} />
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-slate-900 uppercase italic">Financials & Wallet Requests</span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase">
-                        Admin Only
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      Manage player cash-in deposits & withdrawal approvals
-                    </span>
-                  </div>
-                </div>
+          {/* Section Navigation Switch Bar (এডমিন কন্ট্রোল সুইচ বার) */}
+          <div className="mx-2 p-1.5 nm-inset rounded-[1.6rem] bg-[#e6e6e9] border-2 border-white/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
+            {/* Tournaments Tab */}
+            <button
+              onClick={() => setActiveSection('tournaments')}
+              className={cn(
+                "flex-1 min-w-[105px] py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap",
+                activeSection === 'tournaments'
+                  ? "nm-flat bg-[#f0f0f3] text-indigo-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/30"
+              )}
+            >
+              <Trophy size={14} className={activeSection === 'tournaments' ? 'text-indigo-600' : 'text-slate-400'} />
+              <span>Tournaments</span>
+              {Object.values(tournaments).length > 0 && (
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none",
+                  activeSection === 'tournaments' ? "bg-indigo-100 text-indigo-700" : "bg-slate-300 text-slate-700"
+                )}>
+                  {Object.values(tournaments).length}
+                </span>
+              )}
+            </button>
 
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider group-hover:bg-emerald-600 transition-colors">
-                    Review Requests
+            {/* Access Queue Tab */}
+            <button
+              onClick={() => setActiveSection('access')}
+              className={cn(
+                "flex-1 min-w-[110px] py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap",
+                activeSection === 'access'
+                  ? "nm-flat bg-[#f0f0f3] text-amber-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/30"
+              )}
+            >
+              <Users size={14} className={activeSection === 'access' ? 'text-amber-600' : 'text-slate-400'} />
+              <span>Access Queue</span>
+              {registrations.filter(r => r.status === 'pending').length > 0 ? (
+                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-amber-500 text-white animate-pulse">
+                  {registrations.filter(r => r.status === 'pending').length}
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-slate-200 text-slate-500">
+                  0
+                </span>
+              )}
+            </button>
+
+            {/* 1v1 Moderation Tab (Admin Only) */}
+            {userProfile?.role === 'admin' && (
+              <button
+                onClick={() => setActiveSection('1v1')}
+                className={cn(
+                  "flex-1 min-w-[115px] py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap",
+                  activeSection === '1v1'
+                    ? "nm-flat bg-[#f0f0f3] text-rose-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/30"
+                )}
+              >
+                <Swords size={14} className={activeSection === '1v1' ? 'text-rose-600' : 'text-slate-400'} />
+                <span>1v1 Battles</span>
+                {challenges.filter(c => c.status === 'disputed' || c.status === 'reported').length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-rose-500 text-white animate-pulse">
+                    {challenges.filter(c => c.status === 'disputed' || c.status === 'reported').length}
                   </span>
+                ) : challenges.length > 0 ? (
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none",
+                    activeSection === '1v1' ? "bg-rose-100 text-rose-700" : "bg-slate-300 text-slate-700"
+                  )}>
+                    {challenges.length}
+                  </span>
+                ) : null}
+              </button>
+            )}
+
+            {/* Cashier & Wallet Tab (Admin Only) */}
+            {userProfile?.role === 'admin' && (
+              <button
+                onClick={() => setActiveSection('wallet')}
+                className={cn(
+                  "flex-1 min-w-[115px] py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap",
+                  activeSection === 'wallet'
+                    ? "nm-flat bg-[#f0f0f3] text-emerald-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/30"
+                )}
+              >
+                <Wallet size={14} className={activeSection === 'wallet' ? 'text-emerald-600' : 'text-slate-400'} />
+                <span>Cashier & Wallet</span>
+                {pendingWalletTxs.length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-emerald-500 text-white animate-pulse">
+                    {pendingWalletTxs.length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-emerald-100 text-emerald-700">
+                    ৳
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* PAGE 1: TOURNAMENT MANAGEMENT */}
+          {activeSection === 'tournaments' && (
+            <section className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Trophy size={14} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Tournament Management</h3>
                 </div>
+                <Button 
+                  onClick={onCreateNew} 
+                  size="sm"
+                  className="rounded-xl px-3 py-1.5 text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 bg-indigo-600 text-white shadow"
+                >
+                  <Plus size={12} /> New Cup
+                </Button>
               </div>
-            </div>
+              
+              <div className="space-y-4">
+                {userProfile?.role === 'admin' && (
+                  <Card className="p-6 border-none space-y-4 mx-2 bg-indigo-50/30">
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Broadcast Alert</span>
+                    <textarea 
+                      className="w-full h-24 p-4 nm-inset rounded-2xl text-slate-700 placeholder:text-slate-400 outline-none border border-white/20 text-xs font-medium"
+                      placeholder="Send announcement to all users..."
+                      value={announcement}
+                      onChange={(e) => setAnnouncement(e.target.value)}
+                    />
+                    <Button onClick={handleBroadcast} className="w-full h-12 rounded-xl flex items-center gap-2">
+                      <Megaphone size={16} /> Broadcast System Update
+                    </Button>
+                  </Card>
+                )}
+
+                {Object.values(tournaments).length === 0 ? (
+                  <div className="nm-inset p-8 rounded-[2rem] text-center border border-white/20 mx-2 flex flex-col items-center gap-3">
+                    <Trophy size={28} className="text-slate-300" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">No active cups available</p>
+                    <button 
+                      onClick={onCreateNew}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase tracking-wider shadow"
+                    >
+                      Create Tournament
+                    </button>
+                  </div>
+                ) : (
+                  Object.values(tournaments).map(t => (
+                    <Card key={`cup-${t.id}`} className="p-6 border-none mx-2 group hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-black text-slate-800 uppercase italic tracking-tight">{t.title}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                                <Shield size={10} />
+                                {t.organizerName || t.organizationName || t.publisherName || 'Host'}
+                              </span>
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">· ID:</span>
+                              <span className="text-[9px] font-black text-slate-500 font-mono tracking-wider">{t.id.slice(0, 8)}</span>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="rounded-xl px-4 py-2 border-fc-green text-fc-green hover:bg-fc-green hover:text-white"
+                          onClick={() => onEnterTournament(t)}
+                        >
+                          MANAGE
+                        </Button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </section>
           )}
 
-          {/* Section 1: ACTIVE CUPS */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                <Trophy size={14} />
-              </div>
-              <h3 className="text-sm font-black text-slate-800 uppercase italic">Tournament Management</h3>
-            </div>
-            
-            <div className="space-y-4">
-              {userProfile?.role === 'admin' && (
-                <Card className="p-6 border-none space-y-4 mx-2 bg-indigo-50/30">
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Broadcast Alert</span>
-                  <textarea 
-                    className="w-full h-24 p-4 nm-inset rounded-2xl text-slate-700 placeholder:text-slate-400 outline-none border border-white/20 text-xs font-medium"
-                    placeholder="Send announcement to all users..."
-                    value={announcement}
-                    onChange={(e) => setAnnouncement(e.target.value)}
-                  />
-                  <Button onClick={handleBroadcast} className="w-full h-12 rounded-xl flex items-center gap-2">
-                    <Megaphone size={16} /> Broadcast System Update
-                  </Button>
-                </Card>
-              )}
-
-              {Object.values(tournaments).length === 0 ? (
-                <div className="nm-inset p-8 rounded-[2rem] text-center border border-white/20 mx-2">
-                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">No active cups</p>
+          {/* PAGE 2: REGISTRATION ACCESS QUEUE */}
+          {activeSection === 'access' && (
+            <section className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                    <Users size={14} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Registration Access Queue</h3>
                 </div>
-              ) : (
-                Object.values(tournaments).map(t => (
-                  <Card key={`cup-${t.id}`} className="p-6 border-none mx-2 group hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-black text-slate-800 uppercase italic tracking-tight">{t.title}</span>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-1">
-                              <Shield size={10} />
-                              {t.organizerName || t.organizationName || t.publisherName || 'Host'}
+                <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 uppercase">
+                  {registrations.filter(r => r.status === 'pending').length} Pending
+                </span>
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className="flex items-center gap-2 px-3 overflow-x-auto no-scrollbar">
+                {(['pending', 'approved', 'rejected', 'all'] as const).map((filter) => {
+                  const count = filter === 'all' 
+                    ? registrations.length 
+                    : registrations.filter(r => r.status === filter).length;
+                  return (
+                    <button
+                      key={filter}
+                      onClick={() => setRegFilter(filter)}
+                      className={cn(
+                        "py-1.5 px-3 rounded-full text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5",
+                        regFilter === filter
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "bg-white/80 text-slate-500 hover:bg-white"
+                      )}
+                    >
+                      <span>{filter}</span>
+                      <span className={cn(
+                        "px-1.5 py-0.2 rounded-full text-[8px]",
+                        regFilter === filter ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      )}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-4">
+                {(() => {
+                  const filteredRegs = registrations.filter(r => regFilter === 'all' ? true : r.status === regFilter);
+                  if (filteredRegs.length === 0) {
+                    return (
+                      <div className="nm-inset p-10 rounded-[2.5rem] text-center border border-white/20 mx-2 flex flex-col items-center gap-4 opacity-70 bg-slate-50">
+                        <CheckCircle size={32} className="text-emerald-500" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          {regFilter === 'pending' ? 'All registration requests processed!' : `No ${regFilter} registrations`}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return filteredRegs.map((reg) => (
+                    <Card key={`reg-${reg.id}`} className="p-5 border-none mx-2 group">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-[1.2rem] nm-inset flex items-center justify-center text-slate-800 font-black italic border border-white/30 bg-white">
+                            {reg.gameName.charAt(0)}
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-black text-slate-800 uppercase italic">{reg.gameName}</span>
+                              <span className={cn(
+                                "text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider",
+                                reg.status === 'approved' ? "bg-emerald-100 text-emerald-700" :
+                                reg.status === 'rejected' ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"
+                              )}>
+                                {reg.status}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                              OVR {reg.ovr} · {tournaments[reg.tournamentId]?.title || 'Tournament'}
                             </span>
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">· ID:</span>
-                            <span className="text-[9px] font-black text-slate-500 font-mono tracking-wider">{t.id.slice(0, 8)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleUpdateStatus(reg, 'approved')}
+                            title="Approve Player"
+                            className={cn(
+                              "w-10 h-10 rounded-xl nm-flat flex items-center justify-center active:nm-pressed border border-white/40 transition-all",
+                              reg.status === 'approved' ? "bg-emerald-500 text-white shadow-sm" : "bg-white text-emerald-500 hover:bg-emerald-50"
+                            )}
+                          >
+                            <CheckCircle size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleUpdateStatus(reg, 'rejected')}
+                            title="Reject Player"
+                            className={cn(
+                              "w-10 h-10 rounded-xl nm-flat flex items-center justify-center active:nm-pressed border border-white/40 transition-all",
+                              reg.status === 'rejected' ? "bg-rose-500 text-white shadow-sm" : "bg-white text-rose-400 hover:bg-rose-50"
+                            )}
+                          >
+                            <XCircle size={18} />
+                          </button>
                         </div>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="rounded-xl px-4 py-2 border-fc-green text-fc-green hover:bg-fc-green hover:text-white"
-                        onClick={() => onEnterTournament(t)}
-                      >
-                        MANAGE
-                      </Button>
-                    </div>
-                  </Card>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* Section 2: ACCESS QUEUE */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-3 px-4">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
-                <Users size={14} />
+                    </Card>
+                  ));
+                })()}
               </div>
-              <h3 className="text-sm font-black text-slate-800 uppercase italic">Registration Access Queue</h3>
-            </div>
+            </section>
+          )}
 
-            <div className="space-y-4">
-              {registrations.filter(r => r.status === 'pending').length === 0 ? (
-                <div className="nm-inset p-10 rounded-[2.5rem] text-center border border-white/20 mx-2 flex flex-col items-center gap-4 opacity-40 bg-slate-50">
-                  <CheckCircle size={32} className="text-emerald-500" />
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">All requests processed</p>
+          {/* PAGE 3: 1V1 MATCH MODERATION (Admin Only) */}
+          {activeSection === '1v1' && userProfile?.role === 'admin' && (
+            <section className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                    <Swords size={14} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">1v1 Match Moderation</h3>
                 </div>
-              ) : (
-                registrations.filter(r => r.status === 'pending').map((reg) => (
-                  <Card key={`reg-${reg.id}`} className="p-5 border-none mx-2 group">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-[1.2rem] nm-inset flex items-center justify-center text-slate-800 font-black italic border border-white/30 bg-white">
-                          {reg.gameName.charAt(0)}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-black text-slate-800 uppercase italic">{reg.gameName}</span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                            OVR {reg.ovr} · {tournaments[reg.tournamentId]?.title}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => handleUpdateStatus(reg, 'approved')}
-                          className="w-10 h-10 rounded-xl nm-flat bg-white text-emerald-500 flex items-center justify-center active:nm-pressed border border-white/40"
-                        >
-                          <CheckCircle size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleUpdateStatus(reg, 'rejected')}
-                          className="w-10 h-10 rounded-xl nm-flat bg-white text-rose-400 flex items-center justify-center active:nm-pressed border border-white/40"
-                        >
-                          <XCircle size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </Card>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* Section 3: 1V1 MODERATION */}
-          {userProfile?.role === 'admin' && (
-            <section className="space-y-6">
-              <div className="flex items-center gap-3 px-4">
-                <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
-                  <Swords size={14} />
-                </div>
-                <h3 className="text-sm font-black text-slate-800 uppercase italic">1v1 Match Moderation</h3>
+                <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 uppercase">
+                  {challenges.filter(c => c.status === 'disputed' || c.status === 'reported').length} Attention Needed
+                </span>
               </div>
 
               <div className="space-y-4">
                 {challenges.length === 0 ? (
                   <div className="nm-inset p-8 rounded-[2rem] text-center border border-white/20 mx-2 bg-slate-50">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">No matches in queue</p>
+                    <Swords size={28} className="text-slate-300 mx-auto mb-2" />
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">No 1v1 matches in queue</p>
                   </div>
                 ) : (
                   challenges.map((c) => (
@@ -577,6 +794,166 @@ export const AdminDashboard = ({
                       )}
                     </Card>
                   ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* PAGE 4: CASHIER & FINANCIALS (Admin Only) */}
+          {activeSection === 'wallet' && userProfile?.role === 'admin' && (
+            <section className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <Wallet size={14} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Cashier & Financial Control</h3>
+                </div>
+                <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 uppercase">
+                  {pendingWalletTxs.length} Pending
+                </span>
+              </div>
+
+              {/* Fast Action Card Launcher */}
+              <div className="px-2">
+                <div 
+                  onClick={() => onOpenWallet?.()}
+                  className="nm-flat rounded-[2rem] p-5 border-2 border-emerald-100/70 bg-gradient-to-r from-emerald-50/60 via-white to-teal-50/40 flex items-center justify-between cursor-pointer active:scale-95 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                      <Wallet size={22} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-900 uppercase italic">Financial Desk & Ledger</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase">
+                          Live
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Open complete wallet modal to view full transaction logs & stats
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider group-hover:bg-emerald-600 transition-colors">
+                      Open Desk
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Cash-in Deposits & Withdrawals List */}
+              <div className="space-y-4 px-2">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Pending Player Requests ({pendingWalletTxs.length})
+                  </span>
+                </div>
+
+                {pendingWalletTxs.length === 0 ? (
+                  <div className="nm-inset p-8 rounded-[2rem] text-center border border-white/20 flex flex-col items-center gap-3 bg-slate-50/50">
+                    <CheckCircle size={32} className="text-emerald-500" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      All deposit & withdrawal requests have been processed!
+                    </p>
+                  </div>
+                ) : (
+                  pendingWalletTxs.map((tx) => {
+                    const isDeposit = tx.type === 'deposit';
+                    const isProcessing = processingTxId === tx.id;
+                    const methodConfig = PAYMENT_CONFIG[tx.method as keyof typeof PAYMENT_CONFIG] || {
+                      name: tx.method,
+                      brandColor: '#4f46e5'
+                    };
+
+                    return (
+                      <Card key={tx.id || Math.random().toString()} className="p-5 border-none space-y-4 bg-white shadow-md">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center font-black",
+                              isDeposit ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
+                            )}>
+                              {isDeposit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-black text-slate-900 uppercase">
+                                {isDeposit ? 'Deposit Cash-in' : 'Withdrawal Request'}
+                              </span>
+                              <span className="text-[9px] font-mono text-slate-400">
+                                {tx.userName}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end">
+                            <span className={cn(
+                              "text-base font-black italic",
+                              isDeposit ? "text-emerald-600" : "text-amber-600"
+                            )}>
+                              ৳{tx.amount}
+                            </span>
+                            <span 
+                              className="text-[8px] font-black px-2 py-0.5 rounded uppercase"
+                              style={{ 
+                                backgroundColor: `${methodConfig.brandColor}15`, 
+                                color: methodConfig.brandColor 
+                              }}
+                            >
+                              {methodConfig.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="bg-slate-50 rounded-xl p-3 grid grid-cols-2 gap-2 text-[9px]">
+                          <div>
+                            <span className="text-slate-400 font-bold block">Account / Phone:</span>
+                            <span className="font-black text-slate-800 font-mono">
+                              {tx.senderAccount || tx.recipientAccount || 'N/A'}
+                            </span>
+                          </div>
+                          {tx.trxId && (
+                            <div>
+                              <span className="text-slate-400 font-bold block">TrxID / Hash:</span>
+                              <span className="font-black text-slate-800 font-mono break-all">
+                                {tx.trxId}
+                              </span>
+                            </div>
+                          )}
+                          {tx.note && (
+                            <div className="col-span-2">
+                              <span className="text-slate-400 font-bold block">User Note:</span>
+                              <span className="text-slate-700 italic">{tx.note}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                          <button
+                            onClick={() => handleApproveTransaction(tx)}
+                            disabled={isProcessing}
+                            className="py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            <CheckCircle size={14} />
+                            {isProcessing ? 'Processing...' : 'Approve & Credit'}
+                          </button>
+                          <button
+                            onClick={() => handleRejectTransaction(tx)}
+                            disabled={isProcessing}
+                            className="py-3 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all disabled:opacity-50"
+                          >
+                            <XCircle size={14} />
+                            {isProcessing ? 'Processing...' : 'Reject Request'}
+                          </button>
+                        </div>
+                      </Card>
+                    );
+                  })
                 )}
               </div>
             </section>

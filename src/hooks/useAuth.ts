@@ -15,6 +15,8 @@ export interface UserProfile {
   messengerLink?: string;
   whatsappNumber?: string;
   phone?: string;
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
   avatar?: string;
   wallet?: number;
   eliteScore?: number;

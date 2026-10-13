@@ -534,7 +534,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       if (opponentId && opponentId !== currentUid) {
         sendAppNotification({
           recipientId: opponentId,
-          title: `💬 অপনেন্টের মেসেজ (${profile?.inGameName || 'Opponent'})`,
+          title: `💬 Message from ${profile?.inGameName || 'Opponent'}`,
           message: msgText.length > 70 ? msgText.slice(0, 67) + '...' : msgText,
           type: 'chat_message',
           tournamentId: activeMatchChat.tournamentId,
@@ -625,7 +625,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     // Knockout Stage: Draw is strictly prohibited
     const isKnockout = reportingMatch.stage !== 'group' || reportingMatch.groupId === 'knockout';
     if (isKnockout && reportFormData.home === reportFormData.away) {
-      alert('নকআউট স্টেজে কোন ম্যাচের রেজাল্ট ড্র হতে পারবে না! অতিরিক্ত সময় বা পেনাল্টি বিবেচনা করে একজন বিজয়ী নির্ধারণ করতে হবে। ড্র ফলাফল আপলোড করা যাবে না।');
+      alert('Knockout stage matches cannot end in a draw! Extra time or penalties must decide a winner. Draw results cannot be submitted.');
       return;
     }
 
@@ -700,13 +700,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                  <div className="flex items-center justify-center gap-2 mb-0.5">
                    {isDraw ? <AlertCircle size={14} className="text-rose-400" /> : <Trophy size={14} className="text-amber-400" />}
                    <span className="text-[9.5px] font-black uppercase tracking-wider">
-                     {isDraw ? "ড্র ফলাফল গ্রহণযোগ্য নয়!" : "নকআউট স্টেজ: একজন বিজয়ী আবশ্যক"}
+                     {isDraw ? "Draw result is not permitted!" : "Knockout Stage: Winner Required"}
                    </span>
                  </div>
                  <p className="text-[8.5px] font-bold opacity-90 leading-relaxed">
                    {isDraw 
-                     ? "নকআউট ম্যাচে ড্র ফলাফল আপলোড করা যাবে না। অতিরিক্ত সময় বা পেনাল্টি শ্যুটআউট স্কোর সহ জয়ী প্লেয়ারের পক্ষে স্কোর নির্ধারণ করুন।" 
-                     : "এই স্টেজে ম্যাচ ড্র হবে না, দুজনের মধ্যে যেকোনো একজনকে জয়ী হতে হবে।"}
+                     ? "Knockout matches cannot end in a draw. Please record extra time or penalties to submit a winning score." 
+                     : "Matches cannot end in a draw in this stage. One player must be victorious."}
                  </p>
                </div>
              )}
@@ -787,7 +787,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 {isSubmittingReport 
                   ? 'DEPLOYING...' 
                   : isDrawBlocked 
-                    ? 'ড্র ফলাফল গ্রহণযোগ্য নয় (উইনার আবশ্যক)' 
+                    ? 'DRAWS NOT ALLOWED (WINNER REQUIRED)' 
                     : 'DEPLOY FINAL RESULT'}
              </button>
           </div>
@@ -837,7 +837,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     const awayScore = match.awayScore || 0;
 
     if (isKnockout && homeScore === awayScore) {
-      alert('নকআউট স্টেজের কোনো ম্যাচ ড্র হতে পারে না! একজন খেলোয়াড়কে বিজয়ী হতে হবে।');
+      alert('Knockout stage matches cannot end in a draw! A winner must be determined.');
       return;
     }
 
@@ -864,13 +864,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         ? match.homePlayerName 
         : awayScore > homeScore 
           ? match.awayPlayerName 
-          : 'ড্র (Draw)';
+          : 'Draw';
 
       notifyMatchParticipants({
         homePlayerId: match.homePlayerId,
         awayPlayerId: match.awayPlayerId,
-        title: '🏆 ম্যাচ রেজাল্ট কনফার্ম হয়েছে!',
-        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}। বিজয়ী: ${winnerName}! ফলাফল চূড়ান্ত করা হয়েছে।`,
+        title: '🏆 Match Result Confirmed!',
+        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}. Winner: ${winnerName}! Results finalized.`,
         type: 'match_result',
         tournamentId: match.tournamentId,
         matchId: match.id
@@ -1509,8 +1509,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       // Notify the challenge creator
       sendAppNotification({
         recipientId: challenge.creatorId,
-        title: '⚔️ আপনার চ্যালেঞ্জ গৃহীত হয়েছে!',
-        message: `${profile.inGameName || 'Player'} আপনার 1v1 চ্যালেঞ্জ গ্রহণ করেছেন! রুম আইডি: ${challenge.matchId || 'Battle'}।`,
+        title: '⚔️ Challenge Accepted!',
+        message: `${profile.inGameName || 'Player'} accepted your 1v1 challenge! Room ID: ${challenge.matchId || 'Battle'}.`,
         type: 'challenge',
         linkTab: 'matches'
       }).catch(() => {});
@@ -1554,8 +1554,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       const winnerName = winnerId === challenge.creatorId ? challenge.creatorName : (challenge.opponentName || 'Player');
       sendAppNotification({
         recipientId: winnerId,
-        title: '🏆 1v1 চ্যালেঞ্জ জয়ী!',
-        message: `অভিনন্দন! আপনি 1v1 চ্যালেঞ্জে বিজয়ী হয়ে ${challenge.pot} পয়েন্ট জিতেছেন!`,
+        title: '🏆 1v1 Challenge Won!',
+        message: `Congratulations! You won the 1v1 challenge and received ${challenge.pot} points!`,
         type: 'match_result',
         linkTab: 'matches'
       }).catch(() => {});
@@ -1564,8 +1564,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       if (loserId) {
         sendAppNotification({
           recipientId: loserId,
-          title: '⚔️ 1v1 চ্যালেঞ্জ সমাপ্ত',
-          message: `1v1 চ্যালেঞ্জের ফলাফল চূড়ান্ত হয়েছে। বিজয়ী: ${winnerName}।`,
+          title: '⚔️ 1v1 Challenge Concluded',
+          message: `1v1 challenge finalized. Winner: ${winnerName}.`,
           type: 'match_result',
           linkTab: 'matches'
         }).catch(() => {});

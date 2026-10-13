@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { doc, onSnapshot, updateDoc, setDoc, collection, addDoc, Timestamp } from 'firebase/firestore';

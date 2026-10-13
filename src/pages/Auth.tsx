@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { Mail, Lock, Eye, EyeOff, Shield, Trophy, ChevronLeft, Globe, KeyRound, CheckCircle2 } from 'lucide-react';
+import { 
+  Mail, Lock, Eye, EyeOff, Shield, KeyRound, CheckCircle2, Phone, CheckCircle
+} from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { auth, db } from '@/src/lib/firebase';
 import { 
@@ -29,10 +31,20 @@ export const AuthPage = () => {
     ovr: 100,
   });
   const [error, setError] = useState('');
+  const [successInfo, setSuccessInfo] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
 
+  // Reset errors when toggling modes
+  const handleToggleMode = (signUp: boolean) => {
+    setIsSignUp(signUp);
+    setError('');
+    setSuccessInfo('');
+  };
+
+  // ==========================================
+  // FORGOT PASSWORD
+  // ==========================================
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -59,6 +71,9 @@ export const AuthPage = () => {
     }
   };
 
+  // ==========================================
+  // SUBMIT (SIGN IN OR SIGN UP)
+  // ==========================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -66,25 +81,27 @@ export const AuthPage = () => {
 
     try {
       if (isSignUp) {
+        // Validation for registration
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Passwords do not match');
         }
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
         const user = userCredential.user;
         
-        await sendEmailVerification(user);
+        await sendEmailVerification(user).catch(() => {});
         
-        // Create user profile
-        const isSystemAdmin = formData.email === 'sperkplay@gmail.com';
+        // Create user profile in Firestore
+        const isSystemAdmin = formData.email.trim().toLowerCase() === 'sperkplay@gmail.com';
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
-          email: user.email,
+          email: user.email?.toLowerCase() || formData.email.trim().toLowerCase(),
           role: isSystemAdmin ? 'admin' : role,
-          inGameName: formData.inGameName,
-          inGameUID: formData.inGameUID,
-          fbUrl: formData.fbUrl,
-          phone: formData.phone,
-          leagueName: formData.leagueName,
+          inGameName: formData.inGameName.trim(),
+          inGameUID: formData.inGameUID.trim(),
+          fbUrl: formData.fbUrl.trim(),
+          phone: formData.phone.trim(),
+          leagueName: formData.leagueName.trim(),
           ovr: formData.ovr,
           stats: {
             globalRank: 0,
@@ -93,38 +110,58 @@ export const AuthPage = () => {
             fp: 0,
             balance: 0
           },
+          wallet: 0,
           createdAt: new Date().toISOString()
         });
         
-        alert('Verification email sent! Please check your inbox.');
+        alert('Account created successfully! Welcome to FC Arena.');
       } else {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password);
+        // Standard Email + Password Sign In
+        if (!formData.email.trim() || !formData.password) {
+          throw new Error('Please enter email and password.');
+        }
+
+        await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
       }
     } catch (err: any) {
-      setError(err.message);
+      const code = err?.code;
+      if (code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
+        setError('Incorrect email or password. If you have not created an account yet, click "New recruit? Sign Up" below.');
+      } else if (code === 'auth/wrong-password') {
+        setError('Incorrect password. Please verify and try again, or use Forgot Password.');
+      } else if (code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Please click "Already registered? Sign In" below.');
+      } else if (code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters long.');
+      } else {
+        setError(err?.message || 'Authentication process failed.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-soft-bg p-8 flex flex-col items-center justify-center">
-      <div className="max-w-md w-full space-y-12">
-        <div className="flex flex-col items-center text-center space-y-6">
-          <div className="w-24 h-24 rounded-[2.5rem] nm-flat flex items-center justify-center text-indigo-500 border-4 border-[#f0f0f3]">
-             <Shield size={40} fill="currentColor" className="opacity-80" />
+    <div className="min-h-screen bg-soft-bg p-4 sm:p-8 flex flex-col items-center justify-center">
+      <div className="max-w-md w-full space-y-8 my-6">
+        {/* Header Branding */}
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="w-20 h-20 rounded-[2.2rem] nm-flat flex items-center justify-center text-indigo-500 border-4 border-[#f0f0f3]">
+             <Shield size={38} fill="currentColor" className="opacity-80" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-none">
-              ELITE ARENA
+          <div className="space-y-1.5">
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-none">
+              FC ARENA
             </h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              The Ultimate Mobile FC Platform
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center justify-center gap-1.5">
+              <span>Competitive Esports Hub</span>
+              <span className="inline-block w-1 h-1 rounded-full bg-emerald-500"></span>
+              <span className="text-emerald-600 font-bold">Official Tournaments</span>
             </p>
           </div>
         </div>
 
-        <Card className="p-8 space-y-8">
+        <Card className="p-6 sm:p-8 space-y-6">
           {isForgotPassword ? (
             /* Forgot Password Form */
             <div className="space-y-6">
@@ -136,7 +173,7 @@ export const AuthPage = () => {
                   Reset Password
                 </h2>
                 <p className="text-[11px] font-medium text-slate-500">
-                  Enter your registered email and we'll send you a link to reset your password.
+                  Enter your registered email and we will send a password reset link.
                 </p>
               </div>
 
@@ -207,39 +244,53 @@ export const AuthPage = () => {
           ) : (
             /* Regular Sign In / Sign Up Form */
             <>
-              {/* Role Toggle - Neumorphic Inset */}
-              <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
-                <button
-                  type="button"
-                  onClick={() => setRole('player')}
-                  className={cn(
-                    "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                    role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
-                  )}
-                >
-                  Player
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('publisher')}
-                  className={cn(
-                    "flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                    role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
-                  )}
-                >
-                  Host
-                </button>
-              </div>
+              {/* Role Toggle for Sign Up */}
+              {isSignUp && (
+                <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
+                  <button
+                    type="button"
+                    onClick={() => setRole('player')}
+                    className={cn(
+                      "flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
+                      role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
+                    )}
+                  >
+                    Player
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('publisher')}
+                    className={cn(
+                      "flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
+                      role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
+                    )}
+                  >
+                    Host / Organizer
+                  </button>
+                </div>
+              )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Feedback Messages */}
                 {error && (
-                  <div className="nm-inset p-4 rounded-2xl border border-rose-200/50 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
+                  <div className="nm-inset p-3.5 rounded-2xl border border-rose-200/80 text-rose-600 text-[10px] font-bold leading-relaxed text-center">
                     {error}
                   </div>
                 )}
                 
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Email</label>
+                {successInfo && (
+                  <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold text-center flex items-center justify-center gap-1.5">
+                    <CheckCircle size={14} className="text-emerald-600" />
+                    <span>{successInfo}</span>
+                  </div>
+                )}
+
+                {/* Email Field */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                    <Mail size={12} className="text-indigo-500" />
+                    Email
+                  </label>
                   <Input 
                     type="email" 
                     placeholder="name@arena.com" 
@@ -249,15 +300,19 @@ export const AuthPage = () => {
                   />
                 </div>
 
-                <div className="space-y-3">
+                {/* Password Field */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between ml-4 mr-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <Lock size={12} className="text-indigo-500" />
+                      Password
+                    </label>
                     {!isSignUp && (
                       <button 
                         type="button"
                         onClick={() => {
-                          setIsForgotPassword(true);
-                          setError('');
+                           setIsForgotPassword(true);
+                           setError('');
                         }}
                         className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-wider transition-colors"
                       >
@@ -276,16 +331,19 @@ export const AuthPage = () => {
                     <button 
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
                 </div>
 
+                {/* Sign Up: Confirm Password */}
                 {isSignUp && (
-                  <div className="space-y-3">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Confirm Password</label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                      Confirm Password
+                    </label>
                     <Input 
                       type={showPassword ? "text" : "password"} 
                       placeholder="Repeat key" 
@@ -296,12 +354,29 @@ export const AuthPage = () => {
                   </div>
                 )}
 
+                {/* Sign Up: Additional Fields */}
                 {isSignUp && (
-                  <div className="space-y-6 pt-4 border-t border-white/20">
+                  <div className="space-y-4 pt-2 border-t border-slate-200/80">
+                    {/* Mobile Number Field (Simple input, no SMS verification required) */}
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                        <Phone size={12} className="text-indigo-500" />
+                        Mobile / WhatsApp Number
+                      </label>
+                      <Input 
+                        placeholder="017XXXXXXXX or +880..."
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      />
+                    </div>
+
+                    {/* Role Specific Additional Fields */}
                     {role === 'player' ? (
                       <>
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Game Name</label>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            In-Game Nickname
+                          </label>
                           <Input 
                             placeholder="In-game Name"
                             required
@@ -309,8 +384,10 @@ export const AuthPage = () => {
                             onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
                           />
                         </div>
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook URL</label>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Facebook Profile URL
+                          </label>
                           <Input 
                             placeholder="https://facebook.com/profile..."
                             required
@@ -318,27 +395,18 @@ export const AuthPage = () => {
                             onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
                           />
                         </div>
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Phone / WhatsApp</label>
-                          <Input 
-                            placeholder="+880..."
-                            required
-                            value={formData.phone}
-                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-3">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">In-Game UID</label>
                             <Input 
-                              placeholder="ID"
+                              placeholder="UID"
                               required
                               value={formData.inGameUID}
                               onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
                             />
                           </div>
-                          <div className="space-y-3">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">OVR</label>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Squad OVR</label>
                             <Input 
                               type="number"
                               placeholder="104"
@@ -350,8 +418,10 @@ export const AuthPage = () => {
                         </div>
                       </>
                     ) : (
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Organization</label>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                          League / Organization Title
+                        </label>
                         <Input 
                           placeholder="League Title"
                           required
@@ -363,34 +433,40 @@ export const AuthPage = () => {
                   </div>
                 )}
 
+                {/* Submit Action */}
                 <Button 
                   type="submit" 
-                  className="w-full h-18 rounded-[2.5rem] mt-8 text-[11px]"
+                  className="w-full h-16 rounded-[2.2rem] mt-6 text-[11px] font-black uppercase tracking-wider"
                   disabled={loading}
                 >
-                  {loading ? 'Entering...' : (isSignUp ? 'Initialize Profile' : 'Access Arena')}
+                  {loading ? (
+                    'Processing...'
+                  ) : isSignUp ? (
+                    'Initialize Profile'
+                  ) : (
+                    'Access Arena'
+                  )}
                   <ArrowRight className="ml-2" />
                 </Button>
               </form>
 
-              <div className="text-center">
+              {/* Mode Switcher */}
+              <div className="text-center pt-2">
                 <button 
-                  onClick={() => {
-                    setIsSignUp(!isSignUp);
-                    setError('');
-                  }}
-                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                  onClick={() => handleToggleMode(!isSignUp)}
+                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-indigo-600 transition-colors"
                 >
-                  {isSignUp ? 'Already verified? Sign In' : 'New recruit? Sign Up'}
+                  {isSignUp ? 'Already registered? Sign In' : 'New recruit? Sign Up'}
                 </button>
               </div>
             </>
           )}
         </Card>
 
-        <div className="flex items-center justify-center gap-2 opacity-30">
+        {/* Footer Security Badge */}
+        <div className="flex items-center justify-center gap-2 opacity-40">
           <Shield size={14} />
-          <span className="text-[8px] font-black uppercase tracking-[0.3em]">Official Field License</span>
+          <span className="text-[8px] font-black uppercase tracking-[0.3em]">Official Field License & Esports Arena</span>
         </div>
       </div>
     </div>
