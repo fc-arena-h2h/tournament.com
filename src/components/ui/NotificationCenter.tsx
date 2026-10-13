@@ -39,12 +39,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'announcements'>('all');
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [pushPermission, setPushPermission] = useState<NotificationPermission>(
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
-  );
-  const [requestingPerm, setRequestingPerm] = useState(false);
-  const [testStatus, setTestStatus] = useState<string | null>(null);
-  const [testingNotif, setTestingNotif] = useState(false);
 
   // Sync announcements from db
   useEffect(() => {
@@ -66,38 +60,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (activeTab === 'unread') return !n.read;
     return true;
   });
-
-  const handleEnablePush = async () => {
-    setRequestingPerm(true);
-    setTestStatus(null);
-    try {
-      const res = await requestPhoneNotificationPermission();
-      setPushPermission(res);
-      if (res === 'granted') {
-        playNotificationSound();
-        showSystemNotification('FC Arena VS – Welcome! 🏆', {
-          body: 'Background push notifications enabled! Tournament & match updates will arrive directly.',
-          tag: 'welcome-' + Date.now()
-        });
-        setTestStatus('Push notifications successfully enabled!');
-      } else {
-        setTestStatus('Notification permission not granted.');
-      }
-    } finally {
-      setRequestingPerm(false);
-    }
-  };
-
-  const handleTestNotification = async () => {
-    setTestingNotif(true);
-    setTestStatus(null);
-    try {
-      const res = await sendTestPhoneNotification();
-      setTestStatus(res.message);
-    } finally {
-      setTestingNotif(false);
-    }
-  };
 
   const handleNotificationClick = async (notif: AppNotification) => {
     if (!notif.read) {
@@ -226,66 +188,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Push Notification Status & Control */}
-        {pushPermission === 'granted' ? (
-          <div className="mx-4 mt-3 p-3 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 shadow-sm flex flex-col gap-2 shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-black text-emerald-800 uppercase tracking-wide">Push Notifications Active</span>
-              </div>
-              <button
-                onClick={handleTestNotification}
-                disabled={testingNotif}
-                className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1.5"
-                title="Send test notification to device"
-              >
-                <BellRing size={12} />
-                <span>{testingNotif ? 'Sending...' : 'Test'}</span>
-              </button>
-            </div>
-            <p className="text-[10px] text-emerald-700 font-medium leading-tight">
-              Background alerts are enabled for tournaments and match updates.
-            </p>
-            {testStatus && (
-              <p className="text-[10px] font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-200">
-                {testStatus}
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="mx-4 mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg flex flex-col gap-2 shrink-0">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                  <Bell size={18} className="animate-pulse" />
-                </div>
-                <div>
-                  <p className="text-xs font-black tracking-tight leading-tight">Enable Push Notifications</p>
-                  <p className="text-[10px] text-white/80 font-medium">Get match & tournament alerts even when minimized</p>
-                </div>
-              </div>
-              <button
-                onClick={handleEnablePush}
-                disabled={requestingPerm}
-                className="px-3 py-1.5 rounded-xl bg-white text-indigo-700 text-xs font-black uppercase tracking-wider shrink-0 shadow-md active:scale-95 transition-transform"
-              >
-                {requestingPerm ? 'Enabling...' : 'Enable'}
-              </button>
-            </div>
-            {pushPermission === 'denied' && (
-              <p className="text-[10px] text-amber-200 bg-black/20 p-2 rounded-lg leading-tight">
-                ⚠️ Notifications are blocked. Please allow notifications in site settings.
-              </p>
-            )}
-            {testStatus && (
-              <p className="text-[10px] bg-white/20 px-2 py-1 rounded-md text-white font-medium">
-                {testStatus}
-              </p>
-            )}
-          </div>
-        )}
 
         {/* Tab Switcher & Quick Actions */}
         <div className="px-4 pt-3 pb-2 flex flex-col gap-2 shrink-0">
