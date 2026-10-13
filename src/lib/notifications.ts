@@ -223,6 +223,20 @@ export async function sendTestPhoneNotification(): Promise<{ success: boolean; m
  * Create and send a notification record into Firestore,
  * and dispatch sound/system notification if recipient is self.
  */
+function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Timestamp || obj instanceof Date) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeForFirestore);
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    cleaned[key] = sanitizeForFirestore(value);
+  }
+  return cleaned;
+}
+
 export async function sendAppNotification({
   recipientId,
   title,
@@ -245,7 +259,7 @@ export async function sendAppNotification({
   if (!recipientId) return;
 
   try {
-    await addDoc(collection(db, 'notifications'), {
+    const payload = sanitizeForFirestore({
       recipientId,
       title,
       message,
@@ -257,6 +271,7 @@ export async function sendAppNotification({
       read: false,
       createdAt: Timestamp.now()
     });
+    await addDoc(collection(db, 'notifications'), payload);
   } catch (error) {
     console.error('Failed to create notification document:', error);
   }

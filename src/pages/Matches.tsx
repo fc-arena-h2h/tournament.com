@@ -360,6 +360,23 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       const matchData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
       setMatches(matchData);
 
+      // Auto-delete verified match screenshots after 24 hours to save storage
+      const nowMs = Date.now();
+      const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.status === 'completed' && data.screenshotUrl) {
+          const completedTime = data.updatedAt ? data.updatedAt.toDate().getTime() : 0;
+          if (completedTime > 0 && (nowMs - completedTime > twentyFourHoursMs)) {
+            updateDoc(doc(db, 'matches', docSnap.id), {
+              screenshotUrl: deleteField(),
+              screenshotCleared: true
+            }).catch(err => console.error("Auto cleanup match screenshot error:", err));
+          }
+        }
+      });
+
       // Fetch tournament details
       const tIds = Array.from(new Set(matchData.map(m => m.tournamentId))).filter(Boolean);
       const tData = { ...tournaments };
@@ -1190,12 +1207,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
           {match.screenshotUrl && (
             <div className="px-0">
-              <div className="relative group/img aspect-video rounded-[2rem] overflow-hidden bg-fc-dark border border-slate-100 shadow-inner">
+              <div 
+                onClick={() => setPreviewImageModal(match.screenshotUrl || null)}
+                className="relative group/img aspect-video rounded-[2rem] overflow-hidden bg-fc-dark border border-slate-100 shadow-inner cursor-pointer"
+              >
                  <img src={match.screenshotUrl} alt="Match Proof" className="w-full h-full object-cover opacity-80 group-hover/img:opacity-100 transition-opacity" />
                  <div className="absolute inset-0 bg-gradient-to-t from-fc-dark/80 to-transparent flex items-end p-6 pointer-events-none group-hover/img:opacity-0 transition-opacity">
                     <div className="flex items-center gap-2">
                       <Upload size={14} className="text-fc-green" />
-                      <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Match Evidence Attached</span>
+                      <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Match Evidence Attached (Click to View Full Screen)</span>
                     </div>
                  </div>
               </div>
