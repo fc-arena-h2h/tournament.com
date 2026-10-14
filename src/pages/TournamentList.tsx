@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { Trophy, Users, Shield, ArrowRight, Clock, Target, CheckCircle, Hash } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -15,6 +15,7 @@ interface Tournament {
   description: string;
   format?: 'group_knockout' | 'knockout' | 'league' | 'hybrid' | string;
   entryType: 'free' | 'paid';
+  entryFee?: number;
   ovrLimit: number;
   status: 'open' | 'registration_closed' | 'ongoing' | 'finished' | 'completed';
   prizePool: string;
@@ -95,7 +96,37 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
       return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
     }
 
+    const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
+    if (entryFee > 0) {
+      const currentWallet = profile.wallet || 0;
+      if (currentWallet < entryFee) {
+        return alert(`Insufficient wallet balance (৳${currentWallet.toFixed(2)}). Entry fee for this paid tournament is ৳${entryFee}. Please add funds to your wallet.`);
+      }
+      if (!confirm(`Are you sure you want to join "${tournament.title}"? ৳${entryFee} entry fee will be deducted from your wallet and held in the tournament escrow fund. If your request is rejected, the fee will be fully refunded.`)) {
+        return;
+      }
+    }
+
     try {
+      if (entryFee > 0 && auth.currentUser) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          wallet: (profile.wallet || 0) - entryFee
+        });
+
+        await addDoc(collection(db, 'transactions'), {
+          userId: auth.currentUser.uid,
+          userName: profile.inGameName || 'Player',
+          type: 'fee',
+          method: 'bkash',
+          amount: entryFee,
+          currency: 'BDT',
+          status: 'approved',
+          note: `Paid tournament entry fee (${tournament.title})`,
+          createdAt: Timestamp.now()
+        });
+      }
+
       await addDoc(collection(db, 'registrations'), {
         tournamentId: tournament.id,
         userId: auth.currentUser?.uid,
@@ -105,7 +136,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
         ovr: profile.ovr || 0,
         createdAt: Timestamp.now()
       });
-      alert('Join request sent! Waiting for publisher approval.');
+      alert(entryFee > 0 ? `Join request sent! ৳${entryFee} entry fee deducted into escrow fund.` : 'Join request sent! Waiting for publisher approval.');
       // Update local state
       setUserRegistrations({
         ...userRegistrations,

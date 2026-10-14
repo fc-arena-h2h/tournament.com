@@ -489,6 +489,8 @@ export const AdminDashboard = ({
                 )}
               </button>
             )}
+
+
           </div>
 
           {/* PAGE 1: TOURNAMENT MANAGEMENT */}
@@ -958,6 +960,8 @@ export const AdminDashboard = ({
               </div>
             </section>
           )}
+
+
         </>
       )}
 

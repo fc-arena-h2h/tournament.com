@@ -47,6 +47,9 @@ interface Tournament {
   organizerName?: string;
   organizationName?: string;
   publisherName?: string;
+  entryType?: 'free' | 'paid';
+  entryFee?: number;
+  ovrLimit?: number;
 }
 
 interface Match {
@@ -1314,7 +1317,42 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return;
     }
 
+    const userOvr = profile?.ovr || 0;
+    if (tournament.ovrLimit && userOvr > tournament.ovrLimit) {
+      return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
+    }
+
+    const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
+    if (entryFee > 0) {
+      const currentWallet = profile.wallet || 0;
+      if (currentWallet < entryFee) {
+        return alert(`Insufficient wallet balance (৳${currentWallet.toFixed(2)}). Entry fee for this paid tournament is ৳${entryFee}. Please add funds to your wallet.`);
+      }
+      if (!confirm(`Are you sure you want to join "${tournament.title}"? ৳${entryFee} entry fee will be deducted from your wallet and held in the tournament escrow fund. If your request is rejected, the fee will be fully refunded.`)) {
+        return;
+      }
+    }
+
     try {
+      if (entryFee > 0 && auth.currentUser) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          wallet: (profile.wallet || 0) - entryFee
+        });
+
+        await addDoc(collection(db, 'transactions'), {
+          userId: auth.currentUser.uid,
+          userName: profile.inGameName || 'Player',
+          type: 'fee',
+          method: 'bkash',
+          amount: entryFee,
+          currency: 'BDT',
+          status: 'approved',
+          note: `Paid tournament entry fee (${tournament.title})`,
+          createdAt: Timestamp.now()
+        });
+      }
+
       await addDoc(collection(db, 'registrations'), {
         tournamentId: tournament.id,
         userId: auth.currentUser?.uid,
@@ -1324,9 +1362,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         ovr: profile.ovr || 0,
         createdAt: Timestamp.now()
       });
-      alert('Request sent! Waiting for publisher approval.');
+      alert(entryFee > 0 ? `Join request sent! ৳${entryFee} entry fee deducted into escrow fund.` : 'Join request sent! Waiting for publisher approval.');
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.CREATE, 'registrations');
     }
   };
 
@@ -2530,7 +2569,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     </div>
                     <div className="flex gap-2">
                        <button onClick={() => handleApproveRegistration(reg.id)} className="w-9 h-9 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-md"><CheckCircle size={16} /></button>
-                       <button onClick={() => handleRejectRegistration(reg.id)} className="w-9 h-9 rounded-lg bg-rose-500 text-white flex items-center justify-center shadow-md"><X size={16} /></button>
+                       <button onClick={() => handleRejectRegistration(reg.id, reg.userId, reg.gameName)} className="w-9 h-9 rounded-lg bg-rose-500 text-white flex items-center justify-center shadow-md"><X size={16} /></button>
                     </div>
                   </div>
                 </Card>
@@ -2542,16 +2581,52 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     );
   };
 
-  const handleRejectRegistration = async (regId: string) => {
+  const handleRejectRegistration = async (regId: string, regUserId?: string, regGameName?: string) => {
     if (!confirm('Are you sure you want to reject this player?')) return;
     try {
       await updateDoc(doc(db, 'registrations', regId), {
         status: 'rejected',
         updatedAt: Timestamp.now()
       });
-      alert('Player rejected.');
+
+      // If paid tournament, refund entry fee to player
+      const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
+      if (entryFee > 0 && regUserId) {
+        const playerRef = doc(db, 'users', regUserId);
+        const playerSnap = await getDoc(playerRef);
+        if (playerSnap.exists()) {
+          const playerData = playerSnap.data();
+          const currentWallet = playerData.wallet || 0;
+          await updateDoc(playerRef, {
+            wallet: currentWallet + entryFee
+          });
+
+          await addDoc(collection(db, 'transactions'), {
+            userId: regUserId,
+            userName: regGameName || 'Player',
+            type: 'refund',
+            method: 'bkash',
+            amount: entryFee,
+            currency: 'BDT',
+            status: 'approved',
+            note: `Refund for rejected tournament entry (${tournament.title})`,
+            createdAt: Timestamp.now()
+          });
+
+          await addDoc(collection(db, 'notifications'), {
+            recipientId: regUserId,
+            title: 'Tournament Registration Rejected & Refunded',
+            message: `Your join request for "${tournament.title}" was rejected by the publisher. Your entry fee of ৳${entryFee} has been refunded to your wallet.`,
+            createdAt: Timestamp.now(),
+            read: false
+          });
+        }
+      }
+
+      alert('Player rejected and entry fee refunded (if paid tournament).');
     } catch (err) {
       console.error(err);
+      alert('Failed to reject registration');
     }
   };
 
