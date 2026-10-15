@@ -1,0 +1,100 @@
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/src/lib/firebase';
+
+/**
+ * Perform a security integrity check every 2 seconds between local profile and Firestore server data
+ */
+export async function checkUserFraudStatus(userId: string, currentProfile: any): Promise<{ isFrozen: boolean; fraudReason?: string }> {
+  if (!userId) return { isFrozen: false };
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    const serverSnap = await getDoc(userRef);
+
+    if (!serverSnap.exists()) return { isFrozen: false };
+    const serverData = serverSnap.data();
+
+    // Check if admin already froze the account
+    if (serverData.isFrozen || serverData.status === 'banned') {
+      return { isFrozen: true, fraudReason: serverData.fraudReason || 'Account suspended by security system or admin' };
+    }
+
+    // Fraud Detection Logic:
+    // 1. Detect illegal wallet balance inflation without transaction record or mismatch exceeding limits
+    // 2. Check for negative wallet or invalid token injection signatures
+    const localWallet = Number(currentProfile?.wallet || 0);
+    const serverWallet = Number(serverData?.wallet || 0);
+
+    // If local wallet is significantly ahead of server wallet without authorized ledger update
+    if (localWallet > serverWallet + 50000) {
+      // Flag fraud!
+      await updateDoc(userRef, {
+        isFrozen: true,
+        fraudAlert: true,
+        fraudReason: 'Unauthorized token/balance injection detected'
+      });
+
+      // Report to Admin
+      await addDoc(collection(db, 'fraudReports'), {
+        userId,
+        userName: currentProfile?.inGameName || currentProfile?.email || 'Unknown User',
+        userEmail: currentProfile?.email || '',
+        discrepancy: `Local wallet (৳${localWallet}) exceeds server wallet (৳${serverWallet}) by suspicious margin. Possible fake token injection.`,
+        currentWallet: localWallet,
+        serverWallet: serverWallet,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      return { isFrozen: true, fraudReason: 'Unauthorized token/balance injection detected' };
+    }
+
+    return { isFrozen: serverData.isFrozen || false, fraudReason: serverData.fraudReason };
+  } catch (err) {
+    console.warn("Fraud check error:", err);
+    return { isFrozen: false };
+  }
+}
+
+/**
+ * Admin Action: Continue / Verify Account (Unfreeze)
+ */
+export async function adminVerifyAndContinueAccount(userId: string, reportId?: string) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    isFrozen: false,
+    fraudAlert: false,
+    fraudReason: null,
+    status: 'active',
+    updatedAt: serverTimestamp()
+  });
+
+  if (reportId) {
+    await updateDoc(doc(db, 'fraudReports', reportId), {
+      status: 'resolved',
+      adminAction: 'continued',
+      resolvedAt: serverTimestamp()
+    });
+  }
+}
+
+/**
+ * Admin Action: Block / Ban Account
+ */
+export async function adminBlockAccount(userId: string, reportId?: string) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    isFrozen: true,
+    status: 'banned',
+    fraudReason: 'Permanently blocked by admin due to fraud detection',
+    updatedAt: serverTimestamp()
+  });
+
+  if (reportId) {
+    await updateDoc(doc(db, 'fraudReports', reportId), {
+      status: 'resolved',
+      adminAction: 'blocked',
+      resolvedAt: serverTimestamp()
+    });
+  }
+}

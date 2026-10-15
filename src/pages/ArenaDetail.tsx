@@ -3855,7 +3855,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             <CheckCircle size={18} />
                            </button>
                            <button 
-                            onClick={() => handleRejectRegistration(reg.id)}
+                            onClick={() => handleRejectRegistration(reg.id, reg.userId, reg.gameName)}
                             className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-lg active:scale-90"
                            >
                             <X size={18} />
@@ -4710,11 +4710,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  onClick={() => setActiveTab(tab.id)}
                  className={cn(
                    "flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all duration-300",
-                   active ? "bg-slate-900 text-white shadow-lg font-black" : "text-black hover:text-black font-black"
+                   active ? "bg-slate-900 text-white shadow-lg font-black" : "text-slate-600 hover:text-slate-900 font-black hover:bg-white/60"
                  )}
                >
-                 <Icon size={18} className={active ? "text-white" : "text-black"} />
-                 <span className={cn("text-[8px] font-black uppercase tracking-tighter", active ? "text-white" : "text-black")}>{tab.label}</span>
+                 <Icon size={18} className={active ? "text-white" : "text-slate-700"} />
+                 <span className={cn("text-[8px] font-black uppercase tracking-tighter", active ? "text-white" : "text-slate-700")}>{tab.label}</span>
                </button>
              );
            })}

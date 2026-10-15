@@ -6,7 +6,8 @@ import { logPointTransaction } from '@/src/lib/points';
 import { 
   Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
   Camera, AlertCircle, Swords, X, Trash2, LayoutDashboard, 
-  Gamepad2, Clock, Wallet, ArrowDownLeft, ArrowUpRight, Filter, CheckCheck, RefreshCw 
+  Gamepad2, Clock, Wallet, ArrowDownLeft, ArrowUpRight, Filter, CheckCheck, RefreshCw,
+  ShieldAlert, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -15,6 +16,19 @@ import { GameLoader } from '@/src/components/ui/GameLoader';
 import { 
   WalletTransaction, approveWalletTransaction, rejectWalletTransaction, PAYMENT_CONFIG 
 } from '@/src/lib/wallet';
+import { adminVerifyAndContinueAccount, adminBlockAccount } from '@/src/lib/fraudProtection';
+
+interface FraudReport {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  discrepancy: string;
+  currentWallet: number;
+  serverWallet: number;
+  status: 'pending' | 'resolved';
+  createdAt?: any;
+}
 
 interface Registration {
   id: string;
@@ -71,11 +85,32 @@ export const AdminDashboard = ({
   const [announcement, setAnnouncement] = useState('');
   const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
   const [adminViewMode, setAdminViewMode] = useState<'dashboard' | 'matches'>('dashboard');
-  type AdminSectionTab = 'tournaments' | 'access' | '1v1' | 'wallet';
+  type AdminSectionTab = 'tournaments' | 'access' | '1v1' | 'wallet' | 'security';
   const [activeSection, setActiveSection] = useState<AdminSectionTab>('tournaments');
   const [regFilter, setRegFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [pendingWalletTxs, setPendingWalletTxs] = useState<WalletTransaction[]>([]);
+  const [fraudReports, setFraudReports] = useState<FraudReport[]>([]);
   const [processingTxId, setProcessingTxId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    // Listen to fraud reports
+    const fQ = query(collection(db, 'fraudReports'));
+    const unsubFraud = onSnapshot(fQ, (snapshot) => {
+      const reports = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FraudReport));
+      reports.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return timeB - timeA;
+      });
+      setFraudReports(reports);
+    }, (err) => {
+      console.warn("Fraud reports listener error:", err);
+    });
+
+    return () => unsubFraud();
+  }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -485,6 +520,31 @@ export const AdminDashboard = ({
                 ) : (
                   <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-emerald-100 text-emerald-700">
                     ৳
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Security & Fraud Monitor Tab (Admin Only) */}
+            {userProfile?.role === 'admin' && (
+              <button
+                onClick={() => setActiveSection('security')}
+                className={cn(
+                  "flex-1 min-w-[125px] py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap",
+                  activeSection === 'security'
+                    ? "nm-flat bg-[#f0f0f3] text-rose-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/30"
+                )}
+              >
+                <ShieldAlert size={14} className={activeSection === 'security' ? 'text-rose-600' : 'text-slate-400'} />
+                <span>🛡️ Security & Fraud</span>
+                {fraudReports.filter(r => r.status === 'pending').length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-rose-500 text-white animate-pulse">
+                    {fraudReports.filter(r => r.status === 'pending').length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none bg-slate-200 text-slate-500">
+                    0
                   </span>
                 )}
               </button>
@@ -958,6 +1018,101 @@ export const AdminDashboard = ({
                   })
                 )}
               </div>
+            </section>
+          )}
+
+          {/* PAGE 5: SECURITY & FRAUD MONITOR (Admin Only) */}
+          {activeSection === 'security' && userProfile?.role === 'admin' && (
+            <section className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                    <ShieldAlert size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase italic">Anti-Cheat & Fraud Protection Center</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Real-time 2s integrity checks & user transaction audits</p>
+                  </div>
+                </div>
+              </div>
+
+              {fraudReports.length === 0 ? (
+                <Card className="p-10 text-center border-none bg-slate-50/50 space-y-3 mx-2">
+                  <ShieldCheck size={36} className="text-emerald-500 mx-auto" />
+                  <h4 className="text-xs font-black text-slate-800 uppercase italic">No Fraud Alerts or Suspicious Transactions</h4>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">All user transactions and balances are verified and secure.</p>
+                </Card>
+              ) : (
+                <div className="space-y-4 px-2">
+                  {fraudReports.map(report => (
+                    <Card key={report.id} className={cn(
+                      "p-6 border-2 space-y-4",
+                      report.status === 'pending' ? "border-rose-300 bg-rose-50/40 shadow-lg" : "border-slate-200 bg-white"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black">
+                            {report.userName.charAt(0)}
+                          </div>
+                          <div>
+                            <span className="text-sm font-black text-slate-900 uppercase italic">{report.userName}</span>
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-widest">{report.userEmail || report.userId}</span>
+                          </div>
+                        </div>
+                        <span className={cn(
+                          "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                          report.status === 'pending' ? "bg-rose-500 text-white border-rose-600 animate-pulse" : "bg-slate-100 text-slate-600 border-slate-200"
+                        )}>
+                          {report.status.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/80 border border-rose-200/60 space-y-2">
+                        <span className="text-[9px] font-black text-rose-600 uppercase tracking-wider block">Discrepancy Details</span>
+                        <p className="text-xs font-bold text-slate-800 leading-relaxed uppercase">
+                          {report.discrepancy}
+                        </p>
+                        <div className="flex gap-4 text-[9px] font-black text-slate-500 uppercase">
+                          <span>Local Balance: ৳{report.currentWallet}</span>
+                          <span>Server Balance: ৳{report.serverWallet}</span>
+                        </div>
+                      </div>
+
+                      {report.status === 'pending' && (
+                        <div className="flex items-center gap-3 pt-2">
+                          <Button 
+                            onClick={async () => {
+                              try {
+                                await adminVerifyAndContinueAccount(report.userId, report.id);
+                                alert(`Account for ${report.userName} verified and un-frozen! Transactions restored.`);
+                              } catch (e: any) {
+                                alert(e.message || 'Failed to verify account');
+                              }
+                            }}
+                            className="flex-1 h-12 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-md"
+                          >
+                            Continue (Verify & Unfreeze)
+                          </Button>
+                          <Button 
+                            onClick={async () => {
+                              if (!confirm(`Are you sure you want to permanently block ${report.userName}?`)) return;
+                              try {
+                                await adminBlockAccount(report.userId, report.id);
+                                alert(`Account for ${report.userName} permanently blocked.`);
+                              } catch (e: any) {
+                                alert(e.message || 'Failed to block account');
+                              }
+                            }}
+                            className="flex-1 h-12 rounded-2xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest shadow-md"
+                          >
+                            Block (Ban User)
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

@@ -705,30 +705,39 @@ export const LeaguePage = ({ profile }: { profile: UserProfile | null }) => {
         <div className="space-y-4 px-2">
           <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] px-4">My League</h3>
           {myLeagues.map(l => (
-            <Card key={l.id} className="p-6 border-none bg-indigo-600 text-white relative overflow-hidden group cursor-pointer active:scale-95 transition-transform" onClick={() => setSelectedLeague(l)}>
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Shield size={80} />
+            <Card 
+              key={l.id} 
+              className="p-6 rounded-[2.2rem] bg-white border-2 border-slate-200/80 shadow-xl relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all hover:border-slate-300 hover:shadow-2xl" 
+              onClick={() => setSelectedLeague(l)}
+            >
+              <div className="absolute top-0 right-0 p-4 text-slate-100 group-hover:text-slate-200/80 transition-colors pointer-events-none">
+                <Shield size={96} strokeWidth={1.5} />
               </div>
-              <div className="relative z-10 space-y-4">
+              <div className="relative z-10 space-y-5">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-xl font-black uppercase italic">{l.name}</span>
-                    <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest flex items-center gap-2">
-                      <Globe size={12} /> {l.country}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl sm:text-2xl font-black uppercase italic text-black tracking-tight">{l.name}</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[8px] font-black uppercase tracking-wider border border-emerald-200">
+                        Active
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-black/80 uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
+                      <Globe size={12} className="text-black" /> {l.country}
                     </span>
                   </div>
-                  <div className="nm-flat rounded-xl bg-white/20 p-3 border border-white/30 backdrop-blur-md">
-                    <Users size={20} />
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 text-black flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                    <Users size={22} className="text-black" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="nm-inset bg-black/20 rounded-xl p-3 border border-white/10">
-                    <span className="text-[8px] font-black opacity-60 uppercase block">Members</span>
-                    <span className="text-sm font-black">{l.memberCount} / {l.maxMembers}</span>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="rounded-2xl p-3.5 bg-slate-50 border border-slate-200/90 shadow-inner">
+                    <span className="text-[8px] font-black text-black/70 uppercase block tracking-wider">Members</span>
+                    <span className="text-base font-black text-black tracking-tight">{l.memberCount} / {l.maxMembers}</span>
                   </div>
-                  <div className="nm-inset bg-black/20 rounded-xl p-3 border border-white/10">
-                    <span className="text-[8px] font-black opacity-60 uppercase block">OVR Req</span>
-                    <span className="text-sm font-black">{l.minOvr} - {l.maxOvr}</span>
+                  <div className="rounded-2xl p-3.5 bg-slate-50 border border-slate-200/90 shadow-inner">
+                    <span className="text-[8px] font-black text-black/70 uppercase block tracking-wider">OVR Req</span>
+                    <span className="text-base font-black text-black tracking-tight">{l.minOvr} - {l.maxOvr}</span>
                   </div>
                 </div>
               </div>

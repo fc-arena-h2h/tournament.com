@@ -26,12 +26,33 @@ service cloud.firestore {
       return hasRole('publisher') || isAdmin();
     }
 
-    // User profiles
+    // User profiles - Hardened security: users cannot increase wallet arbitrarily or change role,
+    // except a one-time 10 BDT bonus when publisher creates their first virtual card on an unrecorded device
     match /users/{uid} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow update: if isOwner(uid) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified']) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['wallet']) ||
+          request.resource.data.wallet <= resource.data.wallet ||
+          (
+            // Publisher first card bonus condition: wallet increased by at most 10 and bonusClaimed becomes true
+            request.resource.data.wallet <= resource.data.wallet + 10 &&
+            request.resource.data.bonusClaimed == true &&
+            (!('bonusClaimed' in resource.data) || resource.data.bonusClaimed != true)
+          ) ||
+          isAdmin()
+        )
+      );
       allow delete: if isAdmin();
+    }
+
+    // Hardware devices registry to prevent multiple bonus collections on the same device
+    match /devices/{hwid} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     // Tournaments
@@ -80,16 +101,16 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // Point Transactions (Points history: earned, spent, refunded, penalized)
+    // Point Transactions
     match /point_transactions/{id} {
       allow read: if true;
       allow write: if isSignedIn();
     }
     
-    // Transactions / Wallet Requests (Only admin can update status / approve / reject)
+    // Transactions / Wallet Requests - Hardened: users can only create pending requests for themselves, only admin can approve/update
     match /transactions/{id} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.status == 'pending' && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
@@ -116,7 +137,7 @@ service cloud.firestore {
       allow update, delete: if isSignedIn();
     }
 
-    // Notifications (In-app, push, and admin alerts)
+    // Notifications
     match /notifications/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

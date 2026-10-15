@@ -6,12 +6,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 const databaseId = (firebaseConfig as any).firestoreDatabaseId;
 
+// Configure Firestore with in-memory caching to eliminate IndexedDB lock timeouts and ensure snappy network responses
 export const db = initializeFirestore(
   app,
-  {
-    experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
-  },
+  {},
   databaseId || undefined
 );
 

@@ -272,7 +272,7 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
 
         <Button 
           type="submit" 
-          className="w-full h-18 rounded-[2.5rem] mt-8 text-indigo-600"
+          className="w-full h-18 rounded-[2.5rem] mt-8 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 text-white font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/30 active:scale-95 transition-all"
           disabled={loading}
         >
           {loading ? 'Deploying...' : `Deploy Tournament (Fee: ৳${formData.entryType === 'paid' ? 20 : 10})`}

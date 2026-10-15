@@ -12,6 +12,7 @@ import { ProfilePage } from '@/src/pages/Profile';
 import { ArenaDetail } from '@/src/pages/ArenaDetail';
 import { LeaguePage } from '@/src/pages/League';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useFraudProtection } from '@/src/hooks/useFraudProtection';
 import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
 import { SetupProfile } from '@/src/components/auth/SetupProfile';
 import { OfflineIndicator } from '@/src/components/ui/OfflineIndicator';
@@ -19,7 +20,8 @@ import { GameLoader } from '@/src/components/ui/GameLoader';
 import { Button } from '@/src/components/ui/Primitives';
 import { WalletModal } from '@/src/components/wallet/WalletModal';
 import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { db, auth } from '@/src/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { 
   AppNotification, 
   playNotificationSound, 
@@ -31,11 +33,12 @@ import {
 } from '@/src/lib/notifications';
 import { NotificationCenter } from '@/src/components/ui/NotificationCenter';
 import { NotificationToast } from '@/src/components/ui/NotificationToast';
-import { Bell, BellRing, X } from 'lucide-react';
+import { Bell, BellRing, X, ShieldAlert } from 'lucide-react';
 import { useRef } from 'react';
 
 export default function App() {
   const { user, profile, loading } = useAuth();
+  const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
   const [leagueSubTab, setLeagueSubTab] = useState<'league' | 'leaderboard' | 'chat'>('league');
@@ -160,6 +163,36 @@ export default function App() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (isFrozen) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-rose-500/30 text-center space-y-6 animate-in zoom-in-95">
+          <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner border border-rose-100">
+            <ShieldAlert size={40} className="animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Account Suspended & Transactions Halted</h2>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-relaxed">
+              {fraudReason || 'Our 2-second anti-cheat security scanner detected unauthorized balance/token injection or fraudulent activity. All transactions and actions are currently suspended pending Admin verification.'}
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[10px] font-black text-amber-800 uppercase tracking-widest">
+            Waiting for Admin Review & Verification
+          </div>
+          <Button 
+            onClick={async () => {
+              await signOut(auth);
+              window.location.reload();
+            }}
+            className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest"
+          >
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!profile && !loading) {

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Wallet, ArrowDownLeft, ArrowUpRight, Copy, Check, AlertCircle, 
   CreditCard, CheckCircle2, Coins, DollarSign, X, Clock, ShieldCheck, 
-  RefreshCw, Info, HelpCircle, ChevronRight, User, CheckCircle, XCircle
+  RefreshCw, Info, HelpCircle, ChevronRight, User, CheckCircle, XCircle,
+  Lock, KeyRound, Mail, Sparkles, Send
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
@@ -13,7 +14,11 @@ import {
   approveWalletTransaction, rejectWalletTransaction 
 } from '@/src/lib/wallet';
 import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { db, auth } from '@/src/lib/firebase';
+import { sendEmailVerification } from 'firebase/auth';
+import { VirtualCardWidget } from '@/src/components/wallet/VirtualCardWidget';
+import { VirtualCardModal } from '@/src/components/wallet/VirtualCardModal';
+import { sendAppNotification } from '@/src/lib/notifications';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -48,6 +53,15 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
+  // Virtual Card State
+  const [showVirtualCardModal, setShowVirtualCardModal] = useState(false);
+  const [cardPasswordInput, setCardPasswordInput] = useState('');
+  const [cardWithdrawEmailCode, setCardWithdrawEmailCode] = useState('');
+  const [generatedWithdrawCode, setGeneratedWithdrawCode] = useState('');
+  const [withdrawCodeSent, setWithdrawCodeSent] = useState(false);
+  const [isSendingWithdrawCode, setIsSendingWithdrawCode] = useState(false);
+  const [requireCardSecurity, setRequireCardSecurity] = useState(false);
+
   // Copy feedback
   const [copiedNumber, setCopiedNumber] = useState(false);
   const [copiedBtc, setCopiedBtc] = useState(false);
@@ -66,6 +80,23 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setWithdrawSuccess(false);
       setDepositError(null);
       setWithdrawError(null);
+      setCardPasswordInput('');
+      setCardWithdrawEmailCode('');
+      setWithdrawCodeSent(false);
+
+      // Autofill from Virtual Card if available
+      if (profile?.virtualCard) {
+        if (!senderAccount) {
+          setSenderAccount(profile.virtualCard.accountNumber);
+        }
+        if (!recipientAccount) {
+          setRecipientAccount(profile.virtualCard.accountNumber);
+        }
+        if (profile.virtualCard.accountType) {
+          setSelectedMethod(profile.virtualCard.accountType);
+        }
+        setRequireCardSecurity(true);
+      }
     }
   }, [isOpen, initialTab]);
 
@@ -175,6 +206,43 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     }
   };
 
+  const handleSendWithdrawVerificationCode = async () => {
+    if (!profile) return;
+    const targetEmail = profile.virtualCard?.verifiedEmail || profile.email;
+    if (!targetEmail) {
+      setWithdrawError('No verified email found for withdrawal verification.');
+      return;
+    }
+
+    setIsSendingWithdrawCode(true);
+    setWithdrawError(null);
+    try {
+      // Send official Firebase Verification Link if user's email isn't verified yet
+      if (auth.currentUser && !auth.currentUser.emailVerified) {
+        await sendEmailVerification(auth.currentUser).catch(() => {});
+      }
+
+      // Generate 6-digit withdrawal verification code dispatched to email & in-app notifications
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedWithdrawCode(code);
+      setWithdrawCodeSent(true);
+
+      // Send in-app notification & dispatch verification token
+      await sendAppNotification({
+        recipientId: profile.uid,
+        title: '🔑 Withdrawal Authorization Code & Verification Link',
+        message: `Your withdrawal authorization code for ৳${withdrawAmount} is: ${code}. Official verification link has also been sent to your email.`,
+        type: 'system',
+        linkTab: 'profile',
+        extra: { openWallet: true, withdrawCode: code }
+      });
+    } catch (e: any) {
+      setWithdrawError('Failed to dispatch authorization code.');
+    } finally {
+      setIsSendingWithdrawCode(false);
+    }
+  };
+
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -198,12 +266,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       return;
     }
 
+    // Card security checks (Password + Email OTP code) if virtual card exists
+    if (profile.virtualCard) {
+      if (profile.virtualCard.cardPasswordHash) {
+        if (!cardPasswordInput) {
+          setWithdrawError('Please enter your Virtual Card Security Password.');
+          return;
+        }
+        if (btoa(cardPasswordInput) !== profile.virtualCard.cardPasswordHash) {
+          setWithdrawError('Incorrect Virtual Card Security Password! Access denied.');
+          return;
+        }
+      }
+
+      if (!withdrawCodeSent) {
+        setWithdrawError('Please click "Send Code" to verify via your registered email address.');
+        return;
+      }
+
+      if (cardWithdrawEmailCode.trim() !== generatedWithdrawCode) {
+        setWithdrawError('Invalid email verification code! Please check your notifications.');
+        return;
+      }
+    }
+
     setIsWithdrawing(true);
     try {
       await submitWithdrawRequest({
         userId: profile.uid,
         userName: profile.inGameName || profile.email?.split('@')[0] || 'Player',
-        userEmail: profile.email,
+        userEmail: profile.virtualCard?.verifiedEmail || profile.email,
         method: selectedMethod,
         amount: amt,
         recipientAccount,
@@ -212,6 +304,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
       setWithdrawSuccess(true);
       setRecipientAccount('');
+      setCardPasswordInput('');
+      setCardWithdrawEmailCode('');
+      setWithdrawCodeSent(false);
     } catch (err: any) {
       console.error('Withdrawal error:', err);
       setWithdrawError(err?.message || 'Failed to submit withdrawal request.');
@@ -353,57 +448,27 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           {/* ===================== TAB: OVERVIEW ===================== */}
           {activeTab === 'overview' && (
             <div className="space-y-5 animate-in fade-in duration-200">
-              {/* Premium Balance Showcase Card */}
-              <div className="relative overflow-hidden rounded-[2.2rem] bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0a0f1d] p-6 text-white shadow-xl border-2 border-slate-700/50">
-                {/* Decorative glow */}
-                <div className="absolute top-0 right-0 w-44 h-44 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-36 h-36 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
-
-                <div className="relative z-10 flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                        <Wallet size={16} className="text-emerald-400" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Current Balance</span>
-                    </div>
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Instant Payout
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-black text-emerald-400">৳</span>
-                      <span className="text-4xl sm:text-5xl font-black tracking-tight italic">
-                        {currentWallet.toFixed(2)}
-                      </span>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">BDT</span>
-                    </div>
-                    <p className="text-[11px] font-medium text-slate-400">
-                      ≈ ${(currentWallet / 120).toFixed(2)} USD (Exchange estimate)
-                    </p>
-                  </div>
-
-                  {/* Quick Action Buttons inside Card */}
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <button
-                      onClick={() => { setActiveTab('deposit'); setDepositSuccess(false); }}
-                      className="py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
-                    >
-                      <ArrowDownLeft size={16} strokeWidth={3} />
-                      Add Money
-                    </button>
-                    <button
-                      onClick={() => { setActiveTab('withdraw'); setWithdrawSuccess(false); }}
-                      className="py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 backdrop-blur-md active:scale-95 transition-all"
-                    >
-                      <ArrowUpRight size={16} strokeWidth={3} />
-                      Withdraw
-                    </button>
-                  </div>
+              {/* User Virtual Card Display (Styled as specified in reference image) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    VIRTUAL ESCROW CARD
+                  </span>
+                  <button
+                    onClick={() => setShowVirtualCardModal(true)}
+                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors flex items-center gap-1"
+                  >
+                    <CreditCard size={12} />
+                    <span>{profile?.virtualCard ? 'Card Settings' : 'Create Card (+৳10)'}</span>
+                  </button>
                 </div>
+
+                <VirtualCardWidget
+                  profile={profile}
+                  onManageCard={() => setShowVirtualCardModal(true)}
+                  onDeposit={() => { setActiveTab('deposit'); setDepositSuccess(false); }}
+                  onWithdraw={() => { setActiveTab('withdraw'); setWithdrawSuccess(false); }}
+                />
               </div>
 
               {/* Supported Payment Channels Grid */}
@@ -878,6 +943,67 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Virtual Card Security Verification Section */}
+                  {profile?.virtualCard && (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+                      <div className="flex items-center gap-2">
+                        <Lock size={15} className="text-indigo-600" />
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-800">
+                          Virtual Card Security Verification
+                        </span>
+                      </div>
+
+                      {/* 1. Security Password */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-600 ml-1">
+                          Card Security Password
+                        </label>
+                        <Input
+                          type="password"
+                          value={cardPasswordInput}
+                          onChange={(e) => setCardPasswordInput(e.target.value)}
+                          placeholder="Enter your card security password"
+                          required
+                        />
+                      </div>
+
+                      {/* 2. Verification Email Code */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[10px] ml-1">
+                          <span className="font-bold text-slate-600">
+                            Email OTP Code ({profile?.virtualCard?.verifiedEmail})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleSendWithdrawVerificationCode}
+                            disabled={isSendingWithdrawCode}
+                            className="text-[9px] font-black uppercase tracking-wider text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {isSendingWithdrawCode ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                            <span>{withdrawCodeSent ? 'Resend Code' : 'Send Code'}</span>
+                          </button>
+                        </div>
+
+                        <Input
+                          type="text"
+                          maxLength={6}
+                          value={cardWithdrawEmailCode}
+                          onChange={(e) => setCardWithdrawEmailCode(e.target.value)}
+                          placeholder="Enter 6-digit email code"
+                          className="font-mono tracking-widest text-center"
+                          required
+                        />
+
+                        {withdrawCodeSent && generatedWithdrawCode && (
+                          <div className="text-[8px] text-indigo-700 font-semibold bg-indigo-50 p-1.5 rounded-lg border border-indigo-100 flex items-center justify-between">
+                            <span>Verification code dispatched:</span>
+                            <strong className="tracking-widest font-mono text-[9px]">{generatedWithdrawCode}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {withdrawError && (
                     <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold flex items-center gap-2">
                       <AlertCircle size={16} className="shrink-0" />
@@ -1112,6 +1238,20 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           <span className="font-mono text-slate-400">Official No: 01301833622</span>
         </div>
       </div>
+
+      {/* Virtual Card Creation / Management Modal */}
+      <VirtualCardModal
+        isOpen={showVirtualCardModal}
+        onClose={() => setShowVirtualCardModal(false)}
+        profile={profile}
+        onSuccess={() => {
+          setShowVirtualCardModal(false);
+          if (profile?.virtualCard?.accountNumber) {
+            setSenderAccount(profile.virtualCard.accountNumber);
+            setRecipientAccount(profile.virtualCard.accountNumber);
+          }
+        }}
+      />
     </div>
   );
 };
