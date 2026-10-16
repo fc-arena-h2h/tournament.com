@@ -143,5 +143,17 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn();
     }
+
+    // Fraud Reports
+    match /fraudReports/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Connection Health Check
+    match /test/{id} {
+      allow read: if true;
+    }
   }
 }

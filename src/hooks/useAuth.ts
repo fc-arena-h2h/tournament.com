@@ -21,6 +21,8 @@ export interface UserProfile {
   wallet?: number;
   eliteScore?: number;
   pointsGifted?: number;
+  pushEnabled?: boolean;
+  fcmTokens?: string[];
   createdAt?: any;
   virtualCard?: {
     cardHolderName: string;

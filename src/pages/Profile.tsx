@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck } from 'lucide-react';
+import { User, Camera, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck, Languages, Bell, BellRing } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { doc, onSnapshot, updateDoc, setDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db, auth } from '@/src/lib/firebase';
 import { signOut } from 'firebase/auth';
 import imageCompression from 'browser-image-compression';
+import { useI18n } from '@/src/lib/i18n';
+import { requestPushNotificationToken } from '@/src/lib/fcm';
+import { sendTestPhoneNotification } from '@/src/lib/notifications';
 
 interface ProfileProps {
   user: any;
@@ -15,9 +18,11 @@ interface ProfileProps {
 }
 
 export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: ProfileProps) => {
+  const { language, toggleLanguage, t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
   const [editData, setEditData] = useState({
     inGameName: '',
     inGameUID: '',
@@ -470,6 +475,83 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
                </div>
              </div>
            </div>
+        </Card>
+      </div>
+
+      {/* App Preferences & Settings (Language & FCM Push Notifications) */}
+      <div className="px-4 space-y-4">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">
+          {language === 'bn' ? 'অ্যাপ সেটিংস ও নোটিফিকেশন' : 'App Settings & Notifications'}
+        </h3>
+        <Card className="p-6 border-none space-y-6">
+          {/* Language Preference */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-600 border border-white/20">
+                <Languages size={22} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {language === 'bn' ? 'অ্যাপের ভাষা' : 'App Language'}
+                </span>
+                <span className="text-xs font-black text-slate-800">
+                  {language === 'bn' ? 'বাংলা (Bengali)' : 'English'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={toggleLanguage}
+              className="px-4 py-2.5 rounded-xl nm-flat text-indigo-600 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 active:nm-pressed"
+            >
+              <Languages size={13} />
+              <span>{language === 'bn' ? 'Switch to English' : 'বাংলায় পরিবর্তন'}</span>
+            </button>
+          </div>
+
+          <div className="h-[1px] bg-slate-100" />
+
+          {/* FCM Push Notifications */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-amber-500 border border-white/20">
+                <BellRing size={22} className="animate-wiggle" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {language === 'bn' ? 'ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন' : 'Push Notifications (FCM)'}
+                </span>
+                <span className="text-xs font-black text-slate-800">
+                  {profile?.pushEnabled 
+                    ? (language === 'bn' ? 'সক্রিয় রয়েছে (Active)' : 'Active on Device') 
+                    : (language === 'bn' ? 'নতুন ম্যাচ ও অ্যালার্টের নোটিফিকেশন' : 'Match & tournament alerts')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setPushLoading(true);
+                  try {
+                    const res = await requestPushNotificationToken(user?.uid);
+                    if (res.success) {
+                      await sendTestPhoneNotification();
+                      alert(language === 'bn' ? 'পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে!' : 'Push notifications successfully activated!');
+                    } else {
+                      alert(res.error || 'Permission not granted');
+                    }
+                  } finally {
+                    setPushLoading(false);
+                  }
+                }}
+                disabled={pushLoading}
+                className="px-3.5 py-2.5 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 active:scale-95 transition-all shadow-md disabled:opacity-50"
+              >
+                <Bell size={13} />
+                <span>{pushLoading ? '...' : (profile?.pushEnabled ? (language === 'bn' ? 'টেস্ট অ্যালার্ট' : 'Test Push') : (language === 'bn' ? 'চালু করুন' : 'Enable'))}</span>
+              </button>
+            </div>
+          </div>
         </Card>
       </div>
 

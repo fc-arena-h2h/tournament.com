@@ -13,6 +13,7 @@ import { ArenaDetail } from '@/src/pages/ArenaDetail';
 import { LeaguePage } from '@/src/pages/League';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useFraudProtection } from '@/src/hooks/useFraudProtection';
+import { useI18n } from '@/src/lib/i18n';
 import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
 import { SetupProfile } from '@/src/components/auth/SetupProfile';
 import { OfflineIndicator } from '@/src/components/ui/OfflineIndicator';
@@ -37,6 +38,7 @@ import { Bell, BellRing, X, ShieldAlert } from 'lucide-react';
 import { useRef } from 'react';
 
 export default function App() {
+  const { t } = useI18n();
   const { user, profile, loading } = useAuth();
   const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
@@ -155,7 +157,7 @@ export default function App() {
   if (loading || !initialLoadComplete) {
     return (
       <GameLoader 
-        text="CONNECTING TO MATCH ENGINE" 
+        text={t('connected_match_engine')} 
         onComplete={() => setInitialLoadComplete(true)} 
       />
     );
@@ -173,13 +175,13 @@ export default function App() {
             <ShieldAlert size={40} className="animate-pulse" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Account Suspended & Transactions Halted</h2>
+            <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">{t('security_alert')}</h2>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-relaxed">
-              {fraudReason || 'Our 2-second anti-cheat security scanner detected unauthorized balance/token injection or fraudulent activity. All transactions and actions are currently suspended pending Admin verification.'}
+              {fraudReason || t('security_message')}
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[10px] font-black text-amber-800 uppercase tracking-widest">
-            Waiting for Admin Review & Verification
+            {t('waiting_admin')}
           </div>
           <Button 
             onClick={async () => {
@@ -188,7 +190,7 @@ export default function App() {
             }}
             className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest"
           >
-            Sign Out
+            {t('sign_out_button')}
           </Button>
         </div>
       </div>

@@ -7,11 +7,25 @@ import { db } from '@/src/lib/firebase';
 export async function checkUserFraudStatus(userId: string, currentProfile: any): Promise<{ isFrozen: boolean; fraudReason?: string }> {
   if (!userId) return { isFrozen: false };
 
+  // Skip remote check if client is temporarily offline
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { isFrozen: !!currentProfile?.isFrozen, fraudReason: currentProfile?.fraudReason };
+  }
+
   try {
     const userRef = doc(db, 'users', userId);
-    const serverSnap = await getDoc(userRef);
+    let serverSnap;
+    try {
+      serverSnap = await getDoc(userRef);
+    } catch (fetchErr: any) {
+      // Gracefully handle network transitions without error spam
+      if (fetchErr?.code === 'unavailable' || fetchErr?.message?.includes('offline') || fetchErr?.message?.includes('could not be completed')) {
+        return { isFrozen: !!currentProfile?.isFrozen, fraudReason: currentProfile?.fraudReason };
+      }
+      throw fetchErr;
+    }
 
-    if (!serverSnap.exists()) return { isFrozen: false };
+    if (!serverSnap || !serverSnap.exists()) return { isFrozen: false };
     const serverData = serverSnap.data();
 
     // Check if admin already froze the account

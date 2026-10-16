@@ -1,19 +1,46 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentSingleTabManager } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+
+// Silence transient connection retry messages from Firestore SDK internal logger
+try {
+  setLogLevel('silent');
+} catch {}
 
 const app = initializeApp(firebaseConfig);
 const databaseId = (firebaseConfig as any).firestoreDatabaseId;
 
-// Configure Firestore with in-memory caching to eliminate IndexedDB lock timeouts and ensure snappy network responses
+// Configure Firestore with experimentalForceLongPolling to guarantee instant connection behind proxies and iframes without WebSocket handshake drop warnings
 export const db = initializeFirestore(
   app,
-  {},
+  {
+    experimentalForceLongPolling: true,
+  },
   databaseId || undefined
 );
 
 export const auth = getAuth(app);
+
+// Validate Firestore connection smoothly once browser environment and network are ready
+async function testConnection() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error: any) {
+    // Non-blocking fallback during startup; client operates in offline cache mode until connected
+  }
+}
+
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'complete') {
+    setTimeout(testConnection, 2000);
+  } else {
+    window.addEventListener('load', () => setTimeout(testConnection, 2000));
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',

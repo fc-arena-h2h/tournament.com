@@ -1,4 +1,4 @@
-import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut } from 'lucide-react';
+import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut, Languages } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { usePWAInstall } from '@/src/hooks/usePWAInstall';
 import { useState, useEffect } from 'react';
@@ -7,6 +7,7 @@ import { db, auth } from '@/src/lib/firebase';
 import { Card } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { signOut } from 'firebase/auth';
+import { useI18n } from '@/src/lib/i18n';
 
 export type NavTab = 'arena' | 'matches' | 'league' | 'tournament' | 'profile';
 
@@ -16,12 +17,13 @@ interface BottomNavProps {
 }
 
 export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
+  const { t } = useI18n();
   const tabs = [
-    { id: 'arena' as NavTab, label: 'DASHBOARD', icon: Home },
-    { id: 'tournament' as NavTab, label: 'ARENA', icon: Trophy },
-    { id: 'matches' as NavTab, label: 'FIELD', icon: Calendar },
-    { id: 'league' as NavTab, label: 'ELITE', icon: Users },
-    { id: 'profile' as NavTab, label: 'ME', icon: User },
+    { id: 'arena' as NavTab, label: t('nav_dashboard'), icon: Home },
+    { id: 'tournament' as NavTab, label: t('nav_arena'), icon: Trophy },
+    { id: 'matches' as NavTab, label: t('nav_field'), icon: Calendar },
+    { id: 'league' as NavTab, label: t('nav_elite'), icon: Users },
+    { id: 'profile' as NavTab, label: t('nav_me'), icon: User },
   ];
 
   return (
@@ -72,6 +74,7 @@ export const Header = ({
   unreadCount?: number;
 }) => {
   const { isInstallable, install } = usePWAInstall();
+  const { language, toggleLanguage, t } = useI18n();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -137,6 +140,18 @@ export const Header = ({
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Language Switcher Toggle */}
+          <button 
+            onClick={toggleLanguage}
+            className="h-11 sm:h-12 px-2.5 sm:px-3 rounded-2xl nm-flat text-indigo-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
+            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
+          >
+            <Languages size={14} />
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-tight font-mono">
+              {language === 'bn' ? 'EN' : 'বাং'}
+            </span>
+          </button>
+
           <button 
             onClick={() => onOpenWallet?.()}
             className="h-11 sm:h-12 px-2.5 sm:px-3.5 rounded-2xl nm-flat text-emerald-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
@@ -269,6 +284,29 @@ export const Header = ({
                       onClick: () => {
                         setShowMenu(false);
                         onOpenWallet?.();
+                      }
+                    },
+                    { 
+                      label: language === 'bn' ? 'ভাষা: বাংলা (English এ যান)' : 'Language: English (Switch to বাংলা)', 
+                      icon: Languages, 
+                      color: 'text-indigo-500', 
+                      badge: language === 'bn' ? 'বাং' : 'EN',
+                      sub: language === 'bn' ? 'ইংরেজি ভাষায় দেখতে ট্যাপ করুন' : 'Tap to switch to Bengali',
+                      onClick: () => {
+                        toggleLanguage();
+                      }
+                    },
+                    {
+                      label: language === 'bn' ? 'পুশ নোটিফিকেশন টেস্ট' : 'Test Push Notification',
+                      icon: Bell,
+                      color: 'text-amber-500',
+                      badge: 'FCM',
+                      sub: language === 'bn' ? 'ফোনে টেস্ট নোটিফিকেশন পাঠান' : 'Send test background push',
+                      onClick: async () => {
+                        setShowMenu(false);
+                        const { sendTestPhoneNotification } = await import('@/src/lib/notifications');
+                        const res = await sendTestPhoneNotification();
+                        alert(res.message);
                       }
                     },
                     { label: 'Support Center', icon: HeartHandshake, color: 'text-indigo-500', sub: '24/7 Player Assistance' },

@@ -19,6 +19,8 @@ import {
 } from '@/src/lib/notifications';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
+import { useI18n } from '@/src/lib/i18n';
+import { requestPushNotificationToken } from '@/src/lib/fcm';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -37,8 +39,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onNavigateTab,
   onOpenWallet
 }) => {
+  const { t, language } = useI18n();
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'announcements'>('all');
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [pushLoading, setPushLoading] = useState(false);
 
   // Sync announcements from db
   useEffect(() => {
@@ -173,6 +177,28 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setPushLoading(true);
+                try {
+                  const res = await requestPushNotificationToken(userId);
+                  if (res.success) {
+                    await sendTestPhoneNotification();
+                    alert(language === 'bn' ? 'পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে!' : 'Push notifications successfully activated!');
+                  } else {
+                    alert(res.error || 'Permission not granted');
+                  }
+                } finally {
+                  setPushLoading(false);
+                }
+              }}
+              disabled={pushLoading}
+              className="px-2.5 py-1.5 rounded-xl nm-flat text-indigo-600 hover:text-indigo-700 flex items-center gap-1 active:nm-pressed text-[10px] font-black uppercase tracking-wider"
+              title="Enable / Test background push notifications"
+            >
+              <BellRing size={14} className={pushLoading ? 'animate-spin' : 'animate-wiggle text-amber-500'} />
+              <span>{pushLoading ? '...' : (language === 'bn' ? 'পুশ অ্যালার্ট' : 'Push')}</span>
+            </button>
             <button
               onClick={() => playNotificationSound()}
               className="w-9 h-9 rounded-xl nm-flat text-slate-500 hover:text-indigo-600 flex items-center justify-center active:nm-pressed"
