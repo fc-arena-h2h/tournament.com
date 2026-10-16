@@ -35,21 +35,22 @@ export const GameLoader: React.FC<GameLoaderProps> = ({
   useEffect(() => {
     if (!fullScreen) return;
 
-    // Smooth percentage counter animation from 0% to 100%
+    // Faster percentage counter animation
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= targetPercent) {
           clearInterval(interval);
           if (onComplete) {
-            setTimeout(onComplete, 300);
+            setTimeout(onComplete, 100);
           }
           return targetPercent;
         }
-        // Organic randomized loading steps
-        const increment = Math.floor(Math.random() * 8) + 3;
+        
+        // Faster increments for snappier feel
+        const increment = Math.floor(Math.random() * 12) + 6;
         return Math.min(prev + increment, targetPercent);
       });
-    }, 80);
+    }, 40);
 
     return () => clearInterval(interval);
   }, [fullScreen, targetPercent, onComplete]);

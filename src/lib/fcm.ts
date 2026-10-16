@@ -23,7 +23,7 @@ export async function isPushNotificationSupported(): Promise<boolean> {
 }
 
 /**
- * Register background service worker and initialize FCM
+ * Use existing service worker for FCM initialization
  */
 export async function setupBackgroundPushWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -31,19 +31,14 @@ export async function setupBackgroundPushWorker(): Promise<ServiceWorkerRegistra
   }
 
   try {
-    // Register the FCM & Push service worker
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-      scope: '/'
-    });
-    console.log('Background push service worker registered:', reg.scope);
+    // Wait for the PWA or any existing service worker to be ready
+    // This avoids registration conflicts that cause reload loops
+    const reg = await navigator.serviceWorker.ready;
+    console.log('Push service worker ready:', reg.scope);
     return reg;
   } catch (err) {
-    console.warn('Could not register firebase-messaging-sw.js, trying default sw:', err);
-    try {
-      return await navigator.serviceWorker.ready;
-    } catch {
-      return null;
-    }
+    console.warn('Push service worker preparation error:', err);
+    return null;
   }
 }
 

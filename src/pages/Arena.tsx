@@ -35,16 +35,15 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
   useEffect(() => {
     if (!profile?.uid) return;
 
-    // Listen to all completed matches, challenges, and users to calculate exact live stats
+    // Listen to all completed matches and challenges to calculate exact live stats
     const qMatches = query(collection(db, 'matches'), where('status', '==', 'completed'));
     const qChallenges = query(collection(db, 'challenges'), where('status', '==', 'completed'));
-    const qUsers = query(collection(db, 'users'), orderBy('eliteScore', 'desc'));
 
     let cMatches: any[] = [];
     let cChallenges: any[] = [];
-    let allUsers: any[] = [];
+    let syncTimeout: any = null;
 
-    const computeAndSyncStats = () => {
+    const computeAndSyncStats = async () => {
       let played = 0;
       let won = 0;
       let drawn = 0;
@@ -100,54 +99,75 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         }
       });
 
-      // 3. Calculate Global Rank based on eliteScore ranking
-      const userIndex = allUsers.findIndex(u => u.id === profile.uid || u.uid === profile.uid);
-      const globalRank = userIndex !== -1 ? userIndex + 1 : 1;
+      // 3. Optimized Global Rank Calculation (Cheaper than fetching all users)
+      let globalRank = profile.stats?.globalRank || 1;
+      try {
+        const { getCountFromServer } = await import('firebase/firestore');
+        const qRank = query(collection(db, 'users'), where('eliteScore', '>', profile.eliteScore || 0));
+        const rankSnap = await getCountFromServer(qRank);
+        globalRank = rankSnap.data().count + 1;
+      } catch (e) {
+        console.warn("Rank calculation delay:", e);
+      }
 
       const newStats = { played, won, drawn, lost, goalsFor, goalsAgainst, globalRank };
       setLiveStats(newStats);
 
-      // 4. Sync live stats back to user document in Firestore if changed
-      if (
-        profile.stats?.played !== played ||
-        profile.stats?.won !== won ||
-        profile.stats?.globalRank !== globalRank
-      ) {
-        updateDoc(doc(db, 'users', profile.uid), {
-          'stats.played': played,
-          'stats.won': won,
-          'stats.drawn': drawn,
-          'stats.lost': lost,
-          'stats.goalsFor': goalsFor,
-          'stats.goalsAgainst': goalsAgainst,
-          'stats.globalRank': globalRank
-        }).catch(err => console.error("Error syncing stats:", err));
-      }
+      // 4. Debounced Sync back to Firestore
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        const needsSync = 
+          profile.stats?.played !== played ||
+          profile.stats?.won !== won ||
+          profile.stats?.globalRank !== globalRank;
+
+        if (needsSync && profile.uid) {
+          updateDoc(doc(db, 'users', profile.uid), {
+            'stats.played': played,
+            'stats.won': won,
+            'stats.drawn': drawn,
+            'stats.lost': lost,
+            'stats.goalsFor': goalsFor,
+            'stats.goalsAgainst': goalsAgainst,
+            'stats.globalRank': globalRank
+          }).catch(err => console.warn("Stat sync postponed:", err));
+        }
+      }, 5000); // 5 second debounce to prevent spam
+    };
+
+    const handleErr = (context: string, err: any) => {
+      if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota')) return;
+      console.warn(context, err);
     };
 
     const unsubM = onSnapshot(qMatches, (snap) => {
       cMatches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       computeAndSyncStats();
-    }, (err) => console.error("Firestore Matches Sync Error:", err));
+    }, (err) => handleErr("Matches Sync", err));
 
     const unsubC = onSnapshot(qChallenges, (snap) => {
       cChallenges = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       computeAndSyncStats();
-    }, (err) => console.error("Firestore Challenges Sync Error:", err));
-
-    const unsubU = onSnapshot(qUsers, (snap) => {
-      allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      computeAndSyncStats();
-    }, (err) => console.error("Firestore Users Sync Error:", err));
+    }, (err) => handleErr("Challenges Sync", err));
 
     return () => {
       unsubM();
       unsubC();
-      unsubU();
+      if (syncTimeout) clearTimeout(syncTimeout);
     };
-  }, [profile?.uid]);
+  }, [profile?.uid, profile?.eliteScore]);
 
   useEffect(() => {
+    if (!profile?.uid) return;
+
+    const handleErr = (context: string, err: any) => {
+      if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota') || err?.message?.includes('quota') || err?.message?.includes('unavailable')) {
+        console.warn(`Firestore Quota Exceeded (${context}). Operating in cache mode.`);
+      } else {
+        console.error(context, err);
+      }
+    };
+
     // Gift 1000 points to existing users who haven't received it yet
     if (profile && !profile.pointsGifted) {
       updateDoc(doc(db, 'users', profile.uid), {
@@ -155,7 +175,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         pointsGifted: true
       }).then(() => {
         logPointTransaction(profile.uid, 'earned', 1000, 'Welcome Gift', 'Initial 1,000 Arena Points credited');
-      }).catch(err => console.error("Point gift failed:", err));
+      }).catch(err => handleErr("Point gift failed", err));
     }
 
     // Fetch recent matches
@@ -165,7 +185,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
     );
     const unsubMatches = onSnapshot(qMatches, (snapshot) => {
       setRecentResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Firestore Recent Matches Error:", err));
+    }, (err) => handleErr("Firestore Recent Matches Error", err));
 
     // Fetch featured/active tournaments for the user
     const qRegs = query(collection(db, 'registrations'), where('userId', '==', profile?.uid));
@@ -186,15 +206,15 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           const all = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
           const filtered = all.filter(t => allIds.includes(t.id) || t.status === 'open');
           setFeaturedTournaments(filtered.slice(0, 3));
-        }, (err) => console.error("Firestore Featured Tournaments Error:", err));
+        }, (err) => handleErr("Firestore Featured Tournaments Error", err));
       } else {
         // Fallback to open tournaments
         const qOpen = query(collection(db, 'tournaments'), where('status', '==', 'open'), limit(3));
         onSnapshot(qOpen, (tSnap) => {
           setFeaturedTournaments(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (err) => console.error("Firestore Open Tournaments Error:", err));
+        }, (err) => handleErr("Firestore Open Tournaments Error", err));
       }
-    }, (err) => console.error("Firestore Regs Error:", err));
+    }, (err) => handleErr("Firestore Regs Error", err));
 
     return () => {
       unsubMatches();
@@ -236,7 +256,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
   };
 
   return (
-    <div className="space-y-12 pt-4 min-h-screen">
+    <div className="space-y-8 sm:space-y-12 pt-4 min-h-screen">
       {/* Search Bar - Neumorphic Inset */}
       <div className="relative z-[200]">
         <Reveal direction="left">
@@ -299,7 +319,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
             {/* Hero Banner - FC Mobile Styled */}
       <Reveal direction="right" delay={100}>
         <div className="nm-flat rounded-[2.5rem] p-3 sm:p-4 border-2 border-white">
-          <div className="relative h-48 sm:h-56 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
+          <div className="relative h-40 sm:h-56 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
             <div className="absolute inset-0 bg-gradient-to-r from-fc-dark via-fc-dark/60 to-transparent" />
             <div className="absolute top-0 right-0 w-1/2 h-full opacity-40 group-hover:scale-110 transition-transform duration-1000">
                <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
@@ -324,7 +344,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
       {/* Profile Card - Enhanced FC Mobile Pro Player Passport */}
       <Reveal direction="left" delay={200}>
-        <Card className="flex flex-col gap-5 sm:gap-6 bg-gradient-to-b from-white via-[#fafbfe] to-[#f4f6fa] border-2 border-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] p-4 sm:p-7 rounded-[2.2rem] sm:rounded-[2.8rem] relative overflow-hidden">
+        <Card className="flex flex-col gap-3.5 sm:gap-6 bg-gradient-to-b from-white via-[#fafbfe] to-[#f4f6fa] border-2 border-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] p-3.5 sm:p-7 rounded-[2.2rem] sm:rounded-[2.8rem] relative overflow-hidden">
           {/* Subtle Corner Glow Accent */}
           <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-gradient-to-br from-emerald-500/10 via-indigo-500/10 to-transparent blur-2xl pointer-events-none" />
 
@@ -395,7 +415,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           </div>
 
           {/* Center Stats - Enhanced Inset Metrics */}
-          <div className="nm-inset rounded-[1.8rem] sm:rounded-[2.2rem] bg-[#f8f9fc] p-4 sm:p-5 border border-white/70 space-y-3.5 relative z-10">
+          <div className="nm-inset rounded-[1.8rem] sm:rounded-[2.2rem] bg-[#f8f9fc] p-3.5 sm:p-5 border border-white/70 space-y-2.5 relative z-10">
             {/* 3 Core Metric Columns */}
             <div className="grid grid-cols-3 divide-x divide-slate-200/80">
               {/* Global Rank */}

@@ -13,7 +13,8 @@ setupBackgroundPushWorker().catch(() => {});
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    updateSW(true);
+    console.log('New content available, please refresh the app.');
+    // updateSW(true); // Disable automatic reload loop
   },
   onOfflineReady() {
     console.log('FC Arena VS is ready for offline and background notifications');

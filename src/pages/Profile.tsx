@@ -478,38 +478,12 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
         </Card>
       </div>
 
-      {/* App Preferences & Settings (Language & FCM Push Notifications) */}
+      {/* App Preferences & Settings (FCM Push Notifications) */}
       <div className="px-4 space-y-4">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">
-          {language === 'bn' ? 'অ্যাপ সেটিংস ও নোটিফিকেশন' : 'App Settings & Notifications'}
+          {language === 'bn' ? 'অ্যাপ নোটিফিকেশন' : 'App Notifications'}
         </h3>
         <Card className="p-6 border-none space-y-6">
-          {/* Language Preference */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-600 border border-white/20">
-                <Languages size={22} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {language === 'bn' ? 'অ্যাপের ভাষা' : 'App Language'}
-                </span>
-                <span className="text-xs font-black text-slate-800">
-                  {language === 'bn' ? 'বাংলা (Bengali)' : 'English'}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={toggleLanguage}
-              className="px-4 py-2.5 rounded-xl nm-flat text-indigo-600 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 active:nm-pressed"
-            >
-              <Languages size={13} />
-              <span>{language === 'bn' ? 'Switch to English' : 'বাংলায় পরিবর্তন'}</span>
-            </button>
-          </div>
-
-          <div className="h-[1px] bg-slate-100" />
-
           {/* FCM Push Notifications */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

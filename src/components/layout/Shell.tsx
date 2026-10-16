@@ -140,18 +140,6 @@ export const Header = ({
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Language Switcher Toggle */}
-          <button 
-            onClick={toggleLanguage}
-            className="h-11 sm:h-12 px-2.5 sm:px-3 rounded-2xl nm-flat text-indigo-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
-            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
-          >
-            <Languages size={14} />
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-tight font-mono">
-              {language === 'bn' ? 'EN' : 'বাং'}
-            </span>
-          </button>
-
           <button 
             onClick={() => onOpenWallet?.()}
             className="h-11 sm:h-12 px-2.5 sm:px-3.5 rounded-2xl nm-flat text-emerald-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
@@ -284,16 +272,6 @@ export const Header = ({
                       onClick: () => {
                         setShowMenu(false);
                         onOpenWallet?.();
-                      }
-                    },
-                    { 
-                      label: language === 'bn' ? 'ভাষা: বাংলা (English এ যান)' : 'Language: English (Switch to বাংলা)', 
-                      icon: Languages, 
-                      color: 'text-indigo-500', 
-                      badge: language === 'bn' ? 'বাং' : 'EN',
-                      sub: language === 'bn' ? 'ইংরেজি ভাষায় দেখতে ট্যাপ করুন' : 'Tap to switch to Bengali',
-                      onClick: () => {
-                        toggleLanguage();
                       }
                     },
                     {

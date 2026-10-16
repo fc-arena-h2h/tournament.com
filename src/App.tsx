@@ -45,7 +45,7 @@ export default function App() {
   const [isAdminCreating, setIsAdminCreating] = useState(false);
   const [leagueSubTab, setLeagueSubTab] = useState<'league' | 'leaderboard' | 'chat'>('league');
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [hasStartedApp, setHasStartedApp] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
 
   // Notification States
@@ -154,15 +154,6 @@ export default function App() {
     }
   };
 
-  if (loading || !initialLoadComplete) {
-    return (
-      <GameLoader 
-        text={t('connected_match_engine')} 
-        onComplete={() => setInitialLoadComplete(true)} 
-      />
-    );
-  }
-
   if (!user) {
     return <AuthPage />;
   }
@@ -202,18 +193,6 @@ export default function App() {
   }
 
   const renderContent = () => {
-    if (selectedTournament) {
-      return (
-        <div className="fixed inset-0 z-[4000] bg-soft-bg overflow-y-auto">
-          <ArenaDetail 
-            tournament={selectedTournament} 
-            profile={profile} 
-            onBack={() => setSelectedTournament(null)} 
-          />
-        </div>
-      );
-    }
-
     switch (activeTab) {
       case 'arena':
         return (
@@ -322,9 +301,21 @@ export default function App() {
         />
 
         {/* Phone Notification Enable Banner */}
-        <main className="max-w-lg mx-auto px-4 sm:px-6 pt-32 pb-36 min-h-screen animate-slide-left" key={activeTab}>
+        <main className="max-w-lg mx-auto px-4 sm:px-6 pt-28 pb-36 min-h-screen animate-slide-left" key={activeTab}>
           {content}
         </main>
+
+        {/* Tournament Arena Window - Outside main to prevent transform issues */}
+        {selectedTournament && (
+          <div className="fixed inset-0 z-[4000] bg-soft-bg overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
+            <ArenaDetail 
+              tournament={selectedTournament} 
+              profile={profile} 
+              onBack={() => setSelectedTournament(null)} 
+            />
+          </div>
+        )}
+
         <BottomNav 
           activeTab={activeTab} 
           onTabChange={(tab) => {
@@ -335,24 +326,28 @@ export default function App() {
         <OfflineIndicator />
 
         {/* Global Unified Wallet Modal */}
-        <WalletModal 
-          isOpen={showWalletModal} 
-          onClose={() => setShowWalletModal(false)} 
-          profile={profile} 
-        />
+        <div className="relative z-[5000]">
+          <WalletModal 
+            isOpen={showWalletModal} 
+            onClose={() => setShowWalletModal(false)} 
+            profile={profile} 
+          />
+        </div>
 
         {/* Real-time Notification Center Modal */}
-        <NotificationCenter 
-          isOpen={showNotificationCenter}
-          onClose={() => setShowNotificationCenter(false)}
-          notifications={notifications}
-          userId={user?.uid}
-          onNavigateTab={(tab) => {
-            setSelectedTournament(null);
-            setActiveTab(tab as NavTab);
-          }}
-          onOpenWallet={() => setShowWalletModal(true)}
-        />
+        <div className="relative z-[5001]">
+          <NotificationCenter 
+            isOpen={showNotificationCenter}
+            onClose={() => setShowNotificationCenter(false)}
+            notifications={notifications}
+            userId={user?.uid}
+            onNavigateTab={(tab) => {
+              setSelectedTournament(null);
+              setActiveTab(tab as NavTab);
+            }}
+            onOpenWallet={() => setShowWalletModal(true)}
+          />
+        </div>
       </div>
     </div>
   );

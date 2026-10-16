@@ -1334,38 +1334,56 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
 
     try {
-      if (entryFee > 0 && auth.currentUser) {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        await updateDoc(userRef, {
-          wallet: (profile.wallet || 0) - entryFee
-        });
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', auth.currentUser!.uid);
+        const userSnap = await transaction.get(userRef);
+        
+        if (!userSnap.exists()) throw new Error('User profile not found');
+        const currentWallet = Number(userSnap.data().wallet || 0);
 
-        await addDoc(collection(db, 'transactions'), {
-          userId: auth.currentUser.uid,
-          userName: profile.inGameName || 'Player',
-          type: 'fee',
-          method: 'bkash',
-          amount: entryFee,
-          currency: 'BDT',
-          status: 'approved',
-          note: `Paid tournament entry fee (${tournament.title})`,
+        // Re-verify balance inside transaction
+        if (entryFee > 0 && currentWallet < entryFee) {
+          throw new Error(`Insufficient balance! Needed: ৳${entryFee}, Found: ৳${currentWallet}`);
+        }
+
+        // 1. Deduct balance if paid
+        if (entryFee > 0) {
+          transaction.update(userRef, {
+            wallet: currentWallet - entryFee
+          });
+
+          // 2. Log transaction
+          const txRef = doc(collection(db, 'transactions'));
+          transaction.set(txRef, {
+            userId: auth.currentUser!.uid,
+            userName: profile.inGameName || 'Player',
+            type: 'fee',
+            method: 'bkash',
+            amount: entryFee,
+            currency: 'BDT',
+            status: 'approved',
+            note: `Paid tournament entry fee (${tournament.title})`,
+            createdAt: Timestamp.now()
+          });
+        }
+
+        // 3. Create registration
+        const regRef = doc(collection(db, 'registrations'));
+        transaction.set(regRef, {
+          tournamentId: tournament.id,
+          userId: auth.currentUser?.uid,
+          status: 'pending',
+          gameName: profile.inGameName,
+          gameUid: profile.inGameUID,
+          ovr: profile.ovr || 0,
           createdAt: Timestamp.now()
         });
-      }
-
-      await addDoc(collection(db, 'registrations'), {
-        tournamentId: tournament.id,
-        userId: auth.currentUser?.uid,
-        status: 'pending',
-        gameName: profile.inGameName,
-        gameUid: profile.inGameUID,
-        ovr: profile.ovr || 0,
-        createdAt: Timestamp.now()
       });
+
       alert(entryFee > 0 ? `Join request sent! ৳${entryFee} entry fee deducted into escrow fund.` : 'Join request sent! Waiting for publisher approval.');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      handleFirestoreError(err, OperationType.CREATE, 'registrations');
+      alert(err.message || 'Failed to join tournament');
     }
   };
 
