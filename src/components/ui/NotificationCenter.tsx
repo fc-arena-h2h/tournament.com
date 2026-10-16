@@ -184,7 +184,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   const res = await requestPushNotificationToken(userId);
                   if (res.success) {
                     await sendTestPhoneNotification();
-                    alert(language === 'bn' ? 'পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে!' : 'Push notifications successfully activated!');
+                    alert('Push notifications successfully activated!');
                   } else {
                     alert(res.error || 'Permission not granted');
                   }
@@ -197,7 +197,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               title="Enable / Test background push notifications"
             >
               <BellRing size={14} className={pushLoading ? 'animate-spin' : 'animate-wiggle text-amber-500'} />
-              <span>{pushLoading ? '...' : (language === 'bn' ? 'পুশ অ্যালার্ট' : 'Push')}</span>
+              <span>{pushLoading ? '...' : 'Push'}</span>
             </button>
             <button
               onClick={() => playNotificationSound()}

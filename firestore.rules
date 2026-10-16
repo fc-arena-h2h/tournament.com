@@ -19,7 +19,8 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return (isSignedIn() && request.auth.token.email == 'sperkplay@gmail.com') || hasRole('admin');
+      return (isSignedIn() && request.auth.token.email.lower() == 'sperkplay@gmail.com') || 
+             (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
     
     function isPublisher() {
@@ -28,21 +29,29 @@ service cloud.firestore {
 
     // User profiles - Hardened security: users cannot increase wallet arbitrarily or change role,
     // except a one-time 10 BDT bonus when publisher creates their first virtual card on an unrecorded device
+    // User profiles - Hardened security
     match /users/{uid} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update: if isOwner(uid) && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified']) &&
-        (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['wallet']) ||
-          request.resource.data.wallet <= resource.data.wallet ||
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (isOwner(uid) && (
+          // Owner cannot change critical fields
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'isFrozen', 'fraudAlert']) &&
           (
-            // Publisher first card bonus condition: wallet increased by at most 10 and bonusClaimed becomes true
-            request.resource.data.wallet <= resource.data.wallet + 10 &&
-            request.resource.data.bonusClaimed == true &&
-            (!('bonusClaimed' in resource.data) || resource.data.bonusClaimed != true)
-          ) ||
-          isAdmin()
+            // Owner cannot increase wallet balance (except specific bonus)
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['wallet']) ||
+            request.resource.data.wallet <= resource.data.wallet ||
+            (
+              request.resource.data.wallet <= resource.data.wallet + 10 &&
+              request.resource.data.bonusClaimed == true &&
+              (!('bonusClaimed' in resource.data) || resource.data.bonusClaimed != true)
+            )
+          )
+        )) ||
+        (
+          // Cross-user updates for match results (limited to stats and points)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'wallet', 'email', 'fbUrl', 'phone', 'isFrozen', 'uid', 'fraudAlert'])
         )
       );
       allow delete: if isAdmin();
@@ -98,19 +107,27 @@ service cloud.firestore {
     // Announcements
     match /announcements/{id} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
     // Point Transactions
     match /point_transactions/{id} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
     
-    // Transactions / Wallet Requests - Hardened: users can only create pending requests for themselves, only admin can approve/update
+    // Transactions / Wallet Requests - Hardened: users can only create pending requests for themselves, 
+    // or 'approved' fee logs for tournament entry (since balance is already deducted)
     match /transactions/{id} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.status == 'pending' && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && 
+        request.resource.data.userId == request.auth.uid &&
+        (
+          request.resource.data.status == 'pending' ||
+          (request.resource.data.type == 'fee' && request.resource.data.status == 'approved')
+        );
       allow update, delete: if isAdmin();
     }
 

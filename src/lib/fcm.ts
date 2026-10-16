@@ -72,7 +72,7 @@ export async function requestPushNotificationToken(userId?: string): Promise<{ s
       console.log('Foreground push received:', payload);
       playNotificationSound();
       showSystemNotification(payload.notification?.title || 'FC Arena VS', {
-        body: payload.notification?.body || 'নতুন নোটিফিকেশন এসেছে!',
+        body: payload.notification?.body || 'New notification received!',
         tag: payload.data?.tag || 'fcm-' + Date.now(),
         url: payload.data?.url || '/'
       });

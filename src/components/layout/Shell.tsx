@@ -74,7 +74,7 @@ export const Header = ({
   unreadCount?: number;
 }) => {
   const { isInstallable, install } = usePWAInstall();
-  const { language, toggleLanguage, t } = useI18n();
+  const { t } = useI18n();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -275,11 +275,11 @@ export const Header = ({
                       }
                     },
                     {
-                      label: language === 'bn' ? 'পুশ নোটিফিকেশন টেস্ট' : 'Test Push Notification',
+                      label: 'Test Push Notification',
                       icon: Bell,
                       color: 'text-amber-500',
                       badge: 'FCM',
-                      sub: language === 'bn' ? 'ফোনে টেস্ট নোটিফিকেশন পাঠান' : 'Send test background push',
+                      sub: 'Send test background push',
                       onClick: async () => {
                         setShowMenu(false);
                         const { sendTestPhoneNotification } = await import('@/src/lib/notifications');

@@ -61,7 +61,18 @@ export default function App() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const isAdmin = profile?.role === 'admin' || user.email === 'sperkplay@gmail.com';
+    const isAdmin = profile?.role === 'admin' || user?.email === 'sperkplay@gmail.com';
+
+    // Notify Service Worker about current user for background Firestore listening
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      setTimeout(() => {
+        navigator.serviceWorker.controller?.postMessage({
+          type: 'SET_USER_ID',
+          userId: user.uid
+        });
+      }, 2000);
+    }
+
     const q = query(
       collection(db, 'notifications'),
       orderBy('createdAt', 'desc'),
@@ -123,6 +134,23 @@ export default function App() {
     }
   }, [user]);
 
+  // Scroll to top on navigation or modal open
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab, selectedTournament]);
+
+  // Lock body scroll when global modals are open
+  useEffect(() => {
+    if (showWalletModal || showNotificationCenter || selectedTournament) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showWalletModal, showNotificationCenter, selectedTournament]);
+
   const handleNotificationNavigate = async (notif: AppNotification) => {
     if (!notif.read) {
       await markNotificationAsRead(notif.id);
@@ -153,6 +181,10 @@ export default function App() {
       setShowNotificationCenter(false);
     }
   };
+
+  if (loading || !hasStartedApp) {
+    return <GameLoader onComplete={() => setHasStartedApp(true)} />;
+  }
 
   if (!user) {
     return <AuthPage />;

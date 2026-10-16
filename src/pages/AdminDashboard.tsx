@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, getDoc, deleteDoc, deleteField, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, addDoc, getDoc, deleteDoc, deleteField, limit, orderBy } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { logPointTransaction } from '@/src/lib/points';
 import { 
@@ -131,8 +131,8 @@ export const AdminDashboard = ({
 
         // Fetch tournaments based on role
         const tQ = profile.role === 'admin' 
-          ? query(collection(db, 'tournaments'))
-          : query(collection(db, 'tournaments'), where('publisherId', '==', auth.currentUser!.uid));
+          ? query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50))
+          : query(collection(db, 'tournaments'), where('publisherId', '==', auth.currentUser!.uid), orderBy('createdAt', 'desc'), limit(50));
 
         const unsubTournaments = onSnapshot(tQ, (snapshot) => {
           const tMap: Record<string, Tournament> = {};
@@ -142,8 +142,8 @@ export const AdminDashboard = ({
           const tournamentIds = Object.keys(tMap);
           if (tournamentIds.length > 0) {
             const rQ = profile.role === 'admin'
-              ? query(collection(db, 'registrations'))
-              : query(collection(db, 'registrations'), where('tournamentId', 'in', tournamentIds.slice(0, 30)));
+              ? query(collection(db, 'registrations'), orderBy('createdAt', 'desc'), limit(100))
+              : query(collection(db, 'registrations'), where('tournamentId', 'in', tournamentIds.slice(0, 30)), limit(100));
             
             const unsubRegs = onSnapshot(rQ, (regSnap) => {
               setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
@@ -203,7 +203,7 @@ export const AdminDashboard = ({
       await approveWalletTransaction(tx.id, tx);
       alert('Transaction approved successfully!');
     } catch (err: any) {
-      console.error(err);
+      console.error("Wallet approval error:", err);
       alert(err.message || 'Failed to approve transaction.');
     } finally {
       setProcessingTxId(null);

@@ -18,7 +18,7 @@ interface ProfileProps {
 }
 
 export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: ProfileProps) => {
-  const { language, toggleLanguage, t } = useI18n();
+  const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -481,7 +481,7 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
       {/* App Preferences & Settings (FCM Push Notifications) */}
       <div className="px-4 space-y-4">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">
-          {language === 'bn' ? 'অ্যাপ নোটিফিকেশন' : 'App Notifications'}
+          App Notifications
         </h3>
         <Card className="p-6 border-none space-y-6">
           {/* FCM Push Notifications */}
@@ -492,12 +492,12 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {language === 'bn' ? 'ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন' : 'Push Notifications (FCM)'}
+                  Push Notifications (FCM)
                 </span>
                 <span className="text-xs font-black text-slate-800">
                   {profile?.pushEnabled 
-                    ? (language === 'bn' ? 'সক্রিয় রয়েছে (Active)' : 'Active on Device') 
-                    : (language === 'bn' ? 'নতুন ম্যাচ ও অ্যালার্টের নোটিফিকেশন' : 'Match & tournament alerts')}
+                    ? 'Active on Device' 
+                    : 'Match & tournament alerts'}
                 </span>
               </div>
             </div>
@@ -510,7 +510,7 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
                     const res = await requestPushNotificationToken(user?.uid);
                     if (res.success) {
                       await sendTestPhoneNotification();
-                      alert(language === 'bn' ? 'পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে!' : 'Push notifications successfully activated!');
+                      alert('Push notifications successfully activated!');
                     } else {
                       alert(res.error || 'Permission not granted');
                     }
@@ -522,7 +522,7 @@ export const ProfilePage = ({ user, profile: initialProfile, onOpenWallet }: Pro
                 className="px-3.5 py-2.5 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1 active:scale-95 transition-all shadow-md disabled:opacity-50"
               >
                 <Bell size={13} />
-                <span>{pushLoading ? '...' : (profile?.pushEnabled ? (language === 'bn' ? 'টেস্ট অ্যালার্ট' : 'Test Push') : (language === 'bn' ? 'চালু করুন' : 'Enable'))}</span>
+                <span>{pushLoading ? '...' : (profile?.pushEnabled ? 'Test Push' : 'Enable')}</span>
               </button>
             </div>
           </div>
