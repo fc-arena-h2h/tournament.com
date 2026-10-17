@@ -15,37 +15,11 @@ export interface UserProfile {
   messengerLink?: string;
   whatsappNumber?: string;
   phone?: string;
-  phoneVerified?: boolean;
-  phoneVerifiedAt?: string;
   avatar?: string;
-  wallet?: number;
-  eliteScore?: number;
-  pointsGifted?: number;
   pushEnabled?: boolean;
   fcmTokens?: string[];
   createdAt?: any;
-  virtualCard?: {
-    cardHolderName: string;
-    accountType: 'bkash' | 'nagad' | 'bitcoin';
-    accountNumber: string;
-    currency: 'BDT' | 'USDT';
-    verifiedEmail: string;
-    cardPasswordHash?: string;
-    cardNumber: string; // e.g. 5480 **** **** 4021
-    createdAt?: any;
-    updatedAt?: any;
-  };
-  bonusClaimed?: boolean;
-  hwid?: string;
-  stats?: {
-    played: number;
-    won: number;
-    drawn: number;
-    lost: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    globalRank: number;
-  };
+  updatedAt?: any;
 }
 
 export function useAuth() {

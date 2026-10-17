@@ -6,20 +6,15 @@ import { MatchesPage } from '@/src/pages/Matches';
 import { TournamentListPage } from '@/src/pages/TournamentList';
 import { AdminDashboard } from '@/src/pages/AdminDashboard';
 import { CreateTournamentPage } from '@/src/pages/CreateTournament';
-import { GlobalChatPage } from '@/src/pages/GlobalChat';
-import { LeaderboardPage } from '@/src/pages/Leaderboard';
 import { ProfilePage } from '@/src/pages/Profile';
 import { ArenaDetail } from '@/src/pages/ArenaDetail';
-import { LeaguePage } from '@/src/pages/League';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useFraudProtection } from '@/src/hooks/useFraudProtection';
 import { useI18n } from '@/src/lib/i18n';
 import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
 import { SetupProfile } from '@/src/components/auth/SetupProfile';
-import { OfflineIndicator } from '@/src/components/ui/OfflineIndicator';
 import { GameLoader } from '@/src/components/ui/GameLoader';
 import { Button } from '@/src/components/ui/Primitives';
-import { WalletModal } from '@/src/components/wallet/WalletModal';
 import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/src/lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -43,10 +38,8 @@ export default function App() {
   const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
-  const [leagueSubTab, setLeagueSubTab] = useState<'league' | 'leaderboard' | 'chat'>('league');
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
   const [hasStartedApp, setHasStartedApp] = useState(false);
-  const [showWalletModal, setShowWalletModal] = useState(false);
 
   // Notification States
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -76,7 +69,7 @@ export default function App() {
     const q = query(
       collection(db, 'notifications'),
       orderBy('createdAt', 'desc'),
-      limit(60)
+      limit(25)
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
@@ -141,7 +134,7 @@ export default function App() {
 
   // Lock body scroll when global modals are open
   useEffect(() => {
-    if (showWalletModal || showNotificationCenter || selectedTournament) {
+    if (showNotificationCenter || selectedTournament) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -149,18 +142,14 @@ export default function App() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [showWalletModal, showNotificationCenter, selectedTournament]);
+  }, [showNotificationCenter, selectedTournament]);
 
   const handleNotificationNavigate = async (notif: AppNotification) => {
     if (!notif.read) {
       await markNotificationAsRead(notif.id);
     }
 
-    if (notif.extra?.openWallet || notif.type === 'payment_request' || notif.type === 'payment_status') {
-      setShowNotificationCenter(false);
-      setShowWalletModal(true);
-      return;
-    }
+
 
     if (notif.tournamentId) {
       try {
@@ -232,7 +221,6 @@ export default function App() {
             profile={profile} 
             onNavigate={setActiveTab} 
             onEnterTournament={setSelectedTournament} 
-            onOpenWallet={() => setShowWalletModal(true)}
           />
         );
       case 'matches':
@@ -242,50 +230,15 @@ export default function App() {
             <AdminDashboard 
               onCreateNew={() => setIsAdminCreating(true)} 
               onEnterTournament={setSelectedTournament} 
-              onOpenWallet={() => setShowWalletModal(true)}
             />
           );
         }
         return <MatchesPage profile={profile} />;
-      case 'league':
-        return (
-          <div className="space-y-6 pt-4">
-            <div className="flex nm-inset p-2 rounded-full border-2 border-white/20 bg-[#e6e6e9] h-18 mx-2 overflow-x-auto no-scrollbar">
-              <button 
-                onClick={() => setLeagueSubTab('league')}
-                className={cn(
-                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
-                  leagueSubTab === 'league' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
-                )}
-              >
-                Leagues
-              </button>
-              <button 
-                onClick={() => setLeagueSubTab('leaderboard')}
-                className={cn(
-                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
-                  leagueSubTab === 'leaderboard' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
-                )}
-              >
-                Top Rank
-              </button>
-              <button 
-                onClick={() => setLeagueSubTab('chat')}
-                className={cn(
-                  "flex-1 min-w-[80px] py-3 text-[9px] font-black uppercase tracking-wider rounded-full transition-all",
-                  leagueSubTab === 'chat' ? "nm-flat text-indigo-500 bg-[#f0f0f3]" : "text-slate-400"
-                )}
-              >
-                Global Chat
-              </button>
-            </div>
-            {leagueSubTab === 'league' ? <LeaguePage profile={profile} /> : (leagueSubTab === 'leaderboard' ? <LeaderboardPage /> : <GlobalChatPage profile={profile} />)}
-          </div>
-        );
+
       case 'tournament':
         return <TournamentListPage profile={profile} onEnter={setSelectedTournament} />;
       case 'profile':
-        return <ProfilePage user={user} profile={profile} onOpenWallet={() => setShowWalletModal(true)} />;
+        return <ProfilePage user={user} profile={profile} />;
       default:
         return <ArenaPage profile={profile} onNavigate={setActiveTab} onEnterTournament={setSelectedTournament} />;
     }
@@ -301,7 +254,7 @@ export default function App() {
     switch (activeTab) {
       case 'arena': return 'Dashboard';
       case 'matches': return 'My Matches';
-      case 'league': return leagueSubTab === 'leaderboard' ? 'LEADERBOARD' : 'ARENA CHAT';
+
       case 'tournament': return 'ARENA';
       case 'profile': return 'Settings';
       default: return 'Dashboard';
@@ -327,7 +280,6 @@ export default function App() {
         <Header 
           title={getTitle()} 
           profile={profile} 
-          onOpenWallet={() => setShowWalletModal(true)}
           onOpenNotifications={() => setShowNotificationCenter(true)}
           unreadCount={unreadCount}
         />
@@ -355,16 +307,7 @@ export default function App() {
             setActiveTab(tab);
           }} 
         />
-        <OfflineIndicator />
 
-        {/* Global Unified Wallet Modal */}
-        <div className="relative z-[5000]">
-          <WalletModal 
-            isOpen={showWalletModal} 
-            onClose={() => setShowWalletModal(false)} 
-            profile={profile} 
-          />
-        </div>
 
         {/* Real-time Notification Center Modal */}
         <div className="relative z-[5001]">
@@ -377,7 +320,6 @@ export default function App() {
               setSelectedTournament(null);
               setActiveTab(tab as NavTab);
             }}
-            onOpenWallet={() => setShowWalletModal(true)}
           />
         </div>
       </div>

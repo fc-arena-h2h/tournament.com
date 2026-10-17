@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Silence transient connection retry messages from Firestore SDK internal logger
@@ -21,6 +22,7 @@ export const db = initializeFirestore(
 );
 
 export const auth = getAuth(app);
+export const rtdb = getDatabase(app);
 
 // Validate Firestore connection smoothly once browser environment and network are ready
 async function testConnection() {

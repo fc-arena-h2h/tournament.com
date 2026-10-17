@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Bell, BellRing, Trophy, Calendar, MessageSquare, Wallet, CheckCircle, 
+  Bell, BellRing, Trophy, Calendar, MessageSquare, CheckCircle, 
   XCircle, Trash2, CheckCheck, Megaphone, Clock, ExternalLink, Swords, 
   Zap, AlertCircle, X, ShieldAlert, ArrowRight, Volume2
 } from 'lucide-react';
@@ -28,7 +28,6 @@ interface NotificationCenterProps {
   notifications: AppNotification[];
   userId?: string;
   onNavigateTab?: (tab: string, meta?: any) => void;
-  onOpenWallet?: () => void;
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
@@ -37,7 +36,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   notifications,
   userId,
   onNavigateTab,
-  onOpenWallet
 }) => {
   const { t, language } = useI18n();
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'announcements'>('all');
@@ -70,12 +68,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       await markNotificationAsRead(notif.id);
     }
     
-    // Check if notification links to wallet
-    if (notif.extra?.openWallet || notif.type === 'payment_request' || notif.type === 'payment_status') {
-      onClose();
-      onOpenWallet?.();
-      return;
-    }
+
 
     // Check if notification links to a tab
     if (notif.linkTab) {
@@ -125,21 +118,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           icon: MessageSquare,
           color: 'text-blue-600 bg-blue-50 border-blue-200'
         };
-      case 'payment_request':
-        return {
-          icon: Wallet,
-          color: 'text-emerald-600 bg-emerald-50 border-emerald-200'
-        };
-      case 'payment_status':
-        return {
-          icon: CheckCircle,
-          color: 'text-teal-600 bg-teal-50 border-teal-200'
-        };
-      case 'challenge':
-        return {
-          icon: Swords,
-          color: 'text-rose-600 bg-rose-50 border-rose-200'
-        };
+
+
       case 'announcement':
         return {
           icon: Megaphone,
@@ -372,7 +352,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           </span>
 
                           <div className="flex items-center gap-2">
-                            {(n.linkTab || n.extra?.openWallet) && (
+                            {n.linkTab && (
                               <span className="text-indigo-600 font-black flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                                 View <ArrowRight size={10} />
                               </span>

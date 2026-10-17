@@ -7,9 +7,9 @@ import { db } from './firebase';
  * - Within 7 days: Monday 14:30
  * - Older than 7 days: 2026-09-24 14:30
  */
-export const formatMessageTimestamp = (timestamp: Timestamp | null) => {
+export const formatMessageTimestamp = (timestamp: Timestamp | number | null) => {
   if (!timestamp) return '';
-  const date = timestamp.toDate();
+  const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp.toDate();
   const now = new Date();
   
   const diffTime = Math.abs(now.getTime() - date.getTime());

@@ -343,12 +343,12 @@ export async function notifyAdminPaymentRequest({
 }) {
   const isDeposit = type === 'deposit';
   const title = isDeposit 
-    ? `💳 New Deposit Request (৳${amount})` 
-    : `💸 New Withdrawal Request (৳${amount})`;
+    ? `💳 New Deposit Request (BDT${amount})` 
+    : `💸 New Withdrawal Request (BDT${amount})`;
 
   const message = isDeposit
-    ? `${userName} requested to deposit ৳${amount} via ${method.toUpperCase()} (TrxID: ${trxId || 'N/A'}). Please verify and approve.`
-    : `${userName} requested to withdraw ৳${amount} to ${method.toUpperCase()} account (${recipientAccount || 'N/A'}).`;
+    ? `${userName} requested to deposit BDT${amount} via ${method.toUpperCase()} (TrxID: ${trxId || 'N/A'}). Please verify and approve.`
+    : `${userName} requested to withdraw BDT${amount} to ${method.toUpperCase()} account (${recipientAccount || 'N/A'}).`;
 
   await sendAppNotification({
     recipientId: 'admin',

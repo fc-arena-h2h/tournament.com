@@ -103,14 +103,6 @@ export const AuthPage = () => {
           phone: formData.phone.trim(),
           leagueName: formData.leagueName.trim(),
           ovr: formData.ovr,
-          stats: {
-            globalRank: 0,
-            winRate: 0,
-            totalPlay: 0,
-            fp: 0,
-            balance: 0
-          },
-          wallet: 0,
           createdAt: new Date().toISOString()
         });
         

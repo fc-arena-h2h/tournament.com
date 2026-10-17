@@ -46,11 +46,11 @@ export const GameLoader: React.FC<GameLoaderProps> = ({
           return targetPercent;
         }
         
-        // Faster increments for snappier feel
-        const increment = Math.floor(Math.random() * 12) + 6;
+        // Slower increments for better visibility
+        const increment = Math.floor(Math.random() * 4) + 1;
         return Math.min(prev + increment, targetPercent);
       });
-    }, 40);
+    }, 60);
 
     return () => clearInterval(interval);
   }, [fullScreen, targetPercent, onComplete]);

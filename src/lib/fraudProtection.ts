@@ -33,36 +33,6 @@ export async function checkUserFraudStatus(userId: string, currentProfile: any):
       return { isFrozen: true, fraudReason: serverData.fraudReason || 'Account suspended by security system or admin' };
     }
 
-    // Fraud Detection Logic:
-    // 1. Detect illegal wallet balance inflation without transaction record or mismatch exceeding limits
-    // 2. Check for negative wallet or invalid token injection signatures
-    const localWallet = Number(currentProfile?.wallet || 0);
-    const serverWallet = Number(serverData?.wallet || 0);
-
-    // If local wallet is significantly ahead of server wallet without authorized ledger update
-    if (localWallet > serverWallet + 50000) {
-      // Flag fraud!
-      await updateDoc(userRef, {
-        isFrozen: true,
-        fraudAlert: true,
-        fraudReason: 'Unauthorized token/balance injection detected'
-      });
-
-      // Report to Admin
-      await addDoc(collection(db, 'fraudReports'), {
-        userId,
-        userName: currentProfile?.inGameName || currentProfile?.email || 'Unknown User',
-        userEmail: currentProfile?.email || '',
-        discrepancy: `Local wallet (৳${localWallet}) exceeds server wallet (৳${serverWallet}) by suspicious margin. Possible fake token injection.`,
-        currentWallet: localWallet,
-        serverWallet: serverWallet,
-        status: 'pending',
-        createdAt: serverTimestamp()
-      });
-
-      return { isFrozen: true, fraudReason: 'Unauthorized token/balance injection detected' };
-    }
-
     return { isFrozen: serverData.isFrozen || false, fraudReason: serverData.fraudReason };
   } catch (err) {
     console.warn("Fraud check error:", err);

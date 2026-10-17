@@ -4,32 +4,17 @@ import { Card, Button } from '@/src/components/ui/Primitives';
 import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
-import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, Timestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatMessageTimestamp, cleanupOldMessages } from '@/src/lib/chatUtils';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 
-const REACTIONS = ['❤️', '👍', '🔥', '😂', '😮', '😢'];
 
-const BUBBLE_COLORS = [
-  'bg-emerald-500', 'bg-blue-500', 'bg-rose-500', 'bg-amber-500', 
-  'bg-violet-500', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500'
-];
-
-const getUserIdColor = (userId: string) => {
-  if (!userId) return BUBBLE_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return BUBBLE_COLORS[Math.abs(hash) % BUBBLE_COLORS.length];
-};
 
 const DEFAULT_RULES = [
   "Participants must be available during their scheduled match time. Failure to show up within 10 minutes results in a forfeit.",
   "Fair Play & Respect: Toxic behavior, cheating, or glitched gameplay will result in an immediate match loss and potential tournament ban.",
-  "Match Verification: Both players must take a clear screenshot of the final match result screen and submit it in the Match Center for score verification."
+  "Match Verification: Results must be confirmed by both players in the Arena or Match Center for official score verification."
 ];
 
 interface Tournament {
@@ -98,7 +83,7 @@ const CountdownTimer = ({ targetTime }: { targetTime: Timestamp }) => {
   return <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">{timeLeft}</span>;
 };
 
-type ArenaTab = 'group' | 'knockout' | 'ranking' | 'players' | 'rules' | 'manage';
+type ArenaTab = 'group' | 'knockout' | 'players' | 'rules' | 'manage';
 
 interface ArenaDetailProps {
   tournament: Tournament;
@@ -110,21 +95,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const isKnockoutOnly = ((tournament as any)?.format === 'knockout');
   const [activeTab, setActiveTab] = useState<ArenaTab>(isKnockoutOnly ? 'knockout' : 'group');
   const [activeGroup, setActiveGroup] = useState('A');
-  const [activeMatchChat, setActiveMatchChat] = useState<Match | null>(null);
-  const [showArenaChat, setShowArenaChat] = useState(false);
   const [activeKnockoutStage, setActiveKnockoutStage] = useState('R16');
   const [registration, setRegistration] = useState<any>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+
   const [selectedPlayerProfile, setSelectedPlayerProfile] = useState<UserProfile | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [reportingMatch, setReportingMatch] = useState<Match | null>(null);
-  const [reportFormData, setReportFormData] = useState({ home: 0, away: 0, screenshot: '' });
+  const [reportFormData, setReportFormData] = useState({ home: 0, away: 0 });
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -279,8 +261,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           awayPlayerName: awayName,
           participants: [homeId, awayId].filter(Boolean),
           status: 'draft',
-          scheduledTime: Timestamp.now(),
-          createdAt: Timestamp.now()
+          scheduledTime: serverTimestamp(),
+          createdAt: serverTimestamp()
         });
 
         // Prompt to select the other player right away
@@ -481,8 +463,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: 'scheduled',
             stage: stage,
             groupId: 'knockout',
-            scheduledTime: Timestamp.now(),
-            createdAt: Timestamp.now()
+            scheduledTime: serverTimestamp(),
+            createdAt: serverTimestamp()
           });
         }
       } else {
@@ -511,8 +493,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 status: 'scheduled',
                 stage: 'group',
                 groupId: gName,
-                scheduledTime: Timestamp.now(),
-                createdAt: Timestamp.now()
+                scheduledTime: serverTimestamp(),
+                createdAt: serverTimestamp()
               });
             }
           }
@@ -535,8 +517,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: 'scheduled',
             stage: 'group',
             groupId: 'A',
-            scheduledTime: Timestamp.now(),
-            createdAt: Timestamp.now()
+            scheduledTime: serverTimestamp(),
+            createdAt: serverTimestamp()
           });
         }
       }
@@ -598,7 +580,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         stage: manualMatchForm.stage,
         groupId: manualMatchForm.groupId,
         scheduledTime: scheduledTimestamp,
-        createdAt: Timestamp.now()
+        createdAt: serverTimestamp()
       });
 
       // Notify both players
@@ -672,536 +654,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
-  useEffect(() => {
-    // Cleanup old messages once when arena detail opens
-    cleanupOldMessages();
 
-    if (!activeMatchChat && !showArenaChat) return;
 
-    const chatId = showArenaChat ? tournament.id : activeMatchChat?.id;
-    if (!chatId) return;
 
-    const q = query(
-      collection(db, 'messages'),
-      where('chatId', '==', chatId),
-      where('tournamentId', '==', tournament.id)
-    );
-    
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      const sorted = msgs.sort((a: any, b: any) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
-      setMessages(sorted);
 
-      // Seen status update
-      const currentUid = auth.currentUser?.uid;
-      if (currentUid) {
-        sorted.forEach(msg => {
-          if (msg.senderId !== currentUid && (!msg.seenBy || !msg.seenBy.includes(currentUid))) {
-            updateDoc(doc(db, 'messages', msg.id), {
-              seenBy: arrayUnion(currentUid)
-            }).catch(e => console.error("Seen update failed", e));
-          }
-        });
-      }
-    });
 
-    return () => unsubscribe();
-  }, [activeMatchChat, showArenaChat, tournament.id]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || (!activeMatchChat && !showArenaChat)) return;
-    const chatId = showArenaChat ? tournament.id : activeMatchChat?.id;
-    if (!chatId) return;
 
-    try {
-      const msgText = newMessage.trim();
-      await addDoc(collection(db, 'messages'), {
-        chatId: chatId,
-        tournamentId: tournament.id,
-        senderId: auth.currentUser?.uid || '',
-        senderName: profile?.inGameName || 'Player',
-        senderAvatar: profile?.avatar || '',
-        text: msgText,
-        timestamp: Timestamp.now(),
-        reactions: {},
-        seenBy: [auth.currentUser?.uid]
-      });
 
-      // Notify opponent in match room
-      if (activeMatchChat) {
-        const currentUid = auth.currentUser?.uid;
-        const opponentId = currentUid === activeMatchChat.homePlayerId 
-          ? activeMatchChat.awayPlayerId 
-          : activeMatchChat.homePlayerId;
 
-        if (opponentId && opponentId !== currentUid) {
-          sendAppNotification({
-            recipientId: opponentId,
-            title: `💬 Opponent Message (${profile?.inGameName || 'Opponent'})`,
-            message: msgText.length > 70 ? msgText.slice(0, 67) + '...' : msgText,
-            type: 'chat_message',
-            tournamentId: tournament.id,
-            matchId: activeMatchChat.id,
-            linkTab: 'tournament'
-          }).catch(() => {});
-        }
-      }
-
-      setNewMessage('');
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const deleteMessage = async (msgId: string) => {
-    try {
-      await deleteDoc(doc(db, 'messages', msgId));
-      setActiveMenu(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `messages/${msgId}`);
-    }
-  };
-
-  const reactToMessage = async (msgId: string, emoji: string) => {
-    if (!auth.currentUser) return;
-    const msg = messages.find(m => m.id === msgId);
-    if (!msg) return;
-
-    const userReactions = msg.reactions?.[emoji] || [];
-    const hasReacted = userReactions.includes(auth.currentUser.uid);
-
-    try {
-      await updateDoc(doc(db, 'messages', msgId), {
-        [`reactions.${emoji}`]: hasReacted ? arrayRemove(auth.currentUser.uid) : arrayUnion(auth.currentUser.uid)
-      });
-      setActiveMenu(null);
-    } catch (error) {
-      console.error("Reaction failed", error);
-    }
-  };
-
-  const renderArenaChat = () => {
-    if (!showArenaChat) return null;
-
-    const copyMessage = (text: string) => {
-      navigator.clipboard.writeText(text);
-      setActiveMenu(null);
-    };
-
-    return createPortal(
-      <div className="fixed inset-0 z-[5000] bg-white flex flex-col animate-in fade-in slide-in-from-right duration-500">
-        <div className="p-8 pt-16 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc]">
-           <div className="flex flex-col">
-             <span className="text-[10px] font-black text-black uppercase tracking-widest">ARENA GLOBAL CHAT</span>
-             <h3 className="text-xl font-black uppercase italic text-black">
-               {tournament.title}
-             </h3>
-           </div>
-           <button 
-             onClick={() => { setShowArenaChat(false); setActiveMenu(null); setMessages([]); }}
-             className="w-12 h-12 rounded-full nm-flat flex items-center justify-center text-slate-400 active:nm-pressed"
-           >
-             <XCircle size={24} />
-           </button>
-        </div>
-
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar pb-32 bg-[#f8fafc] scroll-smooth"
-        >
-           {messages.length === 0 ? (
-             <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                <div className="w-20 h-20 rounded-3xl nm-flat flex items-center justify-center text-slate-300 mb-6">
-                  <MessageSquare size={32} />
-                </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 italic">No messages in arena yet</p>
-             </div>
-           ) : (
-             messages.map((m, idx) => {
-               const isMe = m.senderId === auth.currentUser?.uid;
-               const showMenu = activeMenu === m.id;
-               const seenCount = (m.seenBy?.length || 0) - (isMe ? 1 : 0);
-               const prevMsg = idx > 0 ? messages[idx - 1] : null;
-               const isFirstInGroup = !prevMsg || prevMsg.senderId !== m.senderId;
-
-               return (
-                <div key={m.id} className={cn(
-                  "flex gap-2 max-w-[90%] group relative",
-                  isMe ? "ml-auto flex-row-reverse" : "flex-row",
-                  isFirstInGroup ? "mt-4" : "mt-0.5"
-                )}>
-                  {/* Avatar */}
-                  <div className="flex-shrink-0 w-8">
-                    {isFirstInGroup && (
-                      <button 
-                        onClick={() => !isMe && setSelectedPlayerProfile(profiles[m.senderId])}
-                        className="active:scale-90 transition-transform"
-                      >
-                        {m.senderAvatar ? (
-                          <img src={m.senderAvatar} className="w-8 h-8 rounded-full border-2 border-white shadow-md object-cover" alt="" />
-                        ) : (
-                          <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-black border-2 border-white shadow-md uppercase",
-                            getUserIdColor(m.senderId)
-                          )}>
-                            {m.senderName?.charAt(0) || '?'}
-                          </div>
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                    {isFirstInGroup && (
-                      <span className="text-[8px] font-black text-black uppercase tracking-widest px-2 mb-1">
-                        {m.senderName}
-                      </span>
-                    )}
-
-                    <div className="relative group/bubble">
-                      <div 
-                        onClick={() => setActiveMenu(showMenu ? null : m.id)}
-                        className={cn(
-                          "px-4 py-2.5 rounded-2xl text-sm font-semibold leading-relaxed border transition-all break-all whitespace-pre-wrap cursor-pointer select-none shadow-sm",
-                          isMe 
-                            ? "bg-fc-dark text-white border-slate-700 rounded-tr-sm" 
-                            : cn("text-white border-transparent rounded-tl-sm", getUserIdColor(m.senderId))
-                        )}
-                      >
-                        {m.text}
-                      </div>
-
-                      {/* Reactions Overlay */}
-                      {m.reactions && Object.entries(m.reactions).some(([_, users]) => (users as string[]).length > 0) && (
-                        <div className={cn(
-                          "absolute -bottom-2.5 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-full border border-slate-100 shadow-sm z-10",
-                          isMe ? "right-1" : "left-1"
-                        )}>
-                          {Object.entries(m.reactions).map(([emoji, users]) => {
-                            if ((users as string[]).length === 0) return null;
-                            return (
-                              <span key={emoji} className="text-[10px] flex items-center gap-0.5 leading-none">
-                                {emoji} <span className="text-[7px] font-black text-slate-400">{(users as string[]).length > 1 ? (users as string[]).length : ''}</span>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Seen & Timestamp */}
-                    {(idx === messages.length - 1 || messages[idx + 1].senderId !== m.senderId || showMenu) && (
-                      <div className="flex items-center gap-2 mt-1 px-1">
-                        <span className="text-[7px] text-black font-bold uppercase tracking-tighter">
-                          {formatMessageTimestamp(m.timestamp)}
-                        </span>
-                        {isMe && seenCount > 0 && (
-                          <span className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter flex items-center gap-1">
-                            Seen by {seenCount}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Interaction Modal */}
-                    <AnimatePresence>
-                      {showMenu && (
-                        <>
-                          <div className="fixed inset-0 z-[3200]" onClick={() => setActiveMenu(null)} />
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className={cn(
-                              "absolute z-[3300] bottom-full mb-2 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 min-w-[160px]",
-                              isMe ? "right-0" : "left-0"
-                            )}
-                          >
-                            <div className="flex items-center justify-around pb-2 border-b border-slate-50 mb-2">
-                              {REACTIONS.map(emoji => (
-                                <button 
-                                  key={emoji} 
-                                  onClick={() => reactToMessage(m.id, emoji)}
-                                  className="text-lg hover:scale-125 transition-transform p-1"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="space-y-1">
-                              <button 
-                                onClick={() => copyMessage(m.text)}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-colors"
-                              >
-                                <Copy size={14} className="text-slate-400" /> Copy Text
-                              </button>
-                              {isMe && (
-                                <button 
-                                  onClick={() => deleteMessage(m.id)}
-                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-rose-50 rounded-xl text-[10px] font-black text-rose-500 uppercase tracking-widest transition-colors"
-                                >
-                                  <Trash2 size={14} className="text-rose-400" /> Delete
-                                </button>
-                              )}
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-               );
-             })
-           )}
-        </div>
-
-        <div className="p-6 border-t border-slate-200 bg-white pb-10">
-          <div className="flex gap-3 nm-flat rounded-[2rem] p-2 bg-slate-50 border border-slate-300 shadow-md">
-            <input 
-              type="text"
-              placeholder="Type your message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="flex-1 h-14 rounded-[1.5rem] bg-white px-6 text-sm font-bold outline-none border border-slate-200 focus:border-indigo-500 transition-all text-slate-900"
-            />
-            <button 
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
-              className="w-14 h-14 rounded-[1.5rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl active:scale-95 disabled:opacity-50 transition-transform shrink-0"
-            >
-              <Send size={24} />
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
-  const renderMatchChat = () => {
-    if (!activeMatchChat) return null;
-
-    const currentUid = auth.currentUser?.uid;
-    const canAccessChat = (
-      currentUid === activeMatchChat.homePlayerId ||
-      currentUid === activeMatchChat.awayPlayerId ||
-      isAdminUser ||
-      isPublisher
-    );
-
-    if (!canAccessChat) {
-      return (
-        <div className="fixed inset-0 z-[3500] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] p-8 max-w-sm text-center space-y-5 shadow-2xl border-2 border-white">
-            <div className="w-16 h-16 rounded-3xl nm-flat bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
-              <Lock size={32} />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-base font-black uppercase italic text-slate-900">Private Match Room</h3>
-              <p className="text-[11px] font-semibold text-slate-500 leading-relaxed">
-                This chat is private. Only Player 1 ({activeMatchChat.homePlayerName}), Player 2 ({activeMatchChat.awayPlayerName}), and the Tournament Publisher can access this conversation.
-              </p>
-            </div>
-            <Button 
-              onClick={() => setActiveMatchChat(null)}
-              className="w-full h-12 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest"
-            >
-              Close / Go Back
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    const copyMessage = (text: string) => {
-      navigator.clipboard.writeText(text);
-      setActiveMenu(null);
-    };
-
-    return createPortal(
-      <div className="fixed inset-0 z-[5000] bg-white flex flex-col animate-in fade-in slide-in-from-right duration-500">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#f8fafc] pt-12">
-           <div className="flex flex-col">
-             <span className="text-[10px] font-black text-black uppercase tracking-widest">MATCH CHAT</span>
-             <h3 className="text-sm font-black uppercase italic text-black">
-               {activeMatchChat.homePlayerName} vs {activeMatchChat.awayPlayerName}
-             </h3>
-           </div>
-           <button 
-             onClick={() => { setActiveMatchChat(null); setActiveMenu(null); setMessages([]); }}
-             className="w-10 h-10 rounded-full nm-flat flex items-center justify-center text-slate-400"
-           >
-             <XCircle size={20} />
-           </button>
-        </div>
-
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-[#f8fafc] scroll-smooth"
-        >
-           {messages.length === 0 ? (
-             <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                <MessageSquare size={48} className="text-slate-300 mb-4" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 italic">No messages yet</p>
-             </div>
-           ) : (
-             messages.map((m, idx) => {
-               const isMe = m.senderId === auth.currentUser?.uid;
-               const showMenu = activeMenu === m.id;
-               const seenCount = (m.seenBy?.length || 0) - (isMe ? 1 : 0);
-               const prevMsg = idx > 0 ? messages[idx - 1] : null;
-               const isFirstInGroup = !prevMsg || prevMsg.senderId !== m.senderId;
-
-               return (
-                <div key={m.id} className={cn(
-                  "flex gap-2 max-w-[92%] group relative",
-                  isMe ? "ml-auto flex-row-reverse" : "flex-row",
-                  isFirstInGroup ? "mt-4" : "mt-0.5"
-                )}>
-                  {/* Avatar */}
-                  <div className="flex-shrink-0 w-8">
-                    {isFirstInGroup && (
-                      <div className={cn(
-                        "w-8 h-8 rounded-full border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white text-[10px] font-black uppercase",
-                        m.senderAvatar ? "bg-slate-200" : getUserIdColor(m.senderId)
-                      )}>
-                        {m.senderAvatar ? (
-                          <img src={m.senderAvatar} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          m.senderName?.charAt(0) || '?'
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                    {isFirstInGroup && (
-                      <span className="text-[8px] font-black text-black uppercase tracking-widest px-2 mb-1">
-                        {m.senderName}
-                      </span>
-                    )}
-
-                    <div className="relative group/bubble">
-                      <div 
-                        onClick={() => setActiveMenu(showMenu ? null : m.id)}
-                        className={cn(
-                          "px-4 py-2.5 rounded-2xl text-xs font-semibold leading-relaxed border transition-all break-all whitespace-pre-wrap cursor-pointer select-none shadow-sm",
-                          isMe 
-                            ? "bg-fc-dark text-white border-slate-700 rounded-tr-sm" 
-                            : cn("text-white border-transparent rounded-tl-sm", getUserIdColor(m.senderId))
-                        )}
-                      >
-                        {m.text}
-                      </div>
-
-                      {/* Reactions */}
-                      {m.reactions && Object.entries(m.reactions).some(([_, users]) => (users as string[]).length > 0) && (
-                        <div className={cn(
-                          "absolute -bottom-2.5 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-full border border-slate-100 shadow-sm z-10",
-                          isMe ? "right-1" : "left-1"
-                        )}>
-                          {Object.entries(m.reactions).map(([emoji, users]) => {
-                            if ((users as string[]).length === 0) return null;
-                            return (
-                              <span key={emoji} className="text-[10px] flex items-center gap-0.5 leading-none">
-                                {emoji} <span className="text-[7px] font-black text-slate-400">{(users as string[]).length > 1 ? (users as string[]).length : ''}</span>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Seen & Timestamp */}
-                    {(idx === messages.length - 1 || messages[idx + 1].senderId !== m.senderId || showMenu) && (
-                      <div className="flex items-center gap-2 mt-1 px-1">
-                        <span className="text-[7px] text-black font-bold uppercase tracking-tighter">
-                          {formatMessageTimestamp(m.timestamp)}
-                        </span>
-                        {isMe && seenCount > 0 && (
-                          <span className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter">
-                            Seen by {seenCount}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Interaction Modal */}
-                    <AnimatePresence>
-                      {showMenu && (
-                        <>
-                          <div className="fixed inset-0 z-[3200]" onClick={() => setActiveMenu(null)} />
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className={cn(
-                              "absolute z-[3300] bottom-full mb-2 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 min-w-[160px]",
-                              isMe ? "right-0" : "left-0"
-                            )}
-                          >
-                            <div className="flex items-center justify-around pb-2 border-b border-slate-50 mb-2">
-                              {REACTIONS.map(emoji => (
-                                <button 
-                                  key={emoji} 
-                                  onClick={() => reactToMessage(m.id, emoji)}
-                                  className="text-lg hover:scale-125 transition-transform p-1"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="space-y-1">
-                              <button 
-                                onClick={() => copyMessage(m.text)}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest transition-colors"
-                              >
-                                <Copy size={14} className="text-slate-400" /> Copy Text
-                              </button>
-                              {isMe && (
-                                <button 
-                                  onClick={() => deleteMessage(m.id)}
-                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-rose-50 rounded-xl text-[10px] font-black text-rose-500 uppercase tracking-widest transition-colors"
-                                >
-                                  <Trash2 size={14} className="text-rose-400" /> Delete
-                                </button>
-                              )}
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-               );
-             })
-           )}
-        </div>
-
-        <div className="p-6 border-t border-slate-200 bg-white pb-10">
-          <div className="flex gap-3 nm-flat rounded-[2rem] p-2 bg-slate-50 border border-slate-300 shadow-md">
-            <input 
-              type="text"
-              placeholder="Type private message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="flex-1 h-14 rounded-[1.5rem] bg-white px-6 text-sm font-bold outline-none border border-slate-200 focus:border-indigo-500 transition-all text-slate-900"
-            />
-            <button 
-              onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
-              className="w-14 h-14 rounded-[1.5rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl active:scale-95 disabled:opacity-50 transition-transform shrink-0"
-            >
-              <Send size={24} />
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
 
   useEffect(() => {
     if (!auth.currentUser) {
@@ -1322,117 +783,37 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
     }
 
-    const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
-    if (entryFee > 0) {
-      const currentWallet = profile.wallet || 0;
-      if (currentWallet < entryFee) {
-        return alert(`Insufficient wallet balance (৳${currentWallet.toFixed(2)}). Entry fee for this paid tournament is ৳${entryFee}. Please add funds to your wallet.`);
-      }
-      if (!confirm(`Are you sure you want to join "${tournament.title}"? ৳${entryFee} entry fee will be deducted from your wallet and held in the tournament escrow fund. If your request is rejected, the fee will be fully refunded.`)) {
-        return;
-      }
-    }
+
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', auth.currentUser!.uid);
-        const userSnap = await transaction.get(userRef);
-        
-        if (!userSnap.exists()) throw new Error('User profile not found');
-        const currentWallet = Number(userSnap.data().wallet || 0);
-
-        // Re-verify balance inside transaction
-        if (entryFee > 0 && currentWallet < entryFee) {
-          throw new Error(`Insufficient balance! Needed: ৳${entryFee}, Found: ৳${currentWallet}`);
-        }
-
-        // 1. Deduct balance if paid
-        if (entryFee > 0) {
-          transaction.update(userRef, {
-            wallet: currentWallet - entryFee
-          });
-
-          // 2. Log transaction
-          const txRef = doc(collection(db, 'transactions'));
-          transaction.set(txRef, {
-            userId: auth.currentUser!.uid,
-            userName: profile.inGameName || 'Player',
-            type: 'fee',
-            method: 'bkash',
-            amount: entryFee,
-            currency: 'BDT',
-            status: 'approved',
-            note: `Paid tournament entry fee (${tournament.title})`,
-            createdAt: Timestamp.now()
-          });
-        }
-
-        // 3. Create registration
-        const regRef = doc(collection(db, 'registrations'));
-        transaction.set(regRef, {
-          tournamentId: tournament.id,
-          userId: auth.currentUser?.uid,
-          status: 'pending',
-          gameName: profile.inGameName,
-          gameUid: profile.inGameUID,
-          ovr: profile.ovr || 0,
-          createdAt: Timestamp.now()
-        });
+      const regRef = doc(collection(db, 'registrations'));
+      await addDoc(collection(db, 'registrations'), {
+        tournamentId: tournament.id,
+        userId: auth.currentUser?.uid,
+        status: 'pending',
+        gameName: profile.inGameName,
+        gameUid: profile.inGameUID,
+        ovr: profile.ovr || 0,
+        createdAt: serverTimestamp()
       });
 
-      alert(entryFee > 0 ? `Join request sent! ৳${entryFee} entry fee deducted into escrow fund.` : 'Join request sent! Waiting for publisher approval.');
+      alert('Join request sent! Waiting for publisher approval.');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to join tournament');
     }
   };
 
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const max = 720;
-          if (width > height) {
-            if (width > max) {
-              height = Math.round((height * max) / width);
-              width = max;
-            }
-          } else {
-            if (height > max) {
-              width = Math.round((width * max) / height);
-              height = max;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
-          }
-          // Compress quality to 0.5 to guarantee size strictly under 100 KB
-          resolve(canvas.toDataURL('image/jpeg', 0.5));
-        };
-      };
-    });
-  };
+
 
   const handleUploadResult = (match: Match) => {
     setReportingMatch(match);
-    setReportFormData({ home: 0, away: 0, screenshot: '' });
+    setReportFormData({ home: 0, away: 0 });
   };
 
   const submitFinalReport = async () => {
     if (!reportingMatch) return;
-    if (!reportFormData.screenshot) return alert('Please upload match result screenshot');
+
 
     // Knockout Stage: Draw is strictly prohibited (must have a decisive winner)
     const isKnockout = reportingMatch.stage !== 'group' || (tournament as any)?.format === 'knockout' || reportingMatch.groupId === 'knockout';
@@ -1448,7 +829,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         awayScore: reportFormData.away,
         status: 'reported',
         reporterId: auth.currentUser?.uid,
-        screenshotUrl: reportFormData.screenshot,
+
         updatedAt: Timestamp.now()
       });
       alert('Result reported! Waiting for opponent to confirm.');
@@ -1470,12 +851,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const isDraw = reportFormData.home === reportFormData.away;
     const isDrawBlocked = isKnockout && isDraw;
 
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const base64 = await compressImage(file);
-      setReportFormData({ ...reportFormData, screenshot: base64 });
-    };
+
 
     return createPortal(
       <div className="fixed inset-0 z-[8000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
@@ -1555,47 +931,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
              </div>
 
-             {/* Evidence */}
-             <div className="space-y-4">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Evidence Screenshot (HD AUTO-OPTIMIZATION)</label>
-                <div className="relative group">
-                   <input 
-                     type="file" 
-                     accept="image/*" 
-                     onChange={handleFile}
-                     className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
-                   />
-                   <div className={cn(
-                     "w-full aspect-video rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center transition-all relative overflow-hidden",
-                     reportFormData.screenshot ? "border-emerald-500 bg-emerald-500/5" : "border-slate-800 bg-slate-900/30 hover:border-indigo-500/50"
-                   )}>
-                      {reportFormData.screenshot ? (
-                        <>
-                          <img src={reportFormData.screenshot} className="w-full h-full object-cover opacity-40 blur-[2px]" alt="" />
-                          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3">
-                             <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                <CheckCircle size={24} className="text-white" />
-                             </div>
-                             <span className="text-[10px] font-black text-white uppercase tracking-widest">IMAGE OPTIMIZED & SCANNED</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <Camera size={32} className="text-slate-700 mb-4" />
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tap to upload proof</span>
-                        </>
-                      )}
-                   </div>
-                </div>
-             </div>
+
 
              {/* Deploy Button */}
              <button 
                onClick={submitFinalReport}
-               disabled={isSubmittingReport || !reportFormData.screenshot || isDrawBlocked}
+               disabled={isSubmittingReport || isDrawBlocked}
                className={cn(
                  "w-full h-16 sm:h-20 rounded-[2rem] flex items-center justify-center text-[11px] sm:text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
-                 isSubmittingReport || !reportFormData.screenshot || isDrawBlocked
+                 isSubmittingReport || isDrawBlocked
                    ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5" 
                    : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20 hover:scale-[1.01]"
                )}
@@ -1634,7 +978,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           status: 'scheduled',
           homeScore: null,
           awayScore: null,
-          screenshotUrl: null,
+
           reporterId: null,
           updatedAt: Timestamp.now()
         });
@@ -1753,8 +1097,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         status: 'scheduled',
         stage: stage,
         groupId: 'knockout',
-        scheduledTime: Timestamp.now(),
-        createdAt: Timestamp.now()
+        scheduledTime: serverTimestamp(),
+        createdAt: serverTimestamp()
       });
     }
   };
@@ -2057,22 +1401,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         updatedAt: Timestamp.now()
       });
       
-      if (homeScore > awayScore) {
-        if (match.homePlayerId) {
-          await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 100 });
-        }
-      } else if (awayScore > homeScore) {
-        if (match.awayPlayerId) {
-          await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 100 });
-        }
-      } else {
-        if (match.homePlayerId) {
-          await updateDoc(doc(db, 'users', match.homePlayerId), { eliteScore: (profiles[match.homePlayerId]?.eliteScore || 0) + 25 });
-        }
-        if (match.awayPlayerId) {
-          await updateDoc(doc(db, 'users', match.awayPlayerId), { eliteScore: (profiles[match.awayPlayerId]?.eliteScore || 0) + 25 });
-        }
-      }
+
 
       // Updated match list with this match set to completed
       const updatedMatches = matches.map(m => m.id === match.id ? { ...m, status: 'completed' as const } : m);
@@ -2091,13 +1420,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         homePlayerId: match.homePlayerId,
         awayPlayerId: match.awayPlayerId,
         title: '🏆 Match Result Confirmed!',
-        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}. Winner: ${winnerName}! Points updated.`,
+        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}. Winner: ${winnerName}!`,
         type: 'match_result',
         tournamentId: tournament.id,
         matchId: match.id
       }).catch(err => console.warn('Match result notification failed:', err));
 
-      alert('Result confirmed! Points updated.');
+      alert('Result confirmed!');
     } catch (err) {
       console.error(err);
       handleFirestoreError(err, OperationType.UPDATE, 'matches');
@@ -2607,41 +1936,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         updatedAt: Timestamp.now()
       });
 
-      // If paid tournament, refund entry fee to player
-      const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
-      if (entryFee > 0 && regUserId) {
-        const playerRef = doc(db, 'users', regUserId);
-        const playerSnap = await getDoc(playerRef);
-        if (playerSnap.exists()) {
-          const playerData = playerSnap.data();
-          const currentWallet = playerData.wallet || 0;
-          await updateDoc(playerRef, {
-            wallet: currentWallet + entryFee
-          });
-
-          await addDoc(collection(db, 'transactions'), {
-            userId: regUserId,
-            userName: regGameName || 'Player',
-            type: 'refund',
-            method: 'bkash',
-            amount: entryFee,
-            currency: 'BDT',
-            status: 'approved',
-            note: `Refund for rejected tournament entry (${tournament.title})`,
-            createdAt: Timestamp.now()
-          });
-
-          await addDoc(collection(db, 'notifications'), {
-            recipientId: regUserId,
-            title: 'Tournament Registration Rejected & Refunded',
-            message: `Your join request for "${tournament.title}" was rejected by the publisher. Your entry fee of ৳${entryFee} has been refunded to your wallet.`,
-            createdAt: Timestamp.now(),
-            read: false
-          });
-        }
-      }
-
-      alert('Player rejected and entry fee refunded (if paid tournament).');
+      alert('Player rejected.');
     } catch (err) {
       console.error(err);
       alert('Failed to reject registration');
@@ -2720,76 +2015,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const tabs = [
     ...(!isKnockoutOnly ? [{ id: 'group' as ArenaTab, icon: LayoutGrid, label: 'Groups' }] : []),
     { id: 'knockout' as ArenaTab, icon: GitPullRequest, label: 'Brackets' },
-    ...(!isKnockoutOnly ? [{ id: 'ranking' as ArenaTab, icon: Trophy, label: 'Ranking' }] : []),
+
     { id: 'players' as ArenaTab, icon: List, label: 'Players' },
     { id: 'rules' as ArenaTab, icon: FileText, label: 'Rules' },
     ...(isAdminUser ? [{ id: 'manage' as ArenaTab, icon: Settings, label: 'Manage' }] : []),
   ];
 
 
-  const calculateOverallRanking = () => {
-    const table = participants.map(p => {
-      const stats = {
-        userId: p.userId,
-        name: p.gameName,
-        played: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        gd: 0,
-        pts: 0,
-        ovr: p.ovr || 0,
-        rankPoints: 0 // FIFA-like performance index
-      };
 
-      const playerMatches = matches.filter(m => 
-        (m.homePlayerId === p.userId || m.awayPlayerId === p.userId) && 
-        m.status === 'completed'
-      );
-
-      playerMatches.forEach(m => {
-        stats.played++;
-        const isHome = m.homePlayerId === p.userId;
-        const hScore = m.homeScore || 0;
-        const aScore = m.awayScore || 0;
-
-        if (isHome) {
-          stats.goalsFor += hScore;
-          stats.goalsAgainst += aScore;
-          if (hScore > aScore) { stats.won++; stats.pts += 3; stats.rankPoints += 50; }
-          else if (hScore === aScore) { stats.drawn++; stats.pts += 1; stats.rankPoints += 20; }
-          else { stats.lost++; stats.rankPoints += 5; }
-        } else {
-          stats.goalsFor += aScore;
-          stats.goalsAgainst += hScore;
-          if (aScore > hScore) { stats.won++; stats.pts += 3; stats.rankPoints += 50; }
-          else if (aScore === hScore) { stats.drawn++; stats.pts += 1; stats.rankPoints += 20; }
-          else { stats.lost++; stats.rankPoints += 5; }
-        }
-        
-        // Bonus for goals
-        stats.rankPoints += (isHome ? hScore : aScore) * 5;
-        // Stage weight
-        if (m.stage === 'FINAL') stats.rankPoints += 500;
-        else if (m.stage === 'SEMI') stats.rankPoints += 250;
-        else if (m.stage === 'QTR') stats.rankPoints += 150;
-        else if (m.stage === 'R16') stats.rankPoints += 100;
-        else stats.rankPoints += 20; // Group stage participation
-      });
-
-      stats.gd = stats.goalsFor - stats.goalsAgainst;
-      return stats;
-    });
-
-    return table.sort((a, b) => {
-      if (b.rankPoints !== a.rankPoints) return b.rankPoints - a.rankPoints;
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.gd !== a.gd) return b.gd - a.gd;
-      return b.goalsFor - a.goalsFor;
-    });
-  };
 
   const renderMatchCard = (match: Match) => {
     const homeProfile = profiles[match.homePlayerId];
@@ -2837,19 +2070,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              )}
           </div>
 
-          {match.screenshotUrl && (
-            <div className="px-0">
-              <div className="relative group/img aspect-video rounded-2xl sm:rounded-[2rem] overflow-hidden bg-fc-dark border border-slate-100 shadow-inner">
-                 <img src={match.screenshotUrl} alt="Match Proof" className="w-full h-full object-cover opacity-80 group-hover/img:opacity-100 transition-opacity" />
-                 <div className="absolute inset-0 bg-gradient-to-t from-fc-dark/80 to-transparent flex items-end p-4 sm:p-6 pointer-events-none group-hover/img:opacity-0 transition-opacity">
-                    <div className="flex items-center gap-2">
-                      <Upload size={14} className="text-fc-green" />
-                      <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Match Evidence Attached</span>
-                    </div>
-                 </div>
-              </div>
-            </div>
-          )}
+
 
           <div className="flex items-center justify-between px-0 relative z-10 gap-1.5 sm:gap-2">
             {/* Home Player */}
@@ -2867,14 +2088,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               </div>
               <div className={cn(
-                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-50 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-md",
-                isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_16px_rgba(245,158,11,0.4)] scale-105" : "border-white"
+                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
+                isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
               )}>
                  {homeProfile?.avatar ? (
-                   <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
+                   <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover opacity-90 transition-opacity" />
                  ) : (
-                   <UserIcon size={24} className="text-slate-300 sm:w-8 sm:h-8" />
+                   <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  )}
+                 <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
               </div>
               <div className="text-center">
                 <h5 className={cn(
@@ -2946,14 +2168,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               </div>
               <div className={cn(
-                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-50 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-md",
-                isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_16px_rgba(245,158,11,0.4)] scale-105" : "border-white"
+                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
+                isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
               )}>
                  {awayProfile?.avatar ? (
-                   <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
+                   <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover opacity-90 transition-opacity" />
                  ) : (
-                   <UserIcon size={24} className="text-slate-300 sm:w-8 sm:h-8" />
+                   <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  )}
+                 <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
               </div>
               <div className="text-center">
                 <h5 className={cn(
@@ -3018,25 +2241,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
             )}
 
-            {/* Private Tactical Match Chat - Authorized Only */}
-            {canAccessMatchChat ? (
-              <button 
-                onClick={() => setActiveMatchChat(match)}
-                className="flex-1 min-w-[120px] h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 transition-transform"
-              >
-                <MessageSquare size={14} className="text-amber-300" />
-                <span>Match Room Chat</span>
-                <span className="text-[7px] bg-white/20 px-2 py-0.5 rounded-full font-bold">PRIVATE</span>
-              </button>
-            ) : (
-              <button 
-                onClick={() => setActiveMatchChat(match)}
-                className="flex-1 min-w-[120px] h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-slate-200 active:scale-95 transition-transform"
-              >
-                <Lock size={12} className="text-slate-400" />
-                <span>Private Match Room</span>
-              </button>
-            )}
+
           </div>
         </div>
       </div>
@@ -3821,15 +3026,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       onClick={() => p && setSelectedPlayerProfile(p)}
                       className="flex items-center gap-4 text-left group flex-1 min-w-0"
                     >
-                      <div className="w-14 h-14 rounded-2xl nm-inset flex items-center justify-center text-slate-800 font-black italic border border-white/30 overflow-hidden bg-slate-50 group-hover:scale-105 transition-transform flex-shrink-0">
-                         {p?.avatar ? (
-                           <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-                         ) : (
-                           <UserIcon size={24} className="text-slate-300" />
-                         )}
+                      <div className="relative shrink-0">
+                        <div className="w-14 h-14 rounded-[1.2rem] nm-inset flex items-center justify-center border-2 border-white/40 overflow-hidden bg-slate-900 shadow-[0_0_15px_rgba(79,70,229,0.1)] group-hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all duration-300">
+                           {p?.avatar ? (
+                             <img src={p.avatar} alt="" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                           ) : (
+                             <UserIcon size={24} className="text-slate-700" />
+                           )}
+                           <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-fc-green rounded-full border-2 border-white flex items-center justify-center shadow-sm">
+                          <Zap size={8} className="text-white fill-current" />
+                        </div>
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-black text-slate-800 uppercase italic group-hover:text-fc-green transition-colors truncate">{p?.inGameName || reg.gameName}</span>
+                        <span className="text-sm font-black text-slate-800 uppercase italic group-hover:text-indigo-600 transition-colors truncate tracking-tight">{p?.inGameName || reg.gameName}</span>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">OVR {p?.ovr || reg.ovr}</span>
                           <div className={cn(
@@ -4135,90 +3346,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
           </div>
         );
-      case 'ranking':
-        const rankings = calculateOverallRanking();
-        return (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col items-center text-center space-y-2 mb-10">
-               <div className="w-16 h-16 rounded-3xl nm-flat flex items-center justify-center text-amber-500 border border-white/50 mb-2">
-                 <Trophy size={32} fill="currentColor" />
-               </div>
-               <h3 className="text-xl font-black text-slate-800 uppercase italic">Power Rankings</h3>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-loose">
-                 Global standings based on <br /> match performance & stage progression
-               </p>
-            </div>
 
-            <div className="nm-flat rounded-[2.5rem] border-4 border-white/40 overflow-hidden bg-white">
-              <div className="bg-slate-50/50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">ELITE CONTENDER</span>
-                <div className="flex gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">
-                  <span className="w-14 text-center">RATING</span>
-                  <span className="w-12 text-center">W/L</span>
-                  <span className="w-12 text-center text-slate-800">POINTS</span>
-                </div>
-              </div>
-              
-              <div className="p-4 space-y-2">
-                {rankings.length === 0 ? (
-                  <div className="py-20 text-center">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.25em] italic">Tournament has not started yet</p>
-                  </div>
-                ) : (
-                  rankings.map((row, i) => {
-                    const p = profiles[row.userId];
-                    const rank = i + 1;
-                    return (
-                      <div key={`rank-${row.userId}-${i}`} className={cn(
-                        "flex items-center justify-between px-4 py-5 rounded-[2rem] transition-all border",
-                        rank === 1 ? "bg-slate-900 border-slate-800 shadow-xl scale-[1.02]" : "hover:bg-slate-50 border-transparent"
-                      )}>
-                        <div className="flex items-center gap-5 flex-1 overflow-hidden">
-                          <div className={cn(
-                            "w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black italic shrink-0",
-                            rank === 1 ? "bg-amber-400 text-slate-900" :
-                            rank === 2 ? "bg-slate-200 text-slate-600" :
-                            rank === 3 ? "bg-orange-100 text-orange-600" :
-                            "bg-slate-50 text-slate-300"
-                          )}>
-                            {rank}
-                          </div>
-                          <div className="flex items-center gap-4 overflow-hidden">
-                             <div className="w-12 h-12 rounded-2xl nm-inset bg-white overflow-hidden border border-white/20 shrink-0">
-                                {p?.avatar && <img src={p.avatar} alt="" className="w-full h-full object-cover" />}
-                             </div>
-                             <div className="flex flex-col overflow-hidden">
-                               <span className={cn(
-                                 "text-sm font-black uppercase italic tracking-tight transition-colors truncate",
-                                 rank === 1 ? "text-white" : "text-slate-800"
-                               )}>{p?.inGameName || row.name}</span>
-                               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">OVR {row.ovr}</span>
-                             </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-4 text-[11px] font-black uppercase tracking-tight shrink-0 pr-4">
-                          <div className={cn(
-                            "w-14 text-center flex flex-col items-center",
-                            rank === 1 ? "text-amber-400" : "text-indigo-500"
-                          )}>
-                            <span>{row.rankPoints}</span>
-                            <span className="text-[7px] opacity-60">PTS</span>
-                          </div>
-                          <span className={cn("w-12 text-center", rank === 1 ? "text-slate-400" : "text-slate-400")}>
-                            {row.won}/{row.lost}
-                          </span>
-                          <span className={cn("w-12 text-center", rank === 1 ? "text-white" : "text-slate-900")}>
-                            {row.pts}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        );
       case 'players':
         return renderParticipantsList();
       case 'rules':
@@ -4378,8 +3506,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   return (
     <div className="min-h-screen bg-soft-bg pb-32 relative animate-fade-in">
       {renderReportResultModal()}
-      {renderMatchChat()}
-      {renderArenaChat()}
+
       {renderPlayerModal()}
       {renderSlotAssignModal()}
       {renderAutoMatchToast()}
@@ -4438,13 +3565,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    </div>
                  </div>
 
-                 <button 
-                   onClick={() => setShowArenaChat(true)}
-                   className="w-12 h-12 rounded-2xl bg-fc-green text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform shrink-0"
-                   title="Arena Chat"
-                 >
-                    <MessageSquare size={20} />
-                 </button>
+
               </div>
 
               {/* Bottom Banner Row: Title and Participants/Join */}

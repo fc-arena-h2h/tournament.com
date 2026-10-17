@@ -1,176 +1,135 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    function getUserDoc() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
+
+    // Role check from user document (Source of Truth)
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
-    
-    function hasRole(role) {
-      return isSignedIn() && exists(getUserDoc()) && get(getUserDoc()).data.role == role;
-    }
-    
+
     function isAdmin() {
-      return (isSignedIn() && request.auth.token.email.lower() == 'sperkplay@gmail.com') || 
-             (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      return isSignedIn() && getUserRole() == 'admin';
     }
-    
+
     function isPublisher() {
-      return hasRole('publisher') || isAdmin();
+      return isSignedIn() && getUserRole() == 'publisher';
     }
 
-    // User profiles - Hardened security: users cannot increase wallet arbitrarily or change role,
-    // except a one-time 10 BDT bonus when publisher creates their first virtual card on an unrecorded device
-    // User profiles - Hardened security
-    match /users/{uid} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        isAdmin() || 
-        (isOwner(uid) && (
-          // Owner cannot change critical fields
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'isFrozen', 'fraudAlert']) &&
-          (
-            // Owner cannot increase wallet balance (except specific bonus)
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['wallet']) ||
-            request.resource.data.wallet <= resource.data.wallet ||
-            (
-              request.resource.data.wallet <= resource.data.wallet + 10 &&
-              request.resource.data.bonusClaimed == true &&
-              (!('bonusClaimed' in resource.data) || resource.data.bonusClaimed != true)
-            )
-          )
-        )) ||
-        (
-          // Cross-user updates for match results (limited to stats and points)
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'wallet', 'email', 'fbUrl', 'phone', 'isFrozen', 'uid', 'fraudAlert'])
-        )
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+        && data.email == request.auth.token.email
+        && data.role in ['player', 'publisher', 'admin']
+        && (data.inGameName is string && data.inGameName.size() <= 50)
+        && (!('ovr' in data) || (data.ovr is number))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 20));
+    }
+
+    function isValidTournament(data) {
+      return data.title is string && data.title.size() <= 100
+        && data.publisherId == request.auth.uid
+        && data.status in ['open', 'registration_closed', 'ongoing', 'finished', 'completed']
+        && data.createdAt == request.time;
+    }
+
+    function isValidRegistration(data) {
+      return data.tournamentId is string
+        && data.userId == request.auth.uid
+        && data.status == 'pending'
+        && data.createdAt == request.time;
+    }
+
+
+
+    // --- Collection Matches ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && (
+        incoming().role == 'player' || (incoming().role == 'admin' && incoming().email == 'sperkplay@gmail.com')
       );
-      allow delete: if isAdmin();
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && (
+        // Action: Update Profile
+        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'ovr', 'fbUrl', 'messengerLink', 'whatsappNumber', 'phone', 'avatar', 'pushEnabled', 'fcmTokens', 'updatedAt']))
+        && incoming().role == existing().role
+      )) || isAdmin();
     }
 
-    // Hardware devices registry to prevent multiple bonus collections on the same device
-    match /devices/{hwid} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
-    // Tournaments
-    match /tournaments/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // Registrations
-    match /registrations/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // Matches
-    match /matches/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-    
-    // Challenges (1v1)
-    match /challenges/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    // Messages / Global Chat / Match Chat
-    match /messages/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-    
-    // Announcements
-    match /announcements/{id} {
-      allow read: if true;
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // Point Transactions
-    match /point_transactions/{id} {
+    // Tournaments Collection
+    match /tournaments/{tournamentId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-    
-    // Transactions / Wallet Requests - Hardened: users can only create pending requests for themselves, 
-    // or 'approved' fee logs for tournament entry (since balance is already deducted)
-    match /transactions/{id} {
-      allow read: if true;
-      allow create: if isSignedIn() && 
-        request.resource.data.userId == request.auth.uid &&
-        (
-          request.resource.data.status == 'pending' ||
-          (request.resource.data.type == 'fee' && request.resource.data.status == 'approved')
-        );
-      allow update, delete: if isAdmin();
+      allow create: if (isAdmin() || isPublisher()) && isValidTournament(incoming());
+      allow update: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid && (
+        // Action: Manage Tournament
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'status', 'filledSlots', 'prizePool', 'rewardType', 'prizes'])
+      ));
     }
 
-    // Leagues
-    match /leagues/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    // Registrations Collection
+    match /registrations/{registrationId} {
+      allow read: if isSignedIn();
+      allow create: if isEmailVerified() && isValidRegistration(incoming());
+      allow update: if isAdmin() || (
+        // Action: Approval (by publisher of tournament)
+        get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
     }
 
-    // League Memberships
-    match /leagueMemberships/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    // Matches Collection
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(incoming().tournamentId)).data.publisherId == request.auth.uid);
+      allow update: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
     }
 
-    // League Messages (Chat)
-    match /leagueMessages/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn();
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
     }
 
     // Notifications
-    match /notifications/{id} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn();
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.recipientId == request.auth.uid || resource.data.recipientId == 'all' || (isAdmin() && resource.data.recipientId == 'admin'));
+      allow update: if isOwner(resource.data.recipientId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow create: if isAdmin();
     }
 
-    // Fraud Reports
-    match /fraudReports/{id} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
-    // Connection Health Check
-    match /test/{id} {
-      allow read: if true;
+    // Test Connection
+    match /test/{testId} {
+      allow read, write: if isSignedIn();
     }
   }
 }

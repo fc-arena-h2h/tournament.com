@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["player", "publisher", "admin"] },
+        "inGameName": { "type": "string", "maxLength": 50 },
+        "inGameUID": { "type": "string", "maxLength": 50 },
+        "leagueName": { "type": "string", "maxLength": 50 },
+        "ovr": { "type": "number" },
+        "fbUrl": { "type": "string", "maxLength": 200 },
+        "messengerLink": { "type": "string", "maxLength": 200 },
+        "whatsappNumber": { "type": "string", "maxLength": 20 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "avatar": { "type": "string", "maxLength": 500 },
+        "pushEnabled": { "type": "boolean" },
+        "fcmTokens": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "object", "description": "Firestore Timestamp" },
+        "updatedAt": { "type": "object", "description": "Firestore Timestamp" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Tournament details and configuration",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "organizerName": { "type": "string", "maxLength": 100 },
+        "organizationName": { "type": "string", "maxLength": 100 },
+        "publisherName": { "type": "string", "maxLength": 100 },
+        "publisherId": { "type": "string" },
+        "format": { "type": "string", "enum": ["group_knockout", "knockout", "league", "hybrid"] },
+        "entryType": { "type": "string", "enum": ["free", "paid"] },
+        "entryFee": { "type": "number" },
+        "ovrLimit": { "type": "number" },
+        "totalSlots": { "type": "number" },
+        "filledSlots": { "type": "number" },
+        "prizePool": { "type": "string", "maxLength": 100 },
+        "rewardType": { "type": "string", "enum": ["winner_only", "top3"] },
+        "prizes": { "type": "object", "nullable": true },
+        "status": { "type": "string", "enum": ["open", "registration_closed", "ongoing", "finished", "completed"] },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["title", "publisherId", "status", "createdAt"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "User registration for a tournament",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "gameName": { "type": "string", "maxLength": 50 },
+        "gameUid": { "type": "string", "maxLength": 50 },
+        "ovr": { "type": "number" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["tournamentId", "userId", "status", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Tournament match schedule and result",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "homePlayerId": { "type": "string" },
+        "awayPlayerId": { "type": "string" },
+        "homePlayerName": { "type": "string", "maxLength": 50 },
+        "awayPlayerName": { "type": "string", "maxLength": 50 },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["scheduled", "ongoing", "reported", "completed", "disputed"] },
+        "stage": { "type": "string", "enum": ["group", "r16", "qtr", "semi", "final"] },
+        "homeScore": { "type": "number", "nullable": true },
+        "awayScore": { "type": "number", "nullable": true },
+        "scheduledTime": { "type": "object" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["tournamentId", "participants", "status", "scheduledTime", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Global system announcement",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "maxLength": 2000 },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "Tournaments list"
+    },
+    "/registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/Registration" },
+      "description": "Tournament registration requests"
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Tournament match scheduling"
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "System wide broadcasts"
+    },
+    "/test/{testId}": {
+      "schema": { "type": "object", "properties": { "status": { "type": "string" } } },
+      "description": "Connection test collection"
+    }
+  }
+}

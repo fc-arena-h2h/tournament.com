@@ -9,7 +9,7 @@ import { UserProfile } from '@/src/hooks/useAuth';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
 
-export type NavTab = 'arena' | 'matches' | 'league' | 'tournament' | 'profile';
+export type NavTab = 'arena' | 'matches' | 'tournament' | 'profile';
 
 interface BottomNavProps {
   activeTab: NavTab;
@@ -22,7 +22,6 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
     { id: 'arena' as NavTab, label: t('nav_dashboard'), icon: Home },
     { id: 'tournament' as NavTab, label: t('nav_arena'), icon: Trophy },
     { id: 'matches' as NavTab, label: t('nav_field'), icon: Calendar },
-    { id: 'league' as NavTab, label: t('nav_elite'), icon: Users },
     { id: 'profile' as NavTab, label: t('nav_me'), icon: User },
   ];
 
@@ -109,21 +108,25 @@ export const Header = ({
             </button>
           ) : (
             <div className="relative group">
-              <div className="w-14 h-14 rounded-[1.8rem] bg-fc-dark border-4 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-transform">
-                {/* Glow effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
-                <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-fc-green/10 rounded-full blur-xl" />
-                
-                {/* Icon Core */}
-                <div className="relative z-10 flex items-center justify-center">
-                  <Trophy size={28} className="text-fc-gold drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" fill="currentColor" />
-                  <div className="absolute -top-1 -right-1">
-                    <Zap size={14} className="text-white animate-pulse" fill="currentColor" />
+              <div className="w-14 h-14 rounded-[1.2rem] bg-fc-dark border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
+                {profile?.avatar ? (
+                  <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                ) : (
+                  <div className="relative z-10 flex items-center justify-center">
+                    <Trophy size={24} className="text-fc-gold drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" fill="currentColor" />
                   </div>
+                )}
+                
+                {/* Pro Badge */}
+                <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-600 text-white text-[6px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg border border-white/20 transform rotate-12 group-hover:rotate-0 transition-transform">
+                  Pro
                 </div>
+                
+                {/* Neon Accent Line */}
+                <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none" />
               </div>
               {/* Badge */}
-              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-lg bg-fc-green border-2 border-white flex items-center justify-center text-[7px] font-black text-white italic shadow-lg">
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-lg bg-fc-green border-2 border-white flex items-center justify-center text-[6px] font-black text-white italic shadow-lg z-20">
                 FC
               </div>
             </div>
@@ -140,18 +143,7 @@ export const Header = ({
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
-          <button 
-            onClick={() => onOpenWallet?.()}
-            className="h-11 sm:h-12 px-2.5 sm:px-3.5 rounded-2xl nm-flat text-emerald-600 border border-white/50 flex items-center gap-1.5 active:nm-pressed shadow-sm"
-            title="Open Wallet"
-          >
-            <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-600">
-              <Wallet size={14} />
-            </div>
-            <span className="text-[11px] sm:text-xs font-black font-mono tracking-tight">
-              ৳{profile?.wallet?.toFixed(0) || '0'}
-            </span>
-          </button>
+
           <button 
             onClick={() => {
               if (onOpenNotifications) {
@@ -263,17 +255,7 @@ export const Header = ({
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">GENERAL SERVICES</span>
                 <div className="grid grid-cols-1 gap-3">
                   {[
-                    { 
-                      label: 'My Wallet', 
-                      icon: Wallet, 
-                      color: 'text-emerald-500', 
-                      badge: `৳${profile?.wallet?.toFixed(2) || '0.00'}`,
-                      sub: 'Add Money · Withdraw',
-                      onClick: () => {
-                        setShowMenu(false);
-                        onOpenWallet?.();
-                      }
-                    },
+
                     {
                       label: 'Test Push Notification',
                       icon: Bell,

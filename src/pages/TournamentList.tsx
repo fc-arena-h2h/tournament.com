@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc, orderBy, limit } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { Trophy, Users, Shield, ArrowRight, Clock, Target, CheckCircle, Hash } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -38,17 +38,30 @@ interface TournamentListPageProps {
 }
 
 export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps) => {
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => {
+    try {
+      const cached = localStorage.getItem('fc_arena_tournaments');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [publisherProfiles, setPublisherProfiles] = useState<Record<string, UserProfile>>({});
-  const [userRegistrations, setUserRegistrations] = useState<Record<string, Registration>>({});
-  const [loading, setLoading] = useState(true);
+  const [userRegistrations, setUserRegistrations] = useState<Record<string, Registration>>(() => {
+    try {
+      const cached = localStorage.getItem('fc_arena_user_registrations');
+      return cached ? JSON.parse(cached) : {};
+    } catch { return {}; }
+  });
+  const [loading, setLoading] = useState(tournaments.length === 0);
   const [viewMode, setViewMode] = useState<'joined' | 'all'>('joined');
 
   useEffect(() => {
-    const q = query(collection(db, 'tournaments'));
+    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
       setTournaments(tData);
+      try {
+        localStorage.setItem('fc_arena_tournaments', JSON.stringify(tData));
+      } catch {}
 
       // Fetch publisher profiles for tournaments that have a publisherId
       const pubIds = Array.from(new Set(tData.map(t => t.publisherId))).filter(Boolean) as string[];
@@ -74,6 +87,9 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
           regs[data.tournamentId] = data;
         });
         setUserRegistrations(regs);
+        try {
+          localStorage.setItem('fc_arena_user_registrations', JSON.stringify(regs));
+        } catch {}
       });
     }
 
@@ -96,37 +112,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
       return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
     }
 
-    const entryFee = tournament.entryType === 'paid' ? (tournament.entryFee || 0) : 0;
-    if (entryFee > 0) {
-      const currentWallet = profile.wallet || 0;
-      if (currentWallet < entryFee) {
-        return alert(`Insufficient wallet balance (৳${currentWallet.toFixed(2)}). Entry fee for this paid tournament is ৳${entryFee}. Please add funds to your wallet.`);
-      }
-      if (!confirm(`Are you sure you want to join "${tournament.title}"? ৳${entryFee} entry fee will be deducted from your wallet and held in the tournament escrow fund. If your request is rejected, the fee will be fully refunded.`)) {
-        return;
-      }
-    }
-
     try {
-      if (entryFee > 0 && auth.currentUser) {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        await updateDoc(userRef, {
-          wallet: (profile.wallet || 0) - entryFee
-        });
-
-        await addDoc(collection(db, 'transactions'), {
-          userId: auth.currentUser.uid,
-          userName: profile.inGameName || 'Player',
-          type: 'fee',
-          method: 'bkash',
-          amount: entryFee,
-          currency: 'BDT',
-          status: 'approved',
-          note: `Paid tournament entry fee (${tournament.title})`,
-          createdAt: Timestamp.now()
-        });
-      }
-
       await addDoc(collection(db, 'registrations'), {
         tournamentId: tournament.id,
         userId: auth.currentUser?.uid,
@@ -136,7 +122,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
         ovr: profile.ovr || 0,
         createdAt: Timestamp.now()
       });
-      alert(entryFee > 0 ? `Join request sent! ৳${entryFee} entry fee deducted into escrow fund.` : 'Join request sent! Waiting for publisher approval.');
+      alert('Join request sent! Waiting for publisher approval.');
       // Update local state
       setUserRegistrations({
         ...userRegistrations,
