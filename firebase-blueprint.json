@@ -8,15 +8,14 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "role": { "type": "string", "enum": ["player", "publisher", "admin"] },
-        "inGameName": { "type": "string", "maxLength": 50 },
+        "inGameName": { "type": "string", "maxLength": 100 },
         "inGameUID": { "type": "string", "maxLength": 50 },
         "leagueName": { "type": "string", "maxLength": 50 },
-        "ovr": { "type": "number" },
         "fbUrl": { "type": "string", "maxLength": 200 },
         "messengerLink": { "type": "string", "maxLength": 200 },
-        "whatsappNumber": { "type": "string", "maxLength": 20 },
-        "phone": { "type": "string", "maxLength": 20 },
-        "avatar": { "type": "string", "maxLength": 500 },
+        "leagueMessengerGroupLink": { "type": "string", "maxLength": 200 },
+        "whatsappNumber": { "type": "string", "maxLength": 40 },
+        "phone": { "type": "string", "maxLength": 40 },
         "pushEnabled": { "type": "boolean" },
         "fcmTokens": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "object", "description": "Firestore Timestamp" },
@@ -29,20 +28,21 @@
       "description": "Tournament details and configuration",
       "type": "object",
       "properties": {
-        "title": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 200 },
         "description": { "type": "string", "maxLength": 2000 },
         "organizerName": { "type": "string", "maxLength": 100 },
         "organizationName": { "type": "string", "maxLength": 100 },
         "publisherName": { "type": "string", "maxLength": 100 },
         "publisherId": { "type": "string" },
-        "format": { "type": "string", "enum": ["group_knockout", "knockout", "league", "hybrid"] },
-        "entryType": { "type": "string", "enum": ["free", "paid"] },
+        "publisherId": { "type": "string" },
+        "format": { "type": "string", "enum": ["group_knockout", "knockout"] },
+        "entryType": { "type": "string", "enum": ["public", "invited"] },
         "entryFee": { "type": "number" },
-        "ovrLimit": { "type": "number" },
         "totalSlots": { "type": "number" },
         "filledSlots": { "type": "number" },
         "prizePool": { "type": "string", "maxLength": 100 },
         "rewardType": { "type": "string", "enum": ["winner_only", "top3"] },
+        "activationKey": { "type": "string", "maxLength": 50 },
         "prizes": { "type": "object", "nullable": true },
         "status": { "type": "string", "enum": ["open", "registration_closed", "ongoing", "finished", "completed"] },
         "createdAt": { "type": "object" }
@@ -59,7 +59,6 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "gameName": { "type": "string", "maxLength": 50 },
         "gameUid": { "type": "string", "maxLength": 50 },
-        "ovr": { "type": "number" },
         "createdAt": { "type": "object" }
       },
       "required": ["tournamentId", "userId", "status", "createdAt"]
@@ -117,6 +116,21 @@
     "/announcements/{announcementId}": {
       "schema": { "$ref": "#/entities/Announcement" },
       "description": "System wide broadcasts"
+    },
+    "/licenseKeys/{keyId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "used"] },
+          "createdBy": { "type": "string" },
+          "usedBy": { "type": "string", "nullable": true },
+          "createdAt": { "type": "object" },
+          "usedAt": { "type": "object", "nullable": true }
+        },
+        "required": ["key", "status", "createdBy", "createdAt"]
+      },
+      "description": "Deployment license keys for hosts"
     },
     "/test/{testId}": {
       "schema": { "type": "object", "properties": { "status": { "type": "string" } } },

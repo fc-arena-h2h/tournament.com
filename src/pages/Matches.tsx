@@ -294,15 +294,10 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex flex-col items-center gap-4 flex-1">
                   <div className="w-20 h-20 rounded-[2.5rem] bg-slate-50 border-4 border-white flex items-center justify-center overflow-hidden shadow-md">
-                    {profiles[match.homePlayerId]?.avatar ? (
-                      <img src={profiles[match.homePlayerId].avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon size={32} className="text-slate-200" />
-                    )}
+                    <UserIcon size={32} className="text-slate-200" />
                   </div>
                   <div className="text-center">
                     <h5 className="text-xs font-black uppercase italic truncate max-w-[80px]">{match.homePlayerName}</h5>
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{profiles[match.homePlayerId]?.ovr || 0} OVR</span>
                   </div>
                 </div>
 
@@ -322,15 +317,10 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
                 <div className="flex flex-col items-center gap-4 flex-1">
                   <div className="w-20 h-20 rounded-[2.5rem] bg-slate-50 border-4 border-white flex items-center justify-center overflow-hidden shadow-md">
-                    {profiles[match.awayPlayerId]?.avatar ? (
-                      <img src={profiles[match.awayPlayerId].avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon size={32} className="text-slate-200" />
-                    )}
+                    <UserIcon size={32} className="text-slate-200" />
                   </div>
                   <div className="text-center">
                     <h5 className="text-xs font-black uppercase italic truncate max-w-[80px]">{match.awayPlayerName}</h5>
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{profiles[match.awayPlayerId]?.ovr || 0} OVR</span>
                   </div>
                 </div>
               </div>

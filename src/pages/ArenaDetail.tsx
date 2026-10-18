@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle, Phone } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp } from 'firebase/firestore';
@@ -32,9 +32,9 @@ interface Tournament {
   organizerName?: string;
   organizationName?: string;
   publisherName?: string;
-  entryType?: 'free' | 'paid';
-  entryFee?: number;
-  ovrLimit?: number;
+  entryType?: 'public' | 'invited';
+  activationKey?: string;
+  messengerGroupLink?: string;
 }
 
 interface Match {
@@ -92,10 +92,21 @@ interface ArenaDetailProps {
 }
 
 export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) => {
-  const isKnockoutOnly = ((tournament as any)?.format === 'knockout');
+  const [currentTournament, setCurrentTournament] = useState<any>(tournament);
+  const isKnockoutOnly = ((currentTournament as any)?.format === 'knockout' || (tournament as any)?.format === 'knockout');
   const [activeTab, setActiveTab] = useState<ArenaTab>(isKnockoutOnly ? 'knockout' : 'group');
   const [activeGroup, setActiveGroup] = useState('A');
-  const [activeKnockoutStage, setActiveKnockoutStage] = useState('R16');
+  
+  const totalSlots = currentTournament?.totalSlots || tournament?.totalSlots || 16;
+  const advancingCount = isKnockoutOnly ? totalSlots : totalSlots / 2;
+  
+  const allPossibleStages = ['R32', 'R16', 'QTR', 'SEMI', 'FINAL'];
+  const knockoutStages = advancingCount >= 32 ? ['R32', 'R16', 'QTR', 'SEMI', 'FINAL'] :
+                         advancingCount >= 16 ? ['R16', 'QTR', 'SEMI', 'FINAL'] :
+                         advancingCount >= 8 ? ['QTR', 'SEMI', 'FINAL'] :
+                         ['SEMI', 'FINAL'];
+
+  const [activeKnockoutStage, setActiveKnockoutStage] = useState(knockoutStages[0]);
   const [registration, setRegistration] = useState<any>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -110,7 +121,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [currentTournament, setCurrentTournament] = useState<any>(tournament);
   const [editingRules, setEditingRules] = useState(false);
   const [editableRules, setEditableRules] = useState<string[]>([]);
   const [savingRules, setSavingRules] = useState(false);
@@ -772,15 +782,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!profile) return alert('Please set up your profile first');
     
     // Profile Validation
-    const isProfileComplete = profile.inGameName && profile.inGameUID && profile.ovr && profile.fbUrl;
+    const isProfileComplete = profile.inGameName && profile.inGameUID && profile.fbUrl;
     if (!isProfileComplete) {
-      alert('Incomplete Profile! Please add your In-Game Name, UID, OVR, and Facebook Link in your profile settings.');
+      alert('Incomplete Profile! Please add your In-Game Name, UID, and Facebook Link in your profile settings.');
       return;
     }
 
-    const userOvr = profile?.ovr || 0;
-    if (tournament.ovrLimit && userOvr > tournament.ovrLimit) {
-      return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
+    if (tournament.entryType === 'invited') {
+      const key = prompt('This is an INVITED tournament. Please enter the Activation Key:');
+      if (!key) return;
+      if (key !== tournament.activationKey) {
+        return alert('Invalid Activation Key!');
+      }
     }
 
 
@@ -793,7 +806,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         status: 'pending',
         gameName: profile.inGameName,
         gameUid: profile.inGameUID,
-        ovr: profile.ovr || 0,
         createdAt: serverTimestamp()
       });
 
@@ -993,12 +1005,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   // Group calculation & standings logic
   const assignedGroupLetters = participants.map(p => p.groupId).filter(Boolean) as string[];
-  const maxAssignedGroupChar = assignedGroupLetters.reduce((max, g) => (g > max ? g : max), 'D');
+  const maxAssignedGroupChar = assignedGroupLetters.reduce((max, g) => (g > max ? g : max), 'A');
   const maxAssignedGroupCount = maxAssignedGroupChar.charCodeAt(0) - 64;
-  const slotsGroupCount = Math.ceil(((currentTournament?.totalSlots || tournament?.totalSlots || 16)) / 4);
-  const numGroups = Math.max(4, Math.min(26, Math.max(slotsGroupCount, maxAssignedGroupCount)));
+  const slotsGroupCount = Math.ceil(totalSlots / 4);
+  const numGroups = isKnockoutOnly ? 0 : Math.max(slotsGroupCount, maxAssignedGroupCount);
   const groups = Array.from({ length: numGroups }, (_, i) => String.fromCharCode(65 + i));
-  const knockoutStages = ['R16', 'QTR', 'SEMI', 'FINAL'];
 
   const calculateGroupTable = (groupId: string, customMatches?: Match[], customParticipants?: any[]) => {
     const pList = customParticipants || participants;
@@ -1911,7 +1922,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       </div>
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-slate-800 uppercase italic">{reg.gameName}</span>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">OVR {reg.ovr}</span>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1961,12 +1971,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           
           <div className="px-8 pb-10 -mt-12 relative z-10">
             <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white">
-                <img 
-                  src={selectedPlayerProfile.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
-                  className="w-full h-full object-cover rounded-[1.8rem]" 
-                  alt="" 
-                />
+              <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white flex items-center justify-center">
+                <UserIcon size={40} className="text-slate-300" />
               </div>
               
               <div className="space-y-1">
@@ -1983,12 +1989,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID}</span>
                   </div>
                 </div>
-                <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">OVR Rating</span>
-                    <span className="text-xs font-black text-fc-green">{selectedPlayerProfile.ovr || 0}</span>
-                  </div>
-                </div>
+
                 
                 {selectedPlayerProfile.fbUrl && (
                   <a href={selectedPlayerProfile.fbUrl} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
@@ -1997,9 +1998,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   </a>
                 )}
                 
+                {selectedPlayerProfile.messengerLink && (
+                  <a href={selectedPlayerProfile.messengerLink} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                    <MessageSquare size={18} className="text-indigo-500" />
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Messenger Chat</span>
+                  </a>
+                )}
+                
                 {selectedPlayerProfile.whatsappNumber && (
-                  <a href={`https://wa.me/${selectedPlayerProfile.whatsappNumber}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <MessageCircle size={18} className="text-green-500" />
+                  <a href={`https://wa.me/${selectedPlayerProfile.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                    <Phone size={18} className="text-emerald-500" />
                     <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">WhatsApp Chat</span>
                   </a>
                 )}
@@ -2080,22 +2088,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             )}>
               <div className="flex flex-col items-center gap-1 min-h-[26px] sm:min-h-[32px]">
                 <span className={cn("text-[8.5px] sm:text-[10px] font-black uppercase tracking-[0.2em]", homeWin ? "text-amber-500 font-black" : "text-slate-400")}>HOME</span>
-                {isCompleted && homeWin && (
-                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 font-black shadow-xs ring-1 ring-amber-300 animate-in zoom-in-50 duration-500">
-                    <Trophy size={9} fill="currentColor" />
-                    <span className="text-[6.5px] sm:text-[7.5px] uppercase tracking-wider">Winner</span>
-                  </div>
-                )}
               </div>
               <div className={cn(
                 "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
                 isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
               )}>
-                 {homeProfile?.avatar ? (
-                   <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover opacity-90 transition-opacity" />
-                 ) : (
-                   <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
-                 )}
+                 <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
               </div>
               <div className="text-center">
@@ -2105,7 +2103,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}>
                   {homeProfile?.inGameName || 'Loading...'}
                 </h5>
-                <span className="text-[7.5px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">{homeProfile?.ovr || 0} OVR</span>
               </div>
             </div>
 
@@ -2171,11 +2168,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
                 isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
               )}>
-                 {awayProfile?.avatar ? (
-                   <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover opacity-90 transition-opacity" />
-                 ) : (
-                   <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
-                 )}
+                 <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
               </div>
               <div className="text-center">
@@ -2185,7 +2178,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}>
                   {awayProfile?.inGameName || 'Loading...'}
                 </h5>
-                <span className="text-[7.5px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest">{awayProfile?.ovr || 0} OVR</span>
               </div>
             </div>
           </div>
@@ -2303,11 +2295,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
                             isHomeWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
                           )}>
-                            {homeProfile?.avatar ? (
-                              <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
-                            )}
+                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
                           </div>
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-0.5 xs:gap-1 min-w-0">
@@ -2323,11 +2311,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                 </span>
                               )}
                             </div>
-                            {homeProfile?.ovr ? (
-                              <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-bold text-slate-400 leading-none">
-                                {homeProfile.ovr} OVR
-                              </span>
-                            ) : null}
                           </div>
                         </>
                       ) : (
@@ -2387,21 +2370,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                 {homePlayerName}
                               </span>
                             </div>
-                            {homeProfile?.ovr ? (
-                              <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-bold text-slate-400 leading-none">
-                                {homeProfile.ovr} OVR
-                              </span>
-                            ) : null}
                           </div>
                           <div className={cn(
                             "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
                             isHomeWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
                           )}>
-                            {homeProfile?.avatar ? (
-                              <img src={homeProfile.avatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
-                            )}
+                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
                           </div>
                         </>
                       ) : (
@@ -2451,11 +2425,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
                             isAwayWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
                           )}>
-                            {awayProfile?.avatar ? (
-                              <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
-                            )}
+                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
                           </div>
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-0.5 xs:gap-1 min-w-0">
@@ -2471,11 +2441,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                 </span>
                               )}
                             </div>
-                            {awayProfile?.ovr ? (
-                              <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-bold text-slate-400 leading-none">
-                                {awayProfile.ovr} OVR
-                              </span>
-                            ) : null}
                           </div>
                         </>
                       ) : (
@@ -2535,21 +2500,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                 {awayPlayerName}
                               </span>
                             </div>
-                            {awayProfile?.ovr ? (
-                              <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-bold text-slate-400 leading-none">
-                                {awayProfile.ovr} OVR
-                              </span>
-                            ) : null}
                           </div>
                           <div className={cn(
                             "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
                             isAwayWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
                           )}>
-                            {awayProfile?.avatar ? (
-                              <img src={awayProfile.avatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
-                            )}
+                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
                           </div>
                         </>
                       ) : (
@@ -2671,11 +2627,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               >
                 <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
-                  {currentHome?.profile?.avatar ? (
-                    <img src={currentHome.profile.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    currentHome?.name?.charAt(0) || 'H'
-                  )}
+                  {currentHome?.name?.charAt(0) || 'H'}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[7px] font-black uppercase text-emerald-600 tracking-wider block">Home Player</span>
@@ -2697,11 +2649,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               >
                 <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
-                  {currentAway?.profile?.avatar ? (
-                    <img src={currentAway.profile.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    currentAway?.name?.charAt(0) || 'A'
-                  )}
+                  {currentAway?.name?.charAt(0) || 'A'}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[7px] font-black uppercase text-amber-600 tracking-wider block">Away Player</span>
@@ -2785,22 +2733,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0 flex items-center justify-center">
-                        {prof?.avatar ? (
-                          <img src={prof.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xs font-black text-slate-400">{displayName.charAt(0)}</span>
-                        )}
+                        <span className="text-xs font-black text-slate-400">{displayName.charAt(0)}</span>
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black uppercase italic text-slate-800 truncate">
                             {displayName}
                           </span>
-                          {prof?.ovr ? (
-                            <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
-                              {prof.ovr} OVR
-                            </span>
-                          ) : null}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[8px] font-bold text-slate-400 uppercase">
@@ -3028,11 +2967,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     >
                       <div className="relative shrink-0">
                         <div className="w-14 h-14 rounded-[1.2rem] nm-inset flex items-center justify-center border-2 border-white/40 overflow-hidden bg-slate-900 shadow-[0_0_15px_rgba(79,70,229,0.1)] group-hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all duration-300">
-                           {p?.avatar ? (
-                             <img src={p.avatar} alt="" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-                           ) : (
-                             <UserIcon size={24} className="text-slate-700" />
-                           )}
+                           <UserIcon size={24} className="text-slate-700" />
                            <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none" />
                         </div>
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-fc-green rounded-full border-2 border-white flex items-center justify-center shadow-sm">
@@ -3042,7 +2977,6 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-black text-slate-800 uppercase italic group-hover:text-indigo-600 transition-colors truncate tracking-tight">{p?.inGameName || reg.gameName}</span>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">OVR {p?.ovr || reg.ovr}</span>
                           <div className={cn(
                             "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
                             reg.status === 'approved' ? "bg-emerald-50 text-emerald-600" : 
@@ -3178,13 +3112,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             </span>
                             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200/50 shadow-xs flex items-center justify-center">
-                                  {p?.avatar ? (
-                                    <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">
-                                      {(p?.inGameName || row.name || 'P').charAt(0)}
-                                    </span>
-                                  )}
+                                 <span className="text-[9px] font-black text-slate-400 uppercase">
+                                   {(p?.inGameName || row.name || 'P').charAt(0)}
+                                 </span>
                                </div>
                                <span className="text-[11px] sm:text-xs font-black text-slate-800 uppercase italic truncate tracking-tight">
                                  {p?.inGameName || row.name || `Player ${i + 1}`}
@@ -3246,10 +3176,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                        className={cn(
                         "px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-300",
                         activeKnockoutStage === stage 
-                          ? "nm-flat bg-slate-900 text-white shadow-md scale-105 font-black" 
-                          : "text-black font-black hover:text-black bg-white"
+                          ? "nm-flat bg-slate-900 text-red-500 shadow-md scale-105 font-black" 
+                          : "text-slate-900 font-black hover:bg-white/90 bg-white"
                       )}>
-                       {stage}
+                       {stage === 'QTR' ? 'Quarter' : stage === 'SEMI' ? 'Semi' : stage === 'FINAL' ? 'Final' : stage}
                      </button>
                      {idx < knockoutStages.length - 1 && <div className="w-1 h-1 rounded-full bg-slate-200 mx-0.5" />}
                    </React.Fragment>
@@ -3261,6 +3191,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               <div className="relative min-w-[320px] xs:min-w-[360px] sm:min-w-[500px] flex justify-between items-center min-h-[250px] sm:min-h-[300px] pt-2 sm:pt-6 px-0.5 sm:px-1">
                 {/* Left Bracket */}
                 {renderBracketSide('left', 
+                  activeKnockoutStage === 'R32' ? 8 :
                   activeKnockoutStage === 'R16' ? 4 : 
                   activeKnockoutStage === 'QTR' ? 2 : 1
                 )}
@@ -3290,11 +3221,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                {tournament.winnerText || 'ELITE PLAYER'}
                              </span>
                              <div className="mt-1 sm:mt-1.5 w-8 h-8 xs:w-10 xs:h-10 sm:w-13 sm:h-13 rounded-lg sm:rounded-xl nm-inset mx-auto overflow-hidden border border-white/50 shadow-xs flex items-center justify-center">
-                                {tournament.winnerId && profiles[tournament.winnerId] && profiles[tournament.winnerId].avatar ? (
-                                  <img src={profiles[tournament.winnerId].avatar} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <UserIcon size={16} className="text-slate-300 sm:w-5 sm:h-5" />
-                                )}
+                                <UserIcon size={16} className="text-slate-300 sm:w-5 sm:h-5" />
                              </div>
                           </div>
                         )}
@@ -3310,6 +3237,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
                 {/* Right Bracket */}
                 {renderBracketSide('right', 
+                  activeKnockoutStage === 'R32' ? 8 :
                   activeKnockoutStage === 'R16' ? 4 : 
                   activeKnockoutStage === 'QTR' ? 2 : 1
                 )}
@@ -3565,7 +3493,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    </div>
                  </div>
 
-
+                 {/* Messenger Group Link Button */}
+                 {(isAdminUser || (registration && registration.status === 'approved')) && (currentTournament?.messengerGroupLink || tournament.messengerGroupLink) && (
+                   <button 
+                     onClick={() => window.open(currentTournament?.messengerGroupLink || tournament.messengerGroupLink, '_blank')}
+                     className="w-12 h-12 rounded-2xl bg-[#00B2FF] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-95 transition-all animate-in zoom-in duration-500 hover:scale-105 shrink-0"
+                     title="Join Messenger Group"
+                   >
+                     <MessageCircle size={24} fill="white" />
+                   </button>
+                 )}
               </div>
 
               {/* Bottom Banner Row: Title and Participants/Join */}
@@ -3888,12 +3825,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     return (
                       <div key={p.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-10 h-10 rounded-xl bg-white nm-inset overflow-hidden border border-slate-200 shrink-0">
-                               {prof?.avatar ? <img src={prof.avatar} className="w-full h-full object-cover" /> : <UserIcon size={20} className="text-slate-300 m-auto mt-2" />}
+                            <div className="w-10 h-10 rounded-xl bg-white nm-inset overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center">
+                               <UserIcon size={20} className="text-slate-300" />
                             </div>
                             <div className="min-w-0 flex-1">
                                <span className="text-xs font-black text-slate-900 uppercase italic block truncate">{prof?.inGameName || p.gameName}</span>
-                               <span className="text-[8px] font-bold text-slate-400 uppercase">OVR {prof?.ovr || p.ovr}</span>
                             </div>
                          </div>
                          <select

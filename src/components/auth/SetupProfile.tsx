@@ -8,24 +8,14 @@ import { signOut } from 'firebase/auth';
 
 export const SetupProfile = ({ user }: { user: any }) => {
   const [role, setRole] = useState<'player' | 'publisher'>('player');
-  const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=400&h=400&fit=crop');
   const [formData, setFormData] = useState({
     inGameName: '',
     inGameUID: '',
     fbUrl: '',
     phone: '',
     leagueName: '',
-    ovr: 100,
   });
 
-  const avatars = [
-    'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&h=400&fit=crop',
-  ];
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,8 +36,6 @@ export const SetupProfile = ({ user }: { user: any }) => {
         fbUrl: formData.fbUrl.trim(),
         phone: formData.phone.trim(),
         leagueName: formData.leagueName.trim(),
-        ovr: formData.ovr,
-        avatar: avatar,
         createdAt: new Date().toISOString()
       });
     } catch (err: any) {
@@ -93,32 +81,6 @@ export const SetupProfile = ({ user }: { user: any }) => {
             </button>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Select Pro Avatar</label>
-            <div className="grid grid-cols-6 gap-2 px-1">
-              {avatars.map((url, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setAvatar(url)}
-                  className={cn(
-                    "relative aspect-square rounded-xl overflow-hidden nm-flat p-0.5 transition-all active:scale-95",
-                    avatar === url ? "ring-2 ring-indigo-500 ring-offset-2" : "opacity-60 hover:opacity-100"
-                  )}
-                >
-                  <img src={url} alt={`Avatar ${i+1}`} className="w-full h-full object-cover rounded-[10px]" />
-                  {avatar === url && (
-                    <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">
-                      <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm">
-                        <div className="w-2 h-2 bg-indigo-500 rounded-full" />
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="nm-inset p-3.5 rounded-2xl border border-rose-200 text-rose-600 text-[10px] font-bold text-center">
@@ -159,26 +121,14 @@ export const SetupProfile = ({ user }: { user: any }) => {
                     onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
-                    <Input 
-                      placeholder="ID"
-                      required
-                      value={formData.inGameUID}
-                      onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">OVR</label>
-                    <Input 
-                      type="number"
-                      placeholder="100"
-                      required
-                      value={formData.ovr}
-                      onChange={(e) => setFormData({...formData, ovr: parseInt(e.target.value) || 0})}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
+                  <Input 
+                    placeholder="ID"
+                    required
+                    value={formData.inGameUID}
+                    onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
+                  />
                 </div>
               </>
             ) : (

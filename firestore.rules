@@ -12,7 +12,8 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      // Allow Google users even if verification flag is transiently false during first login
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
     }
 
     function isValidId(id) {
@@ -33,15 +34,24 @@ service cloud.firestore {
 
     // Role check from user document (Source of Truth)
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userPath) ? get(userPath).data.get('role', 'none') : 'none';
     }
 
     function isAdmin() {
-      return isSignedIn() && getUserRole() == 'admin';
+      return isSignedIn() && (
+        request.auth.token.get('email', '') == 'sperkplay@gmail.com' || 
+        getUserRole() == 'admin'
+      );
     }
 
     function isPublisher() {
-      return isSignedIn() && getUserRole() == 'publisher';
+      let role = getUserRole();
+      return isSignedIn() && (
+        role == 'publisher' || 
+        role == 'admin' || 
+        request.auth.token.get('email', '') == 'sperkplay@gmail.com'
+      );
     }
 
     // --- Entity Validations ---
@@ -50,26 +60,49 @@ service cloud.firestore {
       return data.uid == request.auth.uid 
         && data.email == request.auth.token.email
         && data.role in ['player', 'publisher', 'admin']
-        && (data.inGameName is string && data.inGameName.size() <= 50)
-        && (!('ovr' in data) || (data.ovr is number))
-        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 20));
+        && (data.inGameName is string && data.inGameName.size() <= 100)
+        && (!('inGameUID' in data) || (data.inGameUID is string))
+        && (!('fbUrl' in data) || (data.fbUrl is string))
+        && (!('messengerLink' in data) || (data.messengerLink is string))
+        && (!('leagueMessengerGroupLink' in data) || (data.leagueMessengerGroupLink is string))
+        && (!('whatsappNumber' in data) || (data.whatsappNumber is string))
+        && (!('leagueName' in data) || (data.leagueName is string))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40));
     }
 
     function isValidTournament(data) {
-      return data.title is string && data.title.size() <= 100
+      return data.title is string && data.title.size() <= 200
         && data.publisherId == request.auth.uid
         && data.status in ['open', 'registration_closed', 'ongoing', 'finished', 'completed']
-        && data.createdAt == request.time;
+        && data.format in ['group_knockout', 'knockout']
+        && data.entryType in ['public', 'invited']
+        && (!('activationKey' in data) || (data.activationKey is string))
+        && (!('messengerGroupLink' in data) || (data.messengerGroupLink is string))
+        && (!('description' in data) || (data.description is string))
+        && (!('organizerName' in data) || (data.organizerName is string))
+        && (!('organizationName' in data) || (data.organizationName is string))
+        && (!('publisherName' in data) || (data.publisherName is string))
+        && (!('prizePool' in data) || (data.prizePool is string))
+        && (!('rewardType' in data) || (data.rewardType is string))
+        && (!('prizes' in data) || (data.prizes is map || data.prizes == null))
+        && (!('totalSlots' in data) || (data.totalSlots is number))
+        && (!('filledSlots' in data) || (data.filledSlots is number))
+        && (!('createdAt' in data) || (data.createdAt is timestamp));
     }
 
     function isValidRegistration(data) {
       return data.tournamentId is string
         && data.userId == request.auth.uid
-        && data.status == 'pending'
-        && data.createdAt == request.time;
+        && data.status in ['pending', 'approved', 'rejected']
+        && (data.createdAt <= request.time || !('createdAt' in data));
     }
 
-
+    function isValidLicenseKey(data) {
+      return data.key is string && data.key.size() >= 5
+        && data.status in ['active', 'used']
+        && (data.createdBy == request.auth.uid || !('createdBy' in data))
+        && (data.createdAt <= request.time || !('createdAt' in data));
+    }
 
     // --- Collection Matches ---
 
@@ -77,11 +110,11 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && (
-        incoming().role == 'player' || (incoming().role == 'admin' && incoming().email == 'sperkplay@gmail.com')
+        incoming().role in ['player', 'publisher'] || (incoming().role == 'admin' && incoming().email == 'sperkplay@gmail.com')
       );
       allow update: if (isOwner(userId) && isValidUser(incoming()) && (
         // Action: Update Profile
-        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'ovr', 'fbUrl', 'messengerLink', 'whatsappNumber', 'phone', 'avatar', 'pushEnabled', 'fcmTokens', 'updatedAt']))
+        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'whatsappNumber', 'phone', 'pushEnabled', 'fcmTokens', 'updatedAt']))
         && incoming().role == existing().role
       )) || isAdmin();
     }
@@ -89,21 +122,17 @@ service cloud.firestore {
     // Tournaments Collection
     match /tournaments/{tournamentId} {
       allow read: if isSignedIn();
-      allow create: if (isAdmin() || isPublisher()) && isValidTournament(incoming());
-      allow update: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid && (
-        // Action: Manage Tournament
-        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'status', 'filledSlots', 'prizePool', 'rewardType', 'prizes'])
-      ));
+      allow create: if isSignedIn() && isValidTournament(incoming());
+      allow update: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid);
     }
 
     // Registrations Collection
     match /registrations/{registrationId} {
       allow read: if isSignedIn();
-      allow create: if isEmailVerified() && isValidRegistration(incoming());
+      allow create: if isSignedIn() && isValidRegistration(incoming());
       allow update: if isAdmin() || (
         // Action: Approval (by publisher of tournament)
         get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid
-        && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
       );
     }
 
@@ -112,6 +141,7 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(incoming().tournamentId)).data.publisherId == request.auth.uid);
       allow update: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
+      allow delete: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
     }
 
     // Announcements
@@ -125,6 +155,26 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.recipientId == request.auth.uid || resource.data.recipientId == 'all' || (isAdmin() && resource.data.recipientId == 'admin'));
       allow update: if isOwner(resource.data.recipientId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
       allow create: if isAdmin();
+    }
+
+    // License Keys
+    match /licenseKeys/{keyId} {
+      allow list: if isAdmin();
+      allow get: if isSignedIn();
+      allow create: if isAdmin() && isValidLicenseKey(incoming());
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        existing().status == 'active' && 
+        incoming().status == 'used' && 
+        incoming().usedBy == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+      );
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Test Connection

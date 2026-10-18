@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
-import { Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, Search, Hash, CheckCircle, History, Shield, Flame } from 'lucide-react';
+import { Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, Search, Hash, CheckCircle, History, Shield, Flame, User as UserIcon } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { collection, query, orderBy, limit, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
@@ -215,16 +215,8 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           <div className="flex items-start justify-between relative z-10">
             <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
               <div className="relative shrink-0">
-                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green shadow-xl border border-white overflow-hidden">
-                  <img 
-                    src={profile?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
-                    className="w-full h-full object-cover rounded-full bg-slate-100" 
-                    alt="Player Avatar" 
-                  />
-                </div>
-                <div className="absolute -bottom-1 -right-1 px-2 py-0.5 min-w-[32px] sm:min-w-[36px] rounded-xl bg-gradient-to-br from-[#1e293b] to-[#0f172a] border-2 border-white flex items-center justify-center shadow-lg">
-                  <span className="text-[7px] sm:text-[8px] font-black text-amber-400 mr-0.5">OVR</span>
-                  <span className="text-[10px] sm:text-xs font-black text-white italic tracking-tight">{profile?.ovr || 100}</span>
+                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green shadow-xl border border-white flex items-center justify-center bg-white">
+                  <UserIcon size={32} className="text-slate-400" />
                 </div>
               </div>
 
@@ -233,7 +225,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
                   <h2 className="text-lg sm:text-2xl font-black text-[#0f172a] uppercase italic tracking-tight truncate leading-tight">
                     {profile?.inGameName || 'Player Name'}
                   </h2>
-                  {profile?.inGameName && profile?.inGameUID && profile?.ovr && profile?.fbUrl && (
+                  {profile?.inGameName && profile?.inGameUID && profile?.fbUrl && (
                     <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0" title="Verified Player">
                       <CheckCircle size={10} fill="white" />
                     </div>
@@ -261,7 +253,6 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
               </div>
             </div>
           </div>
-
         </Card>
       </Reveal>
 

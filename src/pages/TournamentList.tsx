@@ -13,10 +13,9 @@ interface Tournament {
   id: string;
   title: string;
   description: string;
-  format?: 'group_knockout' | 'knockout' | 'league' | 'hybrid' | string;
-  entryType: 'free' | 'paid';
-  entryFee?: number;
-  ovrLimit: number;
+  format?: 'group_knockout' | 'knockout';
+  entryType: 'public' | 'invited';
+  activationKey?: string;
   status: 'open' | 'registration_closed' | 'ongoing' | 'finished' | 'completed';
   prizePool: string;
   totalSlots: number;
@@ -101,15 +100,18 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     if (!profile) return alert('Please complete your profile first');
     
     // Profile Validation
-    const isProfileComplete = profile.inGameName && profile.inGameUID && profile.ovr && profile.fbUrl;
+    const isProfileComplete = profile.inGameName && profile.inGameUID && profile.fbUrl;
     if (!isProfileComplete) {
-      alert('Incomplete Profile! Please add your In-Game Name, UID, OVR, and Facebook Link in your profile settings.');
+      alert('Incomplete Profile! Please add your In-Game Name, UID, and Facebook Link in your profile settings.');
       return;
     }
 
-    const userOvr = profile?.ovr || 0;
-    if (userOvr > tournament.ovrLimit) {
-      return alert(`Your OVR (${userOvr}) exceeds the limit (${tournament.ovrLimit})`);
+    if (tournament.entryType === 'invited') {
+      const key = prompt('This is an INVITED tournament. Please enter the Activation Key:');
+      if (!key) return;
+      if (key !== tournament.activationKey) {
+        return alert('Invalid Activation Key!');
+      }
     }
 
     try {
@@ -119,7 +121,6 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
         status: 'pending',
         gameName: profile.inGameName,
         gameUid: profile.inGameUID,
-        ovr: profile.ovr || 0,
         createdAt: Timestamp.now()
       });
       alert('Join request sent! Waiting for publisher approval.');
@@ -237,7 +238,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                     </div>
                     <div className="bg-purple-50 rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 border border-purple-100 shadow-sm">
                       <span className="text-[8px] sm:text-[9px] font-black text-purple-600 uppercase tracking-tight">
-                        {t.entryType === 'paid' ? 'Paid Entry' : 'Free Entry'}
+                        {t.entryType === 'invited' ? 'Invited' : 'Public'}
                       </span>
                     </div>
                   </div>
@@ -284,11 +285,10 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                     {/* Guaranteed Pool */}
                     <div className="nm-flat rounded-[1.6rem] sm:rounded-[2.2rem] p-3.5 sm:p-5 border border-white/40 space-y-2 sm:space-y-3">
                       <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] block">
-                        GUARANTEED POOL
+                        PRIZE POOL
                       </span>
                       <div className="flex items-baseline gap-1">
                         <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tighter">{t.prizePool}</span>
-                        <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">USDT</span>
                       </div>
                       <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100/70">
                         <div className="nm-inset w-4 h-4 rounded-full flex items-center justify-center border border-white/20">

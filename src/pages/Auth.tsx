@@ -26,9 +26,10 @@ export const AuthPage = () => {
     inGameName: '',
     inGameUID: '',
     fbUrl: '',
-    phone: '',
+    messengerLink: '',
+    leagueMessengerGroupLink: '',
+    whatsappNumber: '',
     leagueName: '',
-    ovr: 100,
   });
   const [error, setError] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
@@ -100,9 +101,10 @@ export const AuthPage = () => {
           inGameName: formData.inGameName.trim(),
           inGameUID: formData.inGameUID.trim(),
           fbUrl: formData.fbUrl.trim(),
-          phone: formData.phone.trim(),
+          messengerLink: formData.messengerLink.trim(),
+          leagueMessengerGroupLink: formData.leagueMessengerGroupLink.trim(),
+          whatsappNumber: formData.whatsappNumber.trim(),
           leagueName: formData.leagueName.trim(),
-          ovr: formData.ovr,
           createdAt: new Date().toISOString()
         });
         
@@ -349,28 +351,15 @@ export const AuthPage = () => {
                 {/* Sign Up: Additional Fields */}
                 {isSignUp && (
                   <div className="space-y-4 pt-2 border-t border-slate-200/80">
-                    {/* Mobile Number Field (Simple input, no SMS verification required) */}
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
-                        <Phone size={12} className="text-indigo-500" />
-                        Mobile / WhatsApp Number
-                      </label>
-                      <Input 
-                        placeholder="017XXXXXXXX or +880..."
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      />
-                    </div>
-
                     {/* Role Specific Additional Fields */}
                     {role === 'player' ? (
                       <>
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            In-Game Nickname
+                            IN Game Name
                           </label>
                           <Input 
-                            placeholder="In-game Name"
+                            placeholder="e.g. ArenaMaster"
                             required
                             value={formData.inGameName}
                             onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
@@ -378,48 +367,115 @@ export const AuthPage = () => {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Facebook Profile URL
+                            Game UID
                           </label>
                           <Input 
-                            placeholder="https://facebook.com/profile..."
+                            placeholder="e.g. 12345678"
+                            required
+                            value={formData.inGameUID}
+                            onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Your Facebook profile link
+                          </label>
+                          <Input 
+                            placeholder="https://facebook.com/..."
                             required
                             value={formData.fbUrl}
                             onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">In-Game UID</label>
-                            <Input 
-                              placeholder="UID"
-                              required
-                              value={formData.inGameUID}
-                              onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Squad OVR</label>
-                            <Input 
-                              type="number"
-                              placeholder="104"
-                              required
-                              value={formData.ovr}
-                              onChange={(e) => setFormData({...formData, ovr: parseInt(e.target.value) || 0})}
-                            />
-                          </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Your Messenger link
+                          </label>
+                          <Input 
+                            placeholder="https://m.me/..."
+                            required
+                            value={formData.messengerLink}
+                            onChange={(e) => setFormData({...formData, messengerLink: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            WhatsApp number (Optional)
+                          </label>
+                          <Input 
+                            placeholder="e.g. 017XXXXXXXX"
+                            value={formData.whatsappNumber}
+                            onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}
+                          />
                         </div>
                       </>
                     ) : (
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                          League / Organization Title
-                        </label>
-                        <Input 
-                          placeholder="League Title"
-                          required
-                          value={formData.leagueName}
-                          onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
-                        />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Name
+                          </label>
+                          <Input 
+                            placeholder="Your Name"
+                            required
+                            value={formData.inGameName}
+                            onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            League Title
+                          </label>
+                          <Input 
+                            placeholder="e.g. Champions League"
+                            required
+                            value={formData.leagueName}
+                            onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Your Facebook profile link
+                          </label>
+                          <Input 
+                            placeholder="https://facebook.com/..."
+                            required
+                            value={formData.fbUrl}
+                            onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            Your Messenger link
+                          </label>
+                          <Input 
+                            placeholder="https://m.me/..."
+                            required
+                            value={formData.messengerLink}
+                            onChange={(e) => setFormData({...formData, messengerLink: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            WhatsApp number (Optional)
+                          </label>
+                          <Input 
+                            placeholder="e.g. 017XXXXXXXX"
+                            value={formData.whatsappNumber}
+                            onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                            League Messenger group link
+                          </label>
+                          <Input 
+                            placeholder="https://m.me/j/..."
+                            required
+                            value={formData.leagueMessengerGroupLink}
+                            onChange={(e) => setFormData({...formData, leagueMessengerGroupLink: e.target.value})}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

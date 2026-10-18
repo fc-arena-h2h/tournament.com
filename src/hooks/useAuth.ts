@@ -10,12 +10,11 @@ export interface UserProfile {
   inGameName?: string;
   inGameUID?: string;
   leagueName?: string;
-  ovr?: number;
   fbUrl?: string;
   messengerLink?: string;
+  leagueMessengerGroupLink?: string;
   whatsappNumber?: string;
   phone?: string;
-  avatar?: string;
   pushEnabled?: boolean;
   fcmTokens?: string[];
   createdAt?: any;

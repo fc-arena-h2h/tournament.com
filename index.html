@@ -3,6 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Suppress WebSocket errors in the preview environment where HMR is not supported
+      if (window.location.hostname.includes('asia-southeast1.run.app')) {
+        const originalWebSocket = window.WebSocket;
+        window.WebSocket = function(url, protocols) {
+          console.log('WebSocket connection suppressed for HMR compatibility.');
+          return {
+            url: url,
+            readyState: 3, // CLOSED
+            close: () => {},
+            send: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            onopen: null,
+            onmessage: null,
+            onerror: null,
+            onclose: null
+          };
+        };
+        window.WebSocket.prototype = originalWebSocket.prototype;
+      }
+    </script>
     <title>FC Arena VS – FC Mobile Tournament Platform</title>
     <meta name="description" content="Join the ultimate FC Mobile tournament arena. Compete in cups, 1v1 challenges, and rise through the leaderboard with FC Arena VS." />
     <meta property="og:title" content="FC Arena VS – FC Mobile Tournament Platform" />

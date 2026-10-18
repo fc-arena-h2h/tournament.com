@@ -23,11 +23,12 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   const [editData, setEditData] = useState({
     inGameName: '',
     inGameUID: '',
-    ovr: 100,
     fbUrl: '',
     messengerLink: '',
+    leagueMessengerGroupLink: '',
     phone: '',
     whatsappNumber: '',
+    leagueName: '',
   });
 
   useEffect(() => {
@@ -45,11 +46,12 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
       setEditData({
         inGameName: profile.inGameName || '',
         inGameUID: profile.inGameUID || '',
-        ovr: profile.ovr || 100,
         fbUrl: profile.fbUrl || '',
         messengerLink: profile.messengerLink || '',
+        leagueMessengerGroupLink: profile.leagueMessengerGroupLink || '',
         phone: profile.phone || '',
         whatsappNumber: profile.whatsappNumber || '',
+        leagueName: profile.leagueName || '',
       });
       setIsEditing(true);
     }
@@ -66,21 +68,13 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
     }
   };
 
-
-
-
-
   return (
     <div className="space-y-12 animate-slide-up pb-20">
       {/* Profile Header */}
       <div className="flex flex-col items-center text-center space-y-6 px-4">
         <div className="relative group">
           <div className="w-32 h-32 rounded-[2.5rem] nm-flat p-1 border-4 border-white/50 overflow-hidden bg-slate-900 flex items-center justify-center relative shadow-[0_0_20px_rgba(79,70,229,0.3)] group-hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transition-all duration-500">
-            {profile?.avatar ? (
-              <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover rounded-[2.3rem] opacity-90 group-hover:opacity-100 transition-opacity" />
-            ) : (
-              <User size={48} className="text-slate-700" />
-            )}
+            <User size={48} className="text-indigo-500" />
             
             {/* Pro Badge */}
             <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg border border-white/20 transform rotate-12 group-hover:rotate-0 transition-transform">
@@ -98,7 +92,9 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
              <h2 className="text-3xl font-black text-slate-800 uppercase italic leading-none">{profile?.inGameName || 'Recruit'}</h2>
-             <span className="nm-inset px-3 py-1 rounded-lg text-[10px] font-black text-indigo-500 uppercase">OVR {profile?.ovr || 0}</span>
+             {profile?.role !== 'player' && (
+               <span className="nm-inset px-3 py-1 rounded-lg text-[10px] font-black text-amber-500 uppercase">{profile?.leagueName || 'Official League'}</span>
+             )}
           </div>
           <div className="flex items-center justify-center gap-2">
             <div className={cn(
@@ -135,8 +131,6 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
       </div>
 
-
-
       {/* Contact & Links */}
       <div className="px-4 space-y-6">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-4">Verified Channels</h3>
@@ -162,12 +156,27 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                  <Phone size={24} />
                </div>
                <div className="flex flex-col">
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp / Phone</span>
-                 <span className="text-xs font-bold text-slate-800">{profile?.phone || 'Not Set'}</span>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</span>
+                 <span className="text-xs font-bold text-slate-800">{profile?.whatsappNumber || 'Not Set'}</span>
                </div>
              </div>
-             {profile?.phone && (
-               <button onClick={() => window.open(`tel:${profile.phone}`)} className="text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:underline">Call</button>
+             {profile?.whatsappNumber && (
+               <button onClick={() => window.open(`https://wa.me/${profile.whatsappNumber?.replace(/\D/g, '')}`)} className="text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:underline">Message</button>
+             )}
+           </div>
+
+           <div className="flex items-center justify-between group">
+             <div className="flex items-center gap-5">
+               <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-blue-500 border border-white/20">
+                 <Shield size={24} />
+               </div>
+               <div className="flex flex-col">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Messenger</span>
+                 <span className="text-xs font-bold text-slate-800">{profile?.messengerLink ? 'Linked' : 'Not Set'}</span>
+               </div>
+             </div>
+             {profile?.messengerLink && (
+               <button onClick={() => window.open(profile.messengerLink)} className="text-[9px] font-black text-blue-500 uppercase tracking-widest hover:underline">Chat</button>
              )}
            </div>
 
@@ -177,11 +186,26 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                  <Shield size={24} />
                </div>
                <div className="flex flex-col">
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">In-Game UID</span>
-                 <span className="text-xs font-bold text-slate-800 font-mono tracking-wider">{profile?.inGameUID || 'Pending'}</span>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{profile?.role === 'player' ? 'In-Game UID' : 'League Title'}</span>
+                 <span className="text-xs font-bold text-slate-800 font-mono tracking-wider">{profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Official Organizer')}</span>
                </div>
              </div>
            </div>
+
+           {profile?.role === 'publisher' && profile?.leagueMessengerGroupLink && (
+             <div className="flex items-center justify-between group">
+               <div className="flex items-center gap-5">
+                 <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-blue-600 border border-white/20">
+                   <Languages size={24} />
+                 </div>
+                 <div className="flex flex-col">
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">League Group</span>
+                   <span className="text-xs font-bold text-slate-800">Messenger Community</span>
+                 </div>
+               </div>
+               <button onClick={() => window.open(profile.leagueMessengerGroupLink)} className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">Join Group</button>
+             </div>
+           )}
         </Card>
       </div>
 
@@ -251,29 +275,25 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
            <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar pb-32">
              <div className="space-y-4">
-               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">In-Game Name</label>
+               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">{profile?.role === 'player' ? 'In-Game Name' : 'Name'}</label>
                <Input 
                  value={editData.inGameName}
                  onChange={(e) => setEditData({...editData, inGameName: e.target.value})}
                />
              </div>
-             <div className="grid grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 gap-6">
                <div className="space-y-4">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">In-Game UID</label>
+                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">{profile?.role === 'player' ? 'Game UID' : 'League Title'}</label>
                  <Input 
-                   value={editData.inGameUID}
-                   onChange={(e) => setEditData({...editData, inGameUID: e.target.value})}
-                 />
-               </div>
-               <div className="space-y-4">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">OVR</label>
-                 <Input 
-                   type="number"
-                   value={editData.ovr}
-                   onChange={(e) => setEditData({...editData, ovr: parseInt(e.target.value) || 0})}
+                   value={profile?.role === 'player' ? editData.inGameUID : editData.leagueName}
+                   onChange={(e) => {
+                     if (profile?.role === 'player') setEditData({...editData, inGameUID: e.target.value});
+                     else setEditData({...editData, leagueName: e.target.value});
+                   }}
                  />
                </div>
              </div>
+
              <div className="space-y-4">
                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook Profile URL</label>
                <Input 
@@ -288,22 +308,22 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                  onChange={(e) => setEditData({...editData, messengerLink: e.target.value})}
                />
              </div>
-             <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Phone Number</label>
-                  <Input 
-                    value={editData.phone}
-                    onChange={(e) => setEditData({...editData, phone: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-4">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">WhatsApp</label>
-                  <Input 
-                    value={editData.whatsappNumber}
-                    onChange={(e) => setEditData({...editData, whatsappNumber: e.target.value})}
-                  />
-                </div>
-             </div>
+             {profile?.role === 'publisher' && (
+               <div className="space-y-4">
+                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">League Messenger Group Link</label>
+                 <Input 
+                   value={editData.leagueMessengerGroupLink}
+                   onChange={(e) => setEditData({...editData, leagueMessengerGroupLink: e.target.value})}
+                 />
+               </div>
+             )}
+                 <div className="space-y-4">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">WhatsApp (Optional)</label>
+                   <Input 
+                     value={editData.whatsappNumber}
+                     onChange={(e) => setEditData({...editData, whatsappNumber: e.target.value})}
+                   />
+                 </div>
            </div>
 
            <div className="p-8 border-t border-slate-100 bg-white">

@@ -109,13 +109,9 @@ export const Header = ({
           ) : (
             <div className="relative group">
               <div className="w-14 h-14 rounded-[1.2rem] bg-fc-dark border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
-                {profile?.avatar ? (
-                  <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-                ) : (
-                  <div className="relative z-10 flex items-center justify-center">
-                    <Trophy size={24} className="text-fc-gold drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" fill="currentColor" />
-                  </div>
-                )}
+                <div className="relative z-10 flex items-center justify-center">
+                  <Trophy size={24} className="text-fc-gold drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" fill="currentColor" />
+                </div>
                 
                 {/* Pro Badge */}
                 <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-600 text-white text-[6px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg border border-white/20 transform rotate-12 group-hover:rotate-0 transition-transform">
