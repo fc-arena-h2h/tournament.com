@@ -4,6 +4,7 @@ import { collection, addDoc, updateDoc, doc, getDoc, serverTimestamp, query, whe
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { Trophy, ArrowLeft, Shield, Lock } from 'lucide-react';
 import { UserProfile } from '@/src/hooks/useAuth';
+import { cn } from '@/src/lib/utils';
 
 export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfile | null; onBack: () => void }) => {
   const [formData, setFormData] = useState({
@@ -21,7 +22,9 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
     firstPrize: 0,
     secondPrize: 0,
     thirdPrize: 0,
-    totalSlots: 16
+    totalSlots: 16,
+    resultUploadType: 'players' as 'players' | 'publisher',
+    autoMatchDeploy: false
   });
 
   const generateInvitationKey = () => {
@@ -128,8 +131,8 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
         status: 'open',
         filledSlots: 0,
         totalSlots: Number(formData.totalSlots) || 16,
-        resultUploadType: 'players',
-        autoMatchDeploy: false,
+        resultUploadType: formData.resultUploadType,
+        autoMatchDeploy: formData.autoMatchDeploy,
         createdAt: serverTimestamp()
       });
 
@@ -312,13 +315,54 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
         <div className="space-y-3">
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Prize Distribution Type</label>
           <select 
-            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest"
+            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
             value={formData.rewardType}
             onChange={(e) => setFormData({...formData, rewardType: e.target.value as any})}
           >
             <option value="winner_only">Single Winner</option>
             <option value="top3">Top 3 Winner (1st, 2nd, 3rd)</option>
           </select>
+        </div>
+
+        {/* New Sections for Request 2 */}
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center gap-3 px-4">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Advanced Deployment</span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Match Result Upload Type</label>
+            <select 
+              className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
+              value={formData.resultUploadType}
+              onChange={(e) => setFormData({...formData, resultUploadType: e.target.value as any})}
+            >
+              <option value="players">Players Upload Match Result</option>
+              <option value="publisher">Only Tournament Publisher Upload</option>
+            </select>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+              {formData.resultUploadType === 'players' ? 'Players can submit and confirm scores' : 'Only you can enter match scores'}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between px-6 py-4 nm-inset rounded-[2rem] border border-white/20">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black text-slate-800 uppercase italic">Automatic Match Deploy</span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Auto generate fixtures</span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setFormData({...formData, autoMatchDeploy: !formData.autoMatchDeploy})}
+              className={cn(
+                "h-10 px-6 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm border",
+                formData.autoMatchDeploy ? "bg-fc-green text-white border-fc-green" : "bg-slate-100 text-slate-400 border-slate-200"
+              )}
+            >
+              {formData.autoMatchDeploy ? 'ENABLED' : 'DISABLED'}
+            </button>
+          </div>
         </div>
 
         {formData.rewardType === 'top3' && (

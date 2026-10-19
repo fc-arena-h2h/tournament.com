@@ -8,47 +8,50 @@ interface RevealProps {
   className?: string;
 }
 
-export const Reveal: React.FC<RevealProps> = ({ children, direction = 'left', delay = 0, className }) => {
+export const Reveal: React.FC<RevealProps> = ({ children, direction = 'up', delay = 0, className }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const getAnimationClass = () => {
-    if (!isVisible) return '';
-    switch (direction) {
-      case 'left': return 'animate-slide-left';
-      case 'right': return 'animate-slide-right';
-      case 'up': return 'animate-slide-up';
-      case 'down': return 'animate-slide-down';
-      default: return 'animate-slide-left';
-    }
-  };
+  const domRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
+    // Safety timeout: if observer fails or doesn't trigger, show content anyway after 1s
+    const fallback = setTimeout(() => setIsVisible(true), 1000);
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
         if (entry.isIntersecting) {
           setIsVisible(true);
           observer.unobserve(entry.target);
+          clearTimeout(fallback);
         }
-      },
-      { threshold: 0.1 }
-    );
+      });
+    }, { threshold: 0.1 });
 
-    if (ref.current) {
-      observer.observe(ref.current);
+    if (domRef.current) {
+      observer.observe(domRef.current);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      if (domRef.current) {
+        observer.unobserve(domRef.current);
+      }
+      clearTimeout(fallback);
+    };
   }, []);
 
+  const getAnimationClass = () => {
+    if (!isVisible) return 'opacity-0';
+    switch (direction) {
+      case 'left': return 'animate-slide-left';
+      case 'right': return 'animate-slide-right';
+      case 'down': return 'animate-slide-down';
+      default: return 'animate-slide-up';
+    }
+  };
+
   return (
-    <div
-      ref={ref}
-      className={cn(
-        'opacity-0',
-        getAnimationClass(),
-        className
-      )}
+    <div 
+      ref={domRef}
+      className={cn('w-full', getAnimationClass(), className)}
       style={{ animationDelay: `${delay}ms` }}
     >
       {children}

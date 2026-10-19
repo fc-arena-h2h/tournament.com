@@ -6,7 +6,6 @@ import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { motion, AnimatePresence } from 'framer-motion';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 
 
@@ -280,6 +279,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           awayPlayerName: awayName,
           participants: [homeId, awayId].filter(Boolean),
           status: 'draft',
+          publisherId: tournament.publisherId,
           scheduledTime: serverTimestamp(),
           createdAt: serverTimestamp()
         });
@@ -510,6 +510,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 status: 'scheduled',
                 stage: 'group',
                 groupId: gName,
+                publisherId: tournament.publisherId,
                 scheduledTime: serverTimestamp(),
                 createdAt: serverTimestamp()
               });
@@ -578,6 +579,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         status: 'scheduled',
         stage: manualMatchForm.stage,
         groupId: manualMatchForm.groupId,
+        publisherId: tournament.publisherId,
         scheduledTime: scheduledTimestamp,
         createdAt: serverTimestamp()
       });
@@ -821,8 +823,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!showJoinKeyModal) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[9000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
-        <div className="w-full max-w-md bg-[#1a1f2e] rounded-[2.5rem] border-2 border-slate-800 overflow-hidden shadow-2xl relative">
+      <div className="fixed inset-0 z-[9000] bg-slate-900/60 flex items-center justify-center p-6">
+        <div className="w-full max-w-md nm-flat rounded-[2.5rem] border-2 border-white overflow-hidden shadow-2xl relative">
           {/* Header */}
           <div className="p-8 flex items-center justify-between border-b border-white/5">
              <div className="flex items-center gap-4">
@@ -830,7 +832,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    <Lock size={20} className="text-indigo-500" />
                 </div>
                 <div>
-                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">INVITED ONLY</h3>
+                   <h3 className="text-xl font-black text-fc-dark uppercase italic tracking-tighter">INVITED ONLY</h3>
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                      Enter invitation key to join
                    </p>
@@ -948,8 +950,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
 
     return createPortal(
-      <div className="fixed inset-0 z-[8000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
-        <div className="w-full max-w-md bg-[#1a1f2e] rounded-[2.5rem] border-2 border-slate-800 overflow-hidden shadow-2xl relative">
+      <div className="fixed inset-0 z-[8000] bg-slate-900/60 flex items-center justify-center p-6">
+        <div className="w-full max-w-md nm-flat rounded-[2.5rem] border-2 border-white overflow-hidden shadow-2xl relative">
           {/* Header */}
           <div className="p-8 flex items-center justify-between border-b border-white/5">
              <div className="flex items-center gap-4">
@@ -975,9 +977,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              {/* Knockout Stage Rule Banner */}
              {isKnockout && (
                <div className={cn(
-                 "p-3 rounded-2xl border text-center transition-all animate-in fade-in duration-300",
+                 "p-3 rounded-2xl border text-center transition-all ",
                  isDraw 
-                   ? "bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]" 
+                   ? "bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-md" 
                    : "bg-amber-500/10 border-amber-500/30 text-amber-300"
                )}>
                  <div className="flex items-center justify-center gap-2 mb-0.5">
@@ -1230,6 +1232,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         status: 'scheduled',
         stage: stage,
         groupId: 'knockout',
+        publisherId: tournament.publisherId,
         scheduledTime: serverTimestamp(),
         createdAt: serverTimestamp()
       });
@@ -1684,6 +1687,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               status: 'scheduled',
               groupId: gName,
               stage: 'group',
+              publisherId: tournament.publisherId,
               scheduledTime: Timestamp.now(),
               createdAt: Timestamp.now()
             }));
@@ -1878,7 +1882,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const currentUploadType = currentTournament?.resultUploadType || tournament.resultUploadType || 'players';
 
     return (
-      <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="space-y-10 pb-20">
         {/* Header Summary */}
         <div className="flex flex-col items-center text-center space-y-3">
            <div className="w-16 h-16 rounded-[2rem] nm-flat flex items-center justify-center text-indigo-500 border border-white/50 mb-2">
@@ -1900,7 +1904,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-2">
             {/* 1. Auto-Progression (Auto Knockout) */}
-            <div className="p-6 rounded-[2rem] bg-white border-2 border-slate-100 space-y-4 shadow-sm">
+            <div className="p-6 nm-flat rounded-[2rem] space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -1932,8 +1936,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               onClick={handleAutoGroupSetup}
               disabled={actionLoading || isStep1Done || isStep2Done}
               className={cn(
-                "p-6 rounded-[2rem] border-2 transition-all flex flex-col items-start gap-4 text-left shadow-sm",
-                (isStep1Done || isStep2Done) ? "bg-slate-50 border-slate-200 opacity-60" : "bg-white border-indigo-50 hover:border-indigo-200"
+                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left",
+                (isStep1Done || isStep2Done) ? "opacity-60" : "hover:border-indigo-200"
               )}
             >
               <div className="flex items-center justify-between w-full">
@@ -1958,8 +1962,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               onClick={handleAutoMatchDeploy}
               disabled={actionLoading || isStep2Done || (!isKnockoutOnly && !isStep1Done)}
               className={cn(
-                "p-6 rounded-[2rem] border-2 transition-all flex flex-col items-start gap-4 text-left shadow-sm",
-                isStep2Done ? "bg-slate-50 border-slate-200 opacity-60" : (!isKnockoutOnly && !isStep1Done) ? "bg-slate-50 border-slate-100 opacity-40 grayscale" : "bg-white border-emerald-50 hover:border-emerald-200"
+                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left",
+                isStep2Done ? "opacity-60" : (!isKnockoutOnly && !isStep1Done) ? "opacity-40 grayscale" : "hover:border-emerald-200"
               )}
             >
               <div className="flex items-center justify-between w-full">
@@ -1984,7 +1988,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               onClick={() => setShowManualGroupModal(true)}
               disabled={actionLoading || isStep2Done}
               className={cn(
-                "p-6 rounded-[2rem] border-2 transition-all flex flex-col items-start gap-4 text-left shadow-sm bg-white border-slate-100 hover:border-slate-300",
+                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left bg-white",
                 isStep2Done && "opacity-60"
               )}
             >
@@ -2006,7 +2010,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <button 
               onClick={() => setShowManualMatchModal(true)}
               disabled={actionLoading}
-              className="p-6 rounded-[2rem] border-2 transition-all flex flex-col items-start gap-4 text-left shadow-sm bg-white border-slate-100 hover:border-slate-300"
+              className="p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left bg-white"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -2023,7 +2027,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </button>
 
             {/* 6. Match Result Upload Type */}
-            <div className="p-6 rounded-[2rem] bg-indigo-50/50 border-2 border-indigo-100 space-y-4 shadow-sm">
+            <div className="p-6 nm-flat rounded-[2rem] space-y-4">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-black text-indigo-900 uppercase">৬. ম্যাচ রেজাল্ট আপলোড টাইপ</span>
                 <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest">Result Upload Authority</span>
@@ -2148,13 +2152,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!selectedPlayerProfile) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-slate-900/20 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-        <Card className="w-full max-w-sm p-0 overflow-hidden border-2 border-white shadow-2xl animate-in zoom-in-95 duration-300">
+      <div className="fixed inset-0 z-[9999] bg-slate-900/40 flex items-center justify-center p-6">
+        <Card className="w-full max-w-sm p-0 overflow-hidden border-2 border-white shadow-2xl">
           <div className="relative h-32 bg-fc-dark overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
             <button 
               onClick={() => setSelectedPlayerProfile(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-sm active:scale-95"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center  active:scale-95"
             >
               <X size={20} />
             </button>
@@ -2257,7 +2261,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         <div className="p-4 sm:p-8 space-y-4 sm:space-y-8 relative z-10">
           <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]" : "bg-amber-500 animate-pulse")} />
+                <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 ")} />
                 <span className="text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
              </div>
              {isCompleted && (
@@ -2267,7 +2271,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                <span className="text-[8px] sm:text-[9px] font-black text-amber-600 uppercase tracking-[0.2em] bg-amber-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-amber-200">PENDING VERIFICATION</span>
              )}
              {match.status === 'disputed' && (
-               <span className="text-[8px] sm:text-[9px] font-black text-red-500 uppercase tracking-[0.2em] bg-red-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-red-200 animate-pulse">DISPUTED</span>
+               <span className="text-[8px] sm:text-[9px] font-black text-red-500 uppercase tracking-[0.2em] bg-red-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-red-200 ">DISPUTED</span>
              )}
           </div>
 
@@ -2284,7 +2288,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
               <div className={cn(
                 "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
-                isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
+                isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
               )}>
                  <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
@@ -2303,31 +2307,23 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="flex flex-col items-center gap-2 sm:gap-4 px-1 sm:px-2">
                {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
                  <div className="flex items-center gap-2 sm:gap-4">
-                    <motion.span 
-                      key={`home-${match.homeScore}`}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                      className={cn(
-                        "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
-                        homeWin && isCompleted ? "text-amber-500 drop-shadow-xs" : homeWin ? "text-fc-dark" : "text-slate-300"
-                      )}
-                    >
-                      {match.homeScore || 0}
-                    </motion.span>
-                    <div className="w-2.5 sm:w-4 h-0.5 sm:h-1 bg-slate-200 rounded-full" />
-                    <motion.span 
-                      key={`away-${match.awayScore}`}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                      className={cn(
-                        "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
-                        awayWin && isCompleted ? "text-amber-500 drop-shadow-xs" : awayWin ? "text-fc-dark" : "text-slate-300"
-                      )}
-                    >
-                      {match.awayScore || 0}
-                    </motion.span>
+                     <span 
+                       className={cn(
+                         "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
+                         homeWin && isCompleted ? "text-amber-500 drop-shadow-xs" : homeWin ? "text-fc-dark" : "text-slate-300"
+                       )}
+                     >
+                       {match.homeScore || 0}
+                     </span>
+                     <div className="w-2.5 sm:w-4 h-0.5 sm:h-1 bg-slate-200 rounded-full" />
+                     <span 
+                       className={cn(
+                         "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
+                         awayWin && isCompleted ? "text-amber-500 drop-shadow-xs" : awayWin ? "text-fc-dark" : "text-slate-300"
+                       )}
+                     >
+                       {match.awayScore || 0}
+                     </span>
                  </div>
                ) : (
                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-md">
@@ -2351,7 +2347,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               <div className="flex flex-col items-center gap-1 min-h-[26px] sm:min-h-[32px]">
                 <span className={cn("text-[8.5px] sm:text-[10px] font-black uppercase tracking-[0.2em]", awayWin ? "text-amber-500 font-black" : "text-slate-400")}>AWAY</span>
                 {isCompleted && awayWin && (
-                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 font-black shadow-xs ring-1 ring-amber-300 animate-in zoom-in-50 duration-500">
+                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
                     <Trophy size={9} fill="currentColor" />
                     <span className="text-[6.5px] sm:text-[7.5px] uppercase tracking-wider">Winner</span>
                   </div>
@@ -2359,7 +2355,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
               <div className={cn(
                 "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
-                isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105" : "border-white/50"
+                isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
               )}>
                  <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
                  <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
@@ -2472,7 +2468,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
                   match?.homePlayerId 
                     ? (isHomeWinner
-                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.35)] ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
+                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-md ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
                         : isAwayWinner
                           ? "bg-slate-950/75 border-slate-800/80 text-slate-500 opacity-55"
                           : "bg-slate-900 border-slate-800 text-white")
@@ -2524,9 +2520,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <div className={cn(
                       "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
                       isHomeWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-[0_0_8px_rgba(245,158,11,0.4)] ring-1 ring-amber-300"
+                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
                         : isAwayWinner 
-                          ? "bg-slate-950/80 text-slate-500 font-bold"
+                          ? "bg-slate-900/60 text-slate-500 font-bold"
                           : match?.homePlayerId 
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
@@ -2541,9 +2537,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <div className={cn(
                       "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
                       isHomeWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-[0_0_8px_rgba(245,158,11,0.4)] ring-1 ring-amber-300"
+                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
                         : isAwayWinner 
-                          ? "bg-slate-950/80 text-slate-500 font-bold"
+                          ? "bg-slate-900/60 text-slate-500 font-bold"
                           : match?.homePlayerId 
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
@@ -2602,7 +2598,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
                   match?.awayPlayerId 
                     ? (isAwayWinner
-                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.35)] ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
+                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-md ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
                         : isHomeWinner
                           ? "bg-slate-950/75 border-slate-800/80 text-slate-500 opacity-55"
                           : "bg-slate-900 border-slate-800 text-white")
@@ -2654,9 +2650,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <div className={cn(
                       "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
                       isAwayWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-[0_0_8px_rgba(245,158,11,0.4)] ring-1 ring-amber-300"
+                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
                         : isHomeWinner 
-                          ? "bg-slate-950/80 text-slate-500 font-bold"
+                          ? "bg-slate-900/60 text-slate-500 font-bold"
                           : match?.awayPlayerId 
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
@@ -2671,9 +2667,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <div className={cn(
                       "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
                       isAwayWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-[0_0_8px_rgba(245,158,11,0.4)] ring-1 ring-amber-300"
+                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
                         : isHomeWinner 
-                          ? "bg-slate-950/80 text-slate-500 font-bold"
+                          ? "bg-slate-900/60 text-slate-500 font-bold"
                           : match?.awayPlayerId 
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
@@ -2762,7 +2758,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const hasBoth = Boolean(currentHome?.id && currentAway?.id);
 
     return createPortal(
-      <div className="fixed inset-0 z-[9000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="fixed inset-0 z-[9000] bg-slate-900/60  flex items-center justify-center p-4 ">
         <div className="w-full max-w-lg bg-white rounded-[2.5rem] p-6 space-y-5 max-h-[90vh] flex flex-col shadow-2xl border-2 border-white/40 overflow-hidden">
           {/* Modal Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -3037,7 +3033,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const isDelete = confirmAction.type === 'delete';
 
     return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-[9999] bg-slate-900/60  flex items-center justify-center p-4 animate-in fade-in duration-200">
         <div className="w-full max-w-md bg-white rounded-[2.5rem] p-7 space-y-6 shadow-2xl border-2 border-white/40 overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="flex items-center gap-4">
             <div className={cn(
@@ -3119,7 +3115,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!match) return null;
 
     return (
-      <div className="pt-12 border-t border-slate-100 mt-12 space-y-8 animate-in fade-in duration-700">
+      <div className="pt-12 border-t border-slate-100 mt-12 space-y-8 ">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-3">
              <div className="h-px w-8 bg-slate-200" />
@@ -3148,7 +3144,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   const renderParticipantsList = () => {
     return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-6 ">
         <div className="grid grid-cols-1 gap-4">
           {participants.length === 0 ? (
             <div className="nm-flat rounded-[2.5rem] p-12 text-center border-2 border-white/20">
@@ -3244,7 +3240,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     switch (activeTab) {
       case 'group':
         return (
-          <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-4 sm:space-y-6 ">
             {/* Group Selector */}
             <div className="flex overflow-x-auto gap-2 sm:gap-3 pb-2 no-scrollbar px-1">
               {groups.map((g) => (
@@ -3364,7 +3360,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         );
       case 'knockout':
         return (
-          <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+          <div className="space-y-6 sm:space-y-8  pb-8">
             {/* Stage Header Info */}
             <div className="flex items-center justify-center px-1">
               <div className="nm-inset rounded-2xl p-1 flex items-center gap-1 border border-white/20">
@@ -3398,15 +3394,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 {/* Center Trophy / Final Placeholder */}
                 <div className="flex-shrink-0 flex flex-col items-center justify-center py-2 sm:py-4 px-1 sm:px-4">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-indigo-500/20 blur-xl sm:blur-2xl rounded-full animate-pulse" />
-                    <div className="w-20 xs:w-24 sm:w-34 md:w-36 h-36 xs:h-44 sm:h-56 md:h-60 nm-flat rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4 border-white/50 flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 relative z-10 bg-white/70 backdrop-blur-sm p-1.5 sm:p-3 shadow-xs">
+                    <div className="absolute inset-0 bg-indigo-500/20 blur-xl sm:blur-2xl rounded-full " />
+                    <div className="w-20 xs:w-24 sm:w-34 md:w-36 h-36 xs:h-44 sm:h-56 md:h-60 nm-flat rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4 border-white/50 flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 relative z-10 bg-white/70  p-1.5 sm:p-3 shadow-xs">
                       <div className={cn(
                         "transition-all duration-1000",
                         activeKnockoutStage === 'FINAL' || tournament.status === 'finished' ? "scale-110 rotate-[360deg]" : ""
                       )}>
                         <Trophy strokeWidth={1.2} className={cn(
                           "transition-all duration-700 w-7 h-7 xs:w-9 xs:h-9 sm:w-11 sm:h-11",
-                          tournament.status === 'finished' ? "text-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.5)]" : "text-slate-300"
+                          tournament.status === 'finished' ? "text-amber-500" : "text-slate-300"
                         )} />
                       </div>
                       <div className="text-center px-0.5 sm:px-1 space-y-1 sm:space-y-1.5">
@@ -3425,7 +3421,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                           </div>
                         )}
                         {activeKnockoutStage === 'FINAL' && tournament.status !== 'finished' && (
-                          <div className="pt-0.5 sm:pt-1 animate-bounce">
+                          <div className="pt-0.5 sm:pt-1 ">
                              <span className="text-[6.5px] sm:text-[7px] font-black text-indigo-500 uppercase tracking-widest">LIVE SOON</span>
                           </div>
                         )}
@@ -3482,7 +3478,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           : DEFAULT_RULES;
 
         return (
-          <div className="nm-flat rounded-[2.5rem] p-8 border-4 border-white/40 space-y-6 animate-in fade-in duration-500 bg-white">
+          <div className="nm-flat rounded-[2.5rem] p-8 border-4 border-white/40 space-y-6  bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-sm font-black text-slate-800 uppercase italic">Tournament Rules</h3>
@@ -3590,7 +3586,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     if (isFinished) {
       return (
-        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 text-slate-300 text-[8px] font-black uppercase tracking-widest border border-slate-700 flex items-center gap-2 shadow-sm backdrop-blur-md">
+        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 text-slate-300 text-[8px] font-black uppercase tracking-widest border border-slate-700 flex items-center gap-2 shadow-sm ">
           <span className="w-2 h-2 rounded-full bg-slate-400" />
           END
         </div>
@@ -3599,18 +3595,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     if (isLive) {
       return (
-        <div className="px-3.5 py-1.5 rounded-full bg-rose-500/30 text-rose-300 text-[8px] font-black uppercase tracking-widest border border-rose-500/40 flex items-center gap-2 shadow-sm backdrop-blur-md">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.9)]" />
+        <div className="px-3.5 py-1.5 rounded-full bg-rose-500/30 text-rose-300 text-[8px] font-black uppercase tracking-widest border border-rose-500/40 flex items-center gap-2 shadow-sm ">
+          <span className="w-2 h-2 rounded-full bg-rose-500  shadow-md" />
           LIVE
         </div>
       );
     }
 
     return (
-      <div className="px-3.5 py-1.5 rounded-full bg-emerald-500/30 text-emerald-300 text-[8px] font-black uppercase tracking-widest border border-emerald-500/40 flex items-center gap-2 shadow-sm backdrop-blur-md">
+      <div className="px-3.5 py-1.5 rounded-full bg-emerald-500/30 text-emerald-300 text-[8px] font-black uppercase tracking-widest border border-emerald-500/40 flex items-center gap-2 shadow-sm ">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)]"></span>
+          <span className=" absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-md"></span>
         </span>
         UPCOMING
       </div>
@@ -3631,7 +3627,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     'Official FC Host';
 
   return (
-    <div className="min-h-screen bg-soft-bg pb-32 relative animate-fade-in">
+    <div className="min-h-screen bg-soft-bg pb-32 relative ">
       {renderReportResultModal()}
 
       {renderPlayerModal()}
@@ -3689,7 +3685,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    </div>
 
                    {/* ORGANIZER / CREATOR BADGE ON BANNER */}
-                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-lg w-fit">
+                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60  border border-white/20 text-white shadow-lg w-fit">
                      <div className="w-5 h-5 rounded-full bg-fc-green/20 border border-fc-green/40 flex items-center justify-center shrink-0">
                        <Shield size={11} className="text-fc-green" />
                      </div>
@@ -3697,7 +3693,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      <span className="text-[10px] font-black text-fc-green uppercase tracking-wider truncate max-w-[180px] sm:max-w-xs">
                        {organizerDisplayName}
                      </span>
-                     <span className="w-1.5 h-1.5 rounded-full bg-fc-green animate-pulse shrink-0" />
+                     <span className="w-1.5 h-1.5 rounded-full bg-fc-green  shrink-0" />
                    </div>
                  </div>
 
@@ -3705,7 +3701,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  {(isAdminUser || (registration && registration.status === 'approved')) && (currentTournament?.messengerGroupLink || tournament.messengerGroupLink) && (
                    <button 
                      onClick={() => window.open(currentTournament?.messengerGroupLink || tournament.messengerGroupLink, '_blank')}
-                     className="w-12 h-12 rounded-2xl bg-[#00B2FF] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-95 transition-all animate-in zoom-in duration-500 hover:scale-105 shrink-0"
+                     className="w-12 h-12 rounded-2xl bg-[#00B2FF] text-white flex items-center justify-center shadow-lg active:scale-95 transition-all hover:scale-105 shrink-0"
                      title="Join Messenger Group"
                    >
                      <MessageCircle size={24} fill="white" />
@@ -3744,7 +3740,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         {/* Tournament Stats Overview - Only visible to Admins/Publishers */}
         {isAdminUser && (
           <div className="grid grid-cols-2 gap-4">
-            <div className="nm-flat rounded-[2rem] p-6 border-2 border-white bg-white/50 backdrop-blur-sm space-y-4">
+            <div className="nm-flat rounded-[2rem] p-6 border-2 border-white bg-white/50  space-y-4">
                <div className="flex items-center justify-between">
                   <Users size={16} className="text-fc-green" />
                   <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Players</span>
@@ -3761,7 +3757,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                </div>
             </div>
 
-            <div className="nm-flat rounded-[2rem] p-6 border-2 border-white bg-white/50 backdrop-blur-sm space-y-4">
+            <div className="nm-flat rounded-[2rem] p-6 border-2 border-white bg-white/50  space-y-4">
                <div className="flex items-center justify-between">
                   <Clock size={16} className="text-indigo-500" />
                   <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Matches</span>
@@ -3813,7 +3809,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
       {/* Mode 3: Manual Group Setup Modal */}
       {showManualGroupModal && (
-        <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[3000] bg-slate-900/60  flex items-center justify-center p-4">
           <div className="relative w-full max-w-md bg-white rounded-[2.5rem] p-6 space-y-6 max-h-[85vh] flex flex-col shadow-2xl border-2 border-white/20">
              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
@@ -3866,7 +3862,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
       {/* Mode 4: Manual Match Deploy Modal */}
       {showManualMatchModal && (
-        <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[3000] bg-slate-900/60  flex items-center justify-center p-4">
           <div className="relative w-full max-w-md bg-white rounded-[2.5rem] p-6 space-y-5 max-h-[85vh] flex flex-col overflow-y-auto shadow-2xl border-2 border-white/20">
              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>

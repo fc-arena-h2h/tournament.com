@@ -7,7 +7,6 @@ import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, Ar
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { GameLoader } from '@/src/components/ui/GameLoader';
-import { motion, AnimatePresence } from 'framer-motion';
 import { formatMessageTimestamp, cleanupOldMessages } from '@/src/lib/chatUtils';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 

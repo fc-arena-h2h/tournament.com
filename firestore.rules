@@ -47,10 +47,10 @@ service cloud.firestore {
     }
 
     function isPublisherOf(tournamentId) {
-      return isSignedIn() && (
-        isAdmin() || 
-        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.publisherId == request.auth.uid
-      );
+      if (!isSignedIn()) return false;
+      if (isAdmin()) return true;
+      let tPath = /databases/$(database)/documents/tournaments/$(tournamentId);
+      return exists(tPath) && get(tPath).data.publisherId == request.auth.uid;
     }
 
     function isPublisher() {
@@ -209,7 +209,7 @@ service cloud.firestore {
             (existing().status == 'reported' && incoming().status == 'disputed' && existing().reporterId != request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'disputeReason', 'updatedAt']))
           )
         ) && isValidMatch(incoming());
-      allow delete: if isAdmin() || isPublisherOf(existing().tournamentId);
+      allow delete: if isAdmin() || isPublisherOf(existing().tournamentId) || (isSignedIn() && existing().get('publisherId', '') == request.auth.uid);
     }
 
     // Announcements
