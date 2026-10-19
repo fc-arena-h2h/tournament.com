@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { collection, addDoc, updateDoc, doc, getDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { Trophy, ArrowLeft, Shield } from 'lucide-react';
+import { Trophy, ArrowLeft, Shield, Lock } from 'lucide-react';
 import { UserProfile } from '@/src/hooks/useAuth';
 
 export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfile | null; onBack: () => void }) => {
@@ -12,6 +12,7 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
     organizerName: profile?.inGameName || profile?.leagueName || '',
     format: 'group_knockout' as 'group_knockout' | 'knockout',
     entryType: 'public' as 'public' | 'invited',
+    invitationKey: '',
     prizePool: '',
     rewardType: 'winner_only' as 'winner_only' | 'top3',
     messengerGroupLink: '',
@@ -22,6 +23,24 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
     thirdPrize: 0,
     totalSlots: 16
   });
+
+  const generateInvitationKey = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = 'INV-';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const handleEntryTypeChange = (val: 'public' | 'invited') => {
+    setFormData(prev => ({
+      ...prev,
+      entryType: val,
+      invitationKey: val === 'invited' && !prev.invitationKey ? generateInvitationKey() : prev.invitationKey
+    }));
+  };
+
   const [loading, setLoading] = useState(false);
   const [telegramLink, setTelegramLink] = useState('https://t.me/your_admin_telegram');
 
@@ -42,6 +61,11 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
     // Basic Validation
     if (!formData.messengerGroupLink.trim().startsWith('http')) {
       alert('Please enter a valid Messenger Group Link (starting with http:// or https://)');
+      return;
+    }
+
+    if (formData.entryType === 'invited' && !formData.invitationKey.trim()) {
+      alert('Please provide an invitation key for invited tournaments.');
       return;
     }
 
@@ -91,6 +115,7 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
         publisherId: auth.currentUser.uid,
         format: formData.format,
         entryType: formData.entryType,
+        invitationKey: formData.entryType === 'invited' ? formData.invitationKey.trim() : null,
         activationKey: formData.deploymentKey.trim(), // Use the deployment key as the join key too
         messengerGroupLink: formData.messengerGroupLink.trim(),
         prizePool: formData.prizePool,
@@ -103,6 +128,8 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
         status: 'open',
         filledSlots: 0,
         totalSlots: Number(formData.totalSlots) || 16,
+        resultUploadType: 'players',
+        autoMatchDeploy: false,
         createdAt: serverTimestamp()
       });
 
@@ -186,37 +213,76 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Tournament Type</label>
-            <select 
-              className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
-              value={formData.format}
-              onChange={(e) => {
-                const newFormat = e.target.value as 'group_knockout' | 'knockout';
-                let newSlots = formData.totalSlots;
-                if (newFormat === 'knockout' && newSlots > 32) {
-                  newSlots = 32;
-                }
-                setFormData({...formData, format: newFormat, totalSlots: newSlots});
-              }}
-            >
-              <option value="knockout">Knockout</option>
-              <option value="group_knockout">Group + Knockout</option>
-            </select>
-          </div>
-          <div className="space-y-3">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Entry Type</label>
-            <select 
-              className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest"
-              value={formData.entryType}
-              onChange={(e) => setFormData({...formData, entryType: e.target.value as any})}
-            >
-              <option value="public">Public</option>
-              <option value="invited">Invited</option>
-            </select>
-          </div>
+        <div className="space-y-3">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Tournament Type</label>
+          <select 
+            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
+            value={formData.format}
+            onChange={(e) => {
+              const newFormat = e.target.value as 'group_knockout' | 'knockout';
+              let newSlots = formData.totalSlots;
+              // Enforce knockout limit of 32 for now (as requested previously or inferred from R32 support)
+              if (newFormat === 'knockout' && newSlots > 32) {
+                newSlots = 32;
+              }
+              setFormData({...formData, format: newFormat, totalSlots: newSlots});
+            }}
+          >
+            <option value="knockout">Knockout</option>
+            <option value="group_knockout">Group + Knockout</option>
+          </select>
         </div>
+
+        <div className="space-y-3">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Total Slots</label>
+          <select 
+            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
+            value={formData.totalSlots}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              setFormData({...formData, totalSlots: val});
+            }}
+          >
+            {[8, 16, 32, 64].map(slots => (
+              <option key={slots} value={slots} disabled={formData.format === 'knockout' && slots > 32}>
+                {slots} Slots {formData.format === 'knockout' && slots > 32 ? '(Group Required)' : ''}
+              </option>
+            ))}
+          </select>
+          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+            {formData.format === 'knockout' ? 'Maximum 32 slots allowed for knockout-only format' : 'Maximum 64 slots allowed for group format'}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Entry Type</label>
+          <select 
+            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest"
+            value={formData.entryType}
+            onChange={(e) => handleEntryTypeChange(e.target.value as any)}
+          >
+            <option value="public">Public</option>
+            <option value="invited">Invited</option>
+          </select>
+        </div>
+
+        {formData.entryType === 'invited' && (
+          <div className="space-y-3 animate-in slide-in-from-top-2">
+            <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+              <Lock size={12} className="text-indigo-500" />
+              Invitation Join Key
+            </label>
+            <Input 
+              placeholder="e.g. INV-XXXXXX"
+              required
+              value={formData.invitationKey}
+              onChange={(e) => setFormData({...formData, invitationKey: e.target.value.toUpperCase()})}
+            />
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+              Players must enter this key to send a join request. Share this key with your invited players.
+            </p>
+          </div>
+        )}
 
         {/* Prize Money Field */}
         <div className="space-y-3">
@@ -313,30 +379,11 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
           </p>
         </div>
 
-        <div className="space-y-3">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Total Slots</label>
-          <select 
-            className="w-full h-16 px-6 nm-inset rounded-3xl text-slate-700 outline-none border border-white/20 text-sm font-black uppercase tracking-widest bg-transparent cursor-pointer"
-            value={formData.totalSlots}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setFormData({...formData, totalSlots: val});
-            }}
-          >
-            {[8, 16, 32, 64].map(slots => (
-              <option key={slots} value={slots} disabled={formData.format === 'knockout' && slots > 32}>
-                {slots} Slots {formData.format === 'knockout' && slots > 32 ? '(Group Required)' : ''}
-              </option>
-            ))}
-          </select>
-          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
-            {formData.format === 'knockout' ? 'Maximum 32 slots allowed for knockout-only format' : 'Maximum 64 slots allowed for group format'}
-          </p>
-        </div>
+
 
         <Button 
           type="submit" 
-          className="w-full h-18 rounded-[2.5rem] mt-8 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 text-red-500 font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/30 active:scale-95 transition-all"
+          className="w-full h-18 rounded-[2.5rem] mt-8 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 text-red-600 font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/30 active:scale-95 transition-all"
           disabled={loading}
         >
           {loading ? 'Deploying...' : `Deploy Tournament`}

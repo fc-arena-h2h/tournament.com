@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
-import { Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, Search, Hash, CheckCircle, History, Shield, Flame, User as UserIcon } from 'lucide-react';
+import { 
+  Trophy, Clock, Users, ArrowRight, Plus, Activity, Zap, Play, 
+  Search, Hash, CheckCircle, History, Shield, Flame, User as UserIcon, 
+  Lock, Copy, X, ShieldCheck, ChevronRight, LayoutGrid
+} from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { collection, query, orderBy, limit, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { Reveal } from '@/src/components/ui/Reveal';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ArenaProps {
   profile: UserProfile | null;
@@ -44,59 +49,53 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
       setRecentResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => handleErr("Firestore Recent Matches Error", err));
 
-    // Fetch featured/active tournaments for the user
+    // Fetch user registrations
     const qRegs = query(collection(db, 'registrations'), where('userId', '==', profile?.uid));
-    const unsubRegs = onSnapshot(qRegs, async (regSnap) => {
+    const unsubRegs = onSnapshot(qRegs, (regSnap) => {
       const joinedIds = regSnap.docs.map(d => d.data().tournamentId);
       
-      // Also include tournaments created by the user
-      const qCreated = query(collection(db, 'tournaments'), where('publisherId', '==', profile?.uid));
-      const createdSnap = await getDocs(qCreated);
-      const createdIds = createdSnap.docs.map(d => d.id);
-      
-      const allIds = Array.from(new Set([...joinedIds, ...createdIds]));
-      
-      if (allIds.length > 0) {
-        // Fetch these tournaments
-        const qT = query(collection(db, 'tournaments'), limit(5)); // Simplified for now as where-in has limits
-        onSnapshot(qT, (tSnap) => {
-          const all = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          const filtered = all.filter(t => allIds.includes(t.id) || t.status === 'open');
-          setFeaturedTournaments(filtered.slice(0, 3));
-        }, (err) => handleErr("Firestore Featured Tournaments Error", err));
-      } else {
-        // Fallback to open tournaments
-        const qOpen = query(collection(db, 'tournaments'), where('status', '==', 'open'), limit(3));
-        onSnapshot(qOpen, (tSnap) => {
-          setFeaturedTournaments(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (err) => handleErr("Firestore Open Tournaments Error", err));
-      }
+      // Initial fetch or update featured tournaments list
+      const qT = query(collection(db, 'tournaments'), limit(10));
+      getDocs(qT).then(tSnap => {
+        const all = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        // Filter: user is publisher, user is registered, or tournament is open
+        const filtered = all.filter(t => 
+          joinedIds.includes(t.id) || 
+          t.publisherId === profile.uid || 
+          t.status === 'open'
+        );
+        setFeaturedTournaments(filtered.slice(0, 3));
+      }).catch(err => handleErr("Firestore Featured Tournaments Error", err));
+
     }, (err) => handleErr("Firestore Regs Error", err));
 
     return () => {
       unsubMatches();
       unsubRegs();
     };
-  }, []);
+  }, [profile?.uid]);
 
   useEffect(() => {
     if (searchQuery.length > 0) {
-      const q = query(
-        collection(db, 'tournaments'),
-        orderBy('createdAt', 'desc'),
-        limit(100)
-      );
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        const filtered = all.filter(t => 
-          (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
-          t.id.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setSearchResults(filtered);
-      }, (error) => {
-        console.error("Search Error:", error);
-      });
-      return () => unsubscribe();
+      const fetchSearch = async () => {
+        try {
+          const q = query(
+            collection(db, 'tournaments'),
+            orderBy('createdAt', 'desc'),
+            limit(100)
+          );
+          const snapshot = await getDocs(q);
+          const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          const filtered = all.filter(t => 
+            (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
+            t.id.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setSearchResults(filtered);
+        } catch (error) {
+          console.error("Search Error:", error);
+        }
+      };
+      fetchSearch();
     } else {
       setSearchResults([]);
     }
@@ -104,280 +103,265 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
 
   return (
-    <div className="space-y-8 sm:space-y-12 pt-4 min-h-screen">
-      {/* Search Bar - Neumorphic Inset */}
-      <div className="relative z-[200]">
-        <Reveal direction="left">
-          <div className="relative">
-            <Input 
-              placeholder="Find your tournament" 
-              className="h-16 pl-16 border-fc-green/20"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-slate-500 z-10">
-              <Search size={22} />
-            </div>
-            
+    <div className="space-y-10 sm:space-y-14 pt-6 min-h-screen relative">
+      <div className="absolute inset-0 bg-pattern-dots -z-10" />
+
+      {/* Search Bar - Modern Focused Style */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-[200] px-2"
+      >
+        <div className="relative max-w-2xl mx-auto">
+          <Input 
+            placeholder="Search Tournaments..." 
+            className="h-16 pl-16 bg-white/80 backdrop-blur-md border-white/50 shadow-lg"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-slate-400 z-10">
+            <Search size={22} strokeWidth={2.5} />
+          </div>
+          
+          <AnimatePresence>
             {searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-4 nm-flat rounded-[2.5rem] z-[300] p-6 space-y-3 border border-white/50 shadow-2xl bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="px-2 mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Found {searchResults.length} Cups</span>
-                  <div className="w-8 h-1 bg-slate-100 rounded-full" />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="absolute top-full left-0 right-0 mt-4 glass-card rounded-[2.5rem] z-[300] p-6 space-y-3 overflow-hidden shadow-2xl"
+              >
+                <div className="px-2 mb-2 flex items-center justify-between border-b border-slate-100 pb-3">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    FOUND {searchResults.length} CUPS
+                  </span>
+                  <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <X size={16} />
+                  </button>
                 </div>
-                <div className="max-h-[350px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                  {searchResults.map(t => (
-                    <button 
+                <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                  {searchResults.map((t, idx) => (
+                    <motion.div 
                       key={t.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
                       onClick={() => onEnterTournament(t)}
-                      className="w-full flex items-center justify-between p-5 hover:bg-fc-green/10 rounded-[1.8rem] transition-all text-left group border border-transparent hover:border-fc-green/20 bg-[#f8f9fa]"
+                      className="w-full flex items-center justify-between p-5 hover:bg-slate-50/80 rounded-3xl transition-all text-left group border border-slate-50 hover:border-indigo-100 bg-white/40 cursor-pointer"
                     >
                       <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl nm-inset flex items-center justify-center text-fc-green group-hover:scale-110 transition-transform bg-white">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
                           <Trophy size={24} />
                         </div>
                         <div className="space-y-1">
                           <span className="text-sm font-black text-slate-800 block uppercase italic leading-none">{t.title || 'Untitled Cup'}</span>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                            <span className="text-[9px] font-black text-indigo-500/70 uppercase tracking-wider flex items-center gap-1">
                               <Shield size={10} />
-                              {t.organizerName || t.organizationName || t.publisherName || 'Official Host'}
+                              {t.organizerName || t.publisherName || 'Host'}
                             </span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-100">
-                              ID: {t.id.slice(0, 8).toUpperCase()}
-                            </span>
-                            {t.status === 'open' && (
-                              <span className="text-[8px] font-black text-fc-green uppercase px-2 py-0.5 rounded-md bg-fc-green/5 border border-fc-green/10">ACTIVE</span>
-                            )}
+                            <div className="w-1 h-1 rounded-full bg-slate-200" />
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[80px]">ID: {t.id.toUpperCase()}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="w-10 h-10 rounded-full nm-flat flex items-center justify-center text-slate-400 group-hover:text-fc-green group-hover:nm-inset transition-all">
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </button>
+                      <ArrowRight size={18} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
+      {/* Hero Section - Luxury Pro Card */}
+      <div className="px-2">
+        <Card className="p-1 sm:p-1.5 overflow-hidden border-white bg-slate-200/20">
+          <div className="relative h-48 sm:h-64 rounded-[2.2rem] overflow-hidden group">
+            {/* Animated Gradient Background */}
+            <div className="absolute inset-0 bg-slate-900" />
+            <motion.div 
+              animate={{ 
+                background: [
+                  'radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%)',
+                  'radial-gradient(at 100% 100%, rgba(34, 197, 94, 0.15) 0px, transparent 50%)',
+                  'radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%)'
+                ]
+              }}
+              transition={{ duration: 10, repeat: Infinity }}
+              className="absolute inset-0"
+            />
+            
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-40 mix-blend-overlay group-hover:scale-105 transition-transform duration-[5s]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+            
+            <div className="absolute inset-6 sm:inset-10 flex flex-col justify-end">
+               <motion.div 
+                 initial={{ opacity: 0, x: -20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 transition={{ delay: 0.3 }}
+                 className="flex items-center gap-3 mb-4"
+               >
+                  <div className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase tracking-[0.3em]">
+                    PRO ARENA LIVE
+                  </div>
+                  <div className="h-px flex-1 bg-white/10" />
+               </motion.div>
+               <motion.h1 
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 transition={{ delay: 0.4 }}
+                 className="text-4xl sm:text-6xl font-black text-white uppercase italic leading-none tracking-tighter mb-4"
+               >
+                 ELITE <span className="text-emerald-400">CHAMPIONS</span>
+               </motion.h1>
+               <motion.p 
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 transition={{ delay: 0.5 }}
+                 className="text-[10px] sm:text-xs font-medium text-slate-300 uppercase tracking-widest max-w-sm leading-relaxed"
+               >
+                 The definitive stage for FC Mobile competitive excellence. Compete, advance, and dominate.
+               </motion.p>
+            </div>
           </div>
-        </Reveal>
+        </Card>
       </div>
 
-            {/* Hero Banner - FC Mobile Styled */}
-      <Reveal direction="right" delay={100}>
-        <div className="nm-flat rounded-[2.5rem] p-3 sm:p-4 border-2 border-white">
-          <div className="relative h-40 sm:h-56 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
-            <div className="absolute inset-0 bg-gradient-to-r from-fc-dark via-fc-dark/60 to-transparent" />
-            <div className="absolute top-0 right-0 w-1/2 h-full opacity-40 group-hover:scale-110 transition-transform duration-1000">
-               <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
-            </div>
-            <div className="absolute inset-0 border-2 border-white/10 rounded-[2rem] sm:rounded-[2.5rem] pointer-events-none" />
-            
-            <div className="absolute top-6 sm:top-8 left-6 sm:left-8">
-               <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <div className="w-2 h-2 rounded-full bg-fc-green animate-pulse" />
-                  <span className="text-[8px] sm:text-[9px] font-black text-fc-green uppercase tracking-[0.3em]">Official Tournament Arena</span>
-               </div>
-               <h1 className="text-3xl sm:text-5xl font-black text-white uppercase italic leading-none tracking-tighter mb-2">
-                 ELITE <br /><span className="text-fc-green">ARENA</span>
-               </h1>
-               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[180px] leading-relaxed">
-                 The ultimate destination for FC Mobile pro players
-               </p>
-            </div>
-          </div>
-        </div>
-      </Reveal>
-
-      {/* Profile Card - Enhanced FC Mobile Pro Player Passport */}
-      <Reveal direction="left" delay={200}>
-        <Card className="flex flex-col gap-3.5 sm:gap-6 bg-gradient-to-b from-white via-[#fafbfe] to-[#f4f6fa] border-2 border-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] p-3.5 sm:p-7 rounded-[2.2rem] sm:rounded-[2.8rem] relative overflow-hidden">
-          {/* Subtle Corner Glow Accent */}
-          <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-gradient-to-br from-emerald-500/10 via-indigo-500/10 to-transparent blur-2xl pointer-events-none" />
-
-          {/* Top Passport Ribbon */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 relative z-10">
-            <div className="flex items-center gap-2">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      {/* Player Passport - Enhanced Typography */}
+      <div className="px-2">
+        <Card className="bg-white/80 backdrop-blur-md border-white p-6 sm:p-10 shadow-2xl shadow-slate-200/50">
+          <div className="flex flex-col sm:flex-row items-center gap-8 text-center sm:text-left">
+            <div className="relative">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[2.5rem] bg-slate-900 border-4 border-white shadow-2xl flex items-center justify-center overflow-hidden rotate-3 hover:rotate-0 transition-transform duration-500">
+                <UserIcon size={48} className="text-slate-700" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 to-transparent pointer-events-none" />
               </div>
-              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">FC ARENA PASSPORT</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100/90 border border-slate-200/60 text-slate-600 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-              <Hash size={10} className="text-indigo-500" />
-              <span>{profile?.inGameUID || profile?.uid?.slice(0, 8).toUpperCase() || 'PLAYER'}</span>
-            </div>
-          </div>
-
-          {/* Player Identity Header */}
-          <div className="flex items-start justify-between relative z-10">
-            <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
-              <div className="relative shrink-0">
-                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green shadow-xl border border-white flex items-center justify-center bg-white">
-                  <UserIcon size={32} className="text-slate-400" />
-                </div>
+              <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-emerald-500 border-4 border-white flex items-center justify-center shadow-lg text-white">
+                <ShieldCheck size={20} />
               </div>
+            </div>
 
-              <div className="space-y-1.5 sm:space-y-2 min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 truncate">
-                  <h2 className="text-lg sm:text-2xl font-black text-[#0f172a] uppercase italic tracking-tight truncate leading-tight">
-                    {profile?.inGameName || 'Player Name'}
+            <div className="space-y-4 flex-1">
+              <div className="space-y-1">
+                <div className="flex items-center justify-center sm:justify-start gap-3">
+                  <h2 className="text-3xl sm:text-4xl font-black text-slate-900 uppercase italic leading-none tracking-tighter">
+                    {profile?.inGameName || 'Recruit'}
                   </h2>
-                  {profile?.inGameName && profile?.inGameUID && profile?.fbUrl && (
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0" title="Verified Player">
-                      <CheckCircle size={10} fill="white" />
-                    </div>
-                  )}
+                  <div className="px-2 py-1 rounded-md bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50">PRO</div>
                 </div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">FC ARENA VERIFIED ATHLETE</p>
+              </div>
 
-                <div className="flex gap-1.5 flex-wrap">
-                  <div className="px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-100/80 text-indigo-700 flex items-center gap-1 shadow-xs">
-                    <Shield size={10} className="text-indigo-600 shrink-0" />
-                    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">{profile?.leagueName || 'Elite League'}</span>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-100/80 text-emerald-700 flex items-center gap-1 shadow-xs">
-                    <Activity size={10} className="text-emerald-600 shrink-0" />
-                    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-                      {profile?.role === 'admin' ? 'Admin' : (profile?.role === 'publisher' ? 'Publisher' : 'Pro Tier')}
-                    </span>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-100/80 text-amber-700 flex items-center gap-1 shadow-xs">
-                    <Flame size={10} className="text-amber-500 fill-amber-500 shrink-0" />
-                    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-                      Ready to Play
-                    </span>
-                  </div>
+              <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                <div className="px-4 py-2 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-wider flex items-center gap-2">
+                   <Trophy size={14} className="opacity-70" /> {profile?.leagueName || 'Official League'}
+                </div>
+                <div className="px-4 py-2 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-emerald-600 text-[9px] font-black uppercase tracking-wider flex items-center gap-2">
+                   <Activity size={14} className="opacity-70" /> Competitive Active
                 </div>
               </div>
             </div>
           </div>
         </Card>
-      </Reveal>
+      </div>
 
-      {/* Featured Section */}
-      <div className="space-y-8">
-        <Reveal direction="right">
-          <div className="flex items-center justify-between px-6">
-            <div className="flex flex-col">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-sm bg-fc-green rotate-45" /> 
-                ACTIVE CUPS
-              </h3>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-6">Join now and win prizes</span>
-            </div>
-            <button 
-              onClick={() => onNavigate('tournament')}
-              className="text-[10px] font-black text-fc-green uppercase flex items-center gap-2 group"
-            >
-              Explore All <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+      {/* Active Cups - Visual Grid */}
+      <div className="space-y-8 px-2">
+        <div className="flex items-center justify-between px-6">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-slate-900 uppercase italic leading-none">ACTIVE CUPS</h3>
+            <div className="w-12 h-1 bg-emerald-500 rounded-full" />
           </div>
-        </Reveal>
+          <Button variant="ghost" className="text-xs font-black text-indigo-600 uppercase tracking-widest group" onClick={() => onNavigate('tournament')}>
+            VIEW ALL <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          </Button>
+        </div>
 
         <div className="grid grid-cols-1 gap-8">
           {featuredTournaments.map((t, idx) => (
-            <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
-              <Card className="p-0 group active:scale-[0.98] overflow-hidden border-2 border-white hover:border-fc-green/20 transition-all shadow-xl" onClick={() => onEnterTournament(t)}>
-                 <div className="relative p-4 sm:p-8">
-                   {/* Background faint image for card */}
-                   <div className="absolute inset-0 opacity-[0.03] grayscale pointer-events-none">
-                      <img src="https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
-                   </div>
+            <Card key={t.id} delay={idx * 0.1} className="p-0 border-white hover:border-indigo-100 transition-all shadow-xl group" onClick={() => onEnterTournament(t)}>
+              <div className="relative p-6 sm:p-10">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8 relative z-10">
+                  <div className="flex flex-wrap gap-2">
+                    {t.status === 'finished' || t.status === 'completed' ? (
+                      <span className="px-4 py-1.5 rounded-full bg-slate-800 text-slate-300 text-[9px] font-black uppercase tracking-widest">FINISHED</span>
+                    ) : t.filledSlots >= t.totalSlots ? (
+                      <span className="px-4 py-1.5 rounded-full bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest animate-pulse">FULL</span>
+                    ) : (
+                      <span className="px-4 py-1.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest">OPEN</span>
+                    )}
+                    <span className="px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-slate-100 text-slate-400 text-[9px] font-black uppercase tracking-widest">ID: {t.id.toUpperCase()}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-50 border border-slate-100">
+                    <Users size={16} className="text-slate-400" />
+                    <span className="text-xs font-black text-slate-700">{t.filledSlots} / {t.totalSlots}</span>
+                    <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(t.filledSlots / t.totalSlots) * 100}%` }}
+                        className="h-full bg-emerald-500" 
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                   <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
-                      <div className="flex items-center gap-2">
-                        {t.status === 'finished' || t.status === 'completed' ? (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                            END
-                          </div>
-                        ) : t.status === 'ongoing' || (t.filledSlots >= t.totalSlots) ? (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-rose-500 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                            LIVE
-                          </div>
-                        ) : (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-emerald-500 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-white"></span>
-                            </span>
-                            UPCOMING
-                          </div>
-                        )}
-                        <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-100 text-slate-500 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] border border-white flex items-center gap-1.5">
-                          <Hash size={9} /> {t.id.slice(0, 8)}
-                        </div>
+                <div className="relative z-10 space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Shield size={14} className="text-indigo-500" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.organizerName || 'Official Host'}</span>
+                    </div>
+                    <h4 className="text-3xl sm:text-4xl font-black text-slate-900 uppercase italic leading-none tracking-tighter group-hover:text-indigo-600 transition-colors">
+                      {t.title}
+                    </h4>
+                  </div>
+                  
+                  <div className="flex items-end justify-between pt-4">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">PRIZE POOL</span>
+                      <div className="text-2xl font-black text-slate-900 tracking-tighter flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-amber-400 flex items-center justify-center text-white text-[10px] font-black">C</div>
+                        {t.prizePool}
                       </div>
-                      <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-50 text-slate-500 border border-slate-100">
-                        <Users size={12} />
-                        <span className="text-[9px] sm:text-[10px] font-black">{t.filledSlots}/{t.totalSlots}</span>
-                      </div>
-                   </div>
-                   
-                   <div className="relative z-10 mb-4 sm:mb-8 space-y-1.5 sm:space-y-2">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200/90 shadow-sm max-w-full">
-                        <div className="w-4 h-4 rounded-md bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                          <Shield size={10} />
-                        </div>
-                        <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-800 uppercase tracking-tight truncate">
-                          {t.organizerName || t.organizationName || t.publisherName || 'Official FC Host'}
-                        </span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      </div>
-                      <h4 className="text-xl sm:text-3xl font-black text-slate-800 uppercase italic leading-tight group-hover:text-fc-green transition-colors">{t.title}</h4>
-                      <div className="w-10 sm:w-12 h-1 bg-fc-green/20 mt-1" />
-                   </div>
+                    </div>
+                    <Button variant="success" size="lg" className="rounded-2xl shadow-emerald-500/20" onClick={(e) => { e.stopPropagation(); onEnterTournament(t); }}>
+                      {profile?.uid === t.publisherId ? 'DASHBOARD' : 'JOIN CUP'}
+                    </Button>
+                  </div>
+                </div>
 
-                   <div className="flex items-center justify-between relative z-10">
-                     <div className="flex flex-col">
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Total Rewards</span>
-                        <span className="text-lg sm:text-2xl font-black text-fc-dark tracking-tight flex items-center gap-1.5">
-                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-fc-gold flex items-center justify-center text-white text-[9px] sm:text-[10px] font-black">C</div>
-                          {t.prizePool}
-                        </span>
-                     </div>
-                     <Button 
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         onEnterTournament(t);
-                       }}
-                       className="rounded-xl px-5 sm:px-8 py-2.5 sm:py-4 bg-fc-green text-black text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-md shadow-fc-green/20 hover:bg-fc-dark transition-all"
-                     >
-                        {profile?.uid === t.publisherId ? 'UPDATE' : 'JOIN'}
-                     </Button>
-                   </div>
-                 </div>
-              </Card>
-            </Reveal>
+                {/* Card Subtle Accent */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-indigo-500/5 to-transparent rounded-bl-[5rem] pointer-events-none" />
+              </div>
+            </Card>
           ))}
         </div>
       </div>
 
-      {/* Quick Nav Grid */}
-      <div className="grid grid-cols-1 gap-6 px-2">
-        <Reveal direction="left">
+      {/* Action Footer */}
+      <div className="px-2 pb-20">
+        <Reveal direction="up" delay={500}>
           <button 
             onClick={() => onNavigate('tournament')}
-            className="h-32 nm-flat rounded-[2.5rem] p-8 flex items-center justify-between active:nm-pressed transition-all group w-full"
+            className="w-full h-24 glass-card rounded-[2.5rem] px-8 flex items-center justify-between group active:scale-[0.98] transition-all"
           >
             <div className="flex items-center gap-6">
-              <div className="w-14 h-14 rounded-2xl nm-inset flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
-                <Trophy size={28} fill="currentColor" />
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                <Trophy size={28} />
               </div>
               <div className="text-left">
-                <span className="text-sm font-black text-slate-800 uppercase italic block leading-none mb-1">Elite Cups</span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Join active tournaments</span>
+                <p className="text-lg font-black text-slate-900 uppercase italic leading-none mb-1">ELITE CHAMPIONSHIPS</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BROWSE ALL ACTIVE COMPETITIONS</p>
               </div>
             </div>
-            <ArrowRight size={20} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+            <ArrowRight size={24} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-2 transition-all" />
           </button>
         </Reveal>
       </div>
-
     </div>
   );
 };

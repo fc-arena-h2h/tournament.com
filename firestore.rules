@@ -40,17 +40,23 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.get('email', '') == 'sperkplay@gmail.com' || 
+        request.auth.token.email == 'sperkplay@gmail.com' || 
+        request.auth.token.get('email', '') == 'sperkplay@gmail.com' ||
         getUserRole() == 'admin'
       );
     }
 
-    function isPublisher() {
-      let role = getUserRole();
+    function isPublisherOf(tournamentId) {
       return isSignedIn() && (
-        role == 'publisher' || 
-        role == 'admin' || 
-        request.auth.token.get('email', '') == 'sperkplay@gmail.com'
+        isAdmin() || 
+        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.publisherId == request.auth.uid
+      );
+    }
+
+    function isPublisher() {
+      return isSignedIn() && (
+        isAdmin() || 
+        getUserRole() == 'publisher'
       );
     }
 
@@ -77,6 +83,7 @@ service cloud.firestore {
         && data.format in ['group_knockout', 'knockout']
         && data.entryType in ['public', 'invited']
         && (!('activationKey' in data) || (data.activationKey is string))
+        && (!('invitationKey' in data) || (data.invitationKey == null || data.invitationKey is string))
         && (!('messengerGroupLink' in data) || (data.messengerGroupLink is string))
         && (!('description' in data) || (data.description is string))
         && (!('organizerName' in data) || (data.organizerName is string))
@@ -88,6 +95,27 @@ service cloud.firestore {
         && (!('totalSlots' in data) || (data.totalSlots is number))
         && (!('filledSlots' in data) || (data.filledSlots is number))
         && (!('createdAt' in data) || (data.createdAt is timestamp));
+    }
+
+    function isValidMatch(data) {
+      return data.tournamentId is string
+        && data.homePlayerId is string
+        && data.awayPlayerId is string
+        && data.status in ['scheduled', 'reported', 'disputed', 'completed', 'draft']
+        && (data.participants is list && data.participants.size() <= 2)
+        && (!('homeScore' in data) || data.homeScore is number)
+        && (!('awayScore' in data) || data.awayScore is number)
+        && (!('reporterId' in data) || data.reporterId is string)
+        && (!('groupId' in data) || data.groupId is string)
+        && (!('stage' in data) || data.stage is string)
+        && (!('matchId' in data) || data.matchId is string)
+        && (!('homePlayerName' in data) || data.homePlayerName is string)
+        && (!('awayPlayerName' in data) || data.awayPlayerName is string)
+        && (!('scheduledTime' in data) || data.scheduledTime is timestamp)
+        && (!('screenshotUrl' in data) || data.screenshotUrl is string)
+        && (!('disputeReason' in data) || data.disputeReason is string)
+        && (!('updatedAt' in data) || data.updatedAt is timestamp)
+        && (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidRegistration(data) {
@@ -102,6 +130,19 @@ service cloud.firestore {
         && data.status in ['active', 'used']
         && (data.createdBy == request.auth.uid || !('createdBy' in data))
         && (data.createdAt <= request.time || !('createdAt' in data));
+    }
+
+    function isValidNotification(data) {
+      return data.recipientId is string && data.recipientId.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 1000
+        && data.type is string
+        && data.read is bool
+        && (!('linkTab' in data) || data.linkTab is string)
+        && (!('tournamentId' in data) || data.tournamentId == null || data.tournamentId is string)
+        && (!('matchId' in data) || data.matchId == null || data.matchId is string)
+        && (!('extra' in data) || data.extra == null || data.extra is map)
+        && (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     // --- Collection Matches ---
@@ -121,40 +162,76 @@ service cloud.firestore {
 
     // Tournaments Collection
     match /tournaments/{tournamentId} {
-      allow read: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidTournament(incoming());
-      allow update: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid);
+      allow update, delete: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid);
+    }
+
+    function isParticipantOf(tournamentId) {
+      let regPath = /databases/$(database)/documents/registrations/$(request.auth.uid + "_" + tournamentId);
+      return exists(regPath);
     }
 
     // Registrations Collection
     match /registrations/{registrationId} {
-      allow read: if isSignedIn();
+      allow get, list: if isAdmin() || (isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        get(/databases/$(database)/documents/tournaments/$(resource.data.tournamentId)).data.publisherId == request.auth.uid ||
+        isParticipantOf(resource.data.tournamentId)
+      ));
       allow create: if isSignedIn() && isValidRegistration(incoming());
       allow update: if isAdmin() || (
         // Action: Approval (by publisher of tournament)
         get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid
       );
+      allow delete: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
     }
 
     // Matches Collection
     match /matches/{matchId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(incoming().tournamentId)).data.publisherId == request.auth.uid);
-      allow update: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
-      allow delete: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
+      allow get, list: if isAdmin() || (isSignedIn() && (
+        (request.auth.uid in resource.data.participants) ||
+        isPublisherOf(resource.data.tournamentId) ||
+        isParticipantOf(resource.data.tournamentId)
+      ));
+      allow create: if isPublisherOf(incoming().tournamentId) && isValidMatch(incoming());
+      allow update: if isAdmin() || 
+        isPublisherOf(existing().tournamentId) ||
+        (isSignedIn() && (request.auth.uid == existing().homePlayerId || request.auth.uid == existing().awayPlayerId) &&
+          (
+            // Action: Report Result
+            (existing().status == 'scheduled' && incoming().status == 'reported' && 
+             (get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.get('resultUploadType', 'players') == 'players') &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['homeScore', 'awayScore', 'status', 'reporterId', 'updatedAt', 'penaltyWinnerId'])) ||
+            // Action: Confirm Result (Opponent)
+            (existing().status == 'reported' && incoming().status == 'completed' && existing().reporterId != request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+            // Action: Dispute Result
+            (existing().status == 'reported' && incoming().status == 'disputed' && existing().reporterId != request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'disputeReason', 'updatedAt']))
+          )
+        ) && isValidMatch(incoming());
+      allow delete: if isAdmin() || isPublisherOf(existing().tournamentId);
     }
 
     // Announcements
     match /announcements/{announcementId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, delete: if isAdmin();
     }
 
     // Notifications
     match /notifications/{notifId} {
-      allow read: if isSignedIn() && (resource.data.recipientId == request.auth.uid || resource.data.recipientId == 'all' || (isAdmin() && resource.data.recipientId == 'admin'));
-      allow update: if isOwner(resource.data.recipientId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
-      allow create: if isAdmin();
+      allow get, list: if isSignedIn() && (
+        resource.data.recipientId == request.auth.uid || 
+        resource.data.recipientId == 'all' || 
+        (isAdmin() && resource.data.recipientId == 'admin')
+      );
+      allow create: if isSignedIn() && (
+        // Allow admins/publishers more freedom, but ensure basic validation for others
+        (isAdmin() || isPublisher() || isValidNotification(incoming()))
+      );
+      allow update: if (isOwner(resource.data.recipientId) || (isAdmin() && resource.data.recipientId == 'admin')) 
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.recipientId == request.auth.uid);
     }
 
     // License Keys
@@ -169,12 +246,21 @@ service cloud.firestore {
         incoming().usedBy == request.auth.uid &&
         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
       );
+      allow delete: if isAdmin();
     }
 
     // Settings
     match /settings/{settingId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // Messages
+    match /messages/{messageId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin() || isPublisherOf(resource.data.tournamentId);
     }
 
     // Test Connection

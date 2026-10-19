@@ -1,6 +1,15 @@
-import { initializeApp } from 'firebase/app';
+import { 
+  initializeApp 
+} from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  doc, 
+  getDocFromServer, 
+  setLogLevel,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -12,11 +21,15 @@ try {
 const app = initializeApp(firebaseConfig);
 const databaseId = (firebaseConfig as any).firestoreDatabaseId;
 
-// Configure Firestore with experimentalForceLongPolling to guarantee instant connection behind proxies and iframes without WebSocket handshake drop warnings
+// Configure Firestore with persistent local cache (Idea 1)
+// and experimentalForceLongPolling for proxy stability
 export const db = initializeFirestore(
   app,
   {
     experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   },
   databaseId || undefined
 );

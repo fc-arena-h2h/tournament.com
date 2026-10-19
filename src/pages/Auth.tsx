@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { 
-  Mail, Lock, Eye, EyeOff, Shield, KeyRound, CheckCircle2, Phone, CheckCircle
+  Mail, Lock, Eye, EyeOff, Shield, KeyRound, CheckCircle2, Phone, CheckCircle,
+  ArrowRight, Sparkles, ChevronRight, UserPlus, LogIn, Key, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { auth, db } from '@/src/lib/firebase';
@@ -12,6 +13,7 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -36,16 +38,12 @@ export const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
 
-  // Reset errors when toggling modes
   const handleToggleMode = (signUp: boolean) => {
     setIsSignUp(signUp);
     setError('');
     setSuccessInfo('');
   };
 
-  // ==========================================
-  // FORGOT PASSWORD
-  // ==========================================
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -58,23 +56,20 @@ export const AuthPage = () => {
     try {
       await sendPasswordResetEmail(auth, formData.email.trim());
       setResetSent(true);
-      setResetSuccessMessage(`Password reset link sent to ${formData.email}. Please check your inbox or spam folder.`);
+      setResetSuccessMessage(`Password reset link sent to ${formData.email}. Please check your inbox.`);
     } catch (err: any) {
       if (err.code === 'auth/user-not-found') {
         setError('No account found with this email.');
       } else if (err.code === 'auth/invalid-email') {
         setError('Invalid email address format.');
       } else {
-        setError(err.message || 'Failed to send password reset email.');
+        setError(err.message || 'Failed to send reset email.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ==========================================
-  // SUBMIT (SIGN IN OR SIGN UP)
-  // ==========================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -82,7 +77,6 @@ export const AuthPage = () => {
 
     try {
       if (isSignUp) {
-        // Validation for registration
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Passwords do not match');
         }
@@ -92,7 +86,6 @@ export const AuthPage = () => {
         
         await sendEmailVerification(user).catch(() => {});
         
-        // Create user profile in Firestore
         const isSystemAdmin = formData.email.trim().toLowerCase() === 'sperkplay@gmail.com';
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
@@ -107,28 +100,22 @@ export const AuthPage = () => {
           leagueName: formData.leagueName.trim(),
           createdAt: new Date().toISOString()
         });
-        
-        alert('Account created successfully! Welcome to FC Arena.');
       } else {
-        // Standard Email + Password Sign In
         if (!formData.email.trim() || !formData.password) {
           throw new Error('Please enter email and password.');
         }
-
         await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
       }
     } catch (err: any) {
       const code = err?.code;
       if (code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
-        setError('Incorrect email or password. If you have not created an account yet, click "New recruit? Sign Up" below.');
+        setError('Incorrect email or password. Verify credentials or sign up.');
       } else if (code === 'auth/wrong-password') {
-        setError('Incorrect password. Please verify and try again, or use Forgot Password.');
+        setError('Incorrect password. Try again or reset.');
       } else if (code === 'auth/email-already-in-use') {
-        setError('This email is already registered. Please click "Already registered? Sign In" below.');
-      } else if (code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters long.');
+        setError('This email is already registered.');
       } else {
-        setError(err?.message || 'Authentication process failed.');
+        setError(err?.message || 'Authentication failed.');
       }
     } finally {
       setLoading(false);
@@ -136,393 +123,303 @@ export const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-soft-bg p-4 sm:p-8 flex flex-col items-center justify-center">
-      <div className="max-w-md w-full space-y-8 my-6">
-        {/* Header Branding */}
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-40">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[60%] -right-[10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full" />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md w-full space-y-8 z-10"
+      >
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="w-20 h-20 rounded-[2.2rem] nm-flat flex items-center justify-center text-indigo-500 border-4 border-[#f0f0f3]">
-             <Shield size={38} fill="currentColor" className="opacity-80" />
-          </div>
-          <div className="space-y-1.5">
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-none">
+          <motion.div 
+            whileHover={{ scale: 1.05, rotate: 5 }}
+            className="w-24 h-24 rounded-[2.5rem] bg-slate-900 flex items-center justify-center text-white shadow-2xl shadow-slate-900/20"
+          >
+             <Shield size={44} fill="currentColor" className="opacity-90" />
+          </motion.div>
+          <div className="space-y-1">
+            <h1 className="text-4xl sm:text-5xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
               FC ARENA
             </h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center justify-center gap-1.5">
-              <span>Competitive Esports Hub</span>
-              <span className="inline-block w-1 h-1 rounded-full bg-emerald-500"></span>
-              <span className="text-emerald-600 font-bold">Official Tournaments</span>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center justify-center gap-2">
+              <span>EST. 2024</span>
+              <div className="w-1 h-1 rounded-full bg-indigo-500" />
+              <span className="text-indigo-600">Pro Esports Management</span>
             </p>
           </div>
         </div>
 
-        <Card className="p-6 sm:p-8 space-y-6">
-          {isForgotPassword ? (
-            /* Forgot Password Form */
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-2xl nm-inset flex items-center justify-center text-indigo-500 mb-3">
-                  <KeyRound size={22} />
-                </div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">
-                  Reset Password
-                </h2>
-                <p className="text-[11px] font-medium text-slate-500">
-                  Enter your registered email and we will send a password reset link.
-                </p>
-              </div>
-
-              {resetSent ? (
-                <div className="space-y-6">
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-start gap-3">
-                    <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                    <p className="text-xs font-semibold text-emerald-800 leading-relaxed">
-                      {resetSuccessMessage}
-                    </p>
+        <Card className="p-8 sm:p-10 shadow-2xl border-white bg-white/90" hover={false}>
+          <AnimatePresence mode="wait">
+            {isForgotPassword ? (
+              <motion.div 
+                key="forgot"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="text-center space-y-3">
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4 border border-indigo-100/50 shadow-inner">
+                    <KeyRound size={26} />
                   </div>
-
-                  <Button 
-                    type="button" 
-                    onClick={() => {
-                      setIsForgotPassword(false);
-                      setResetSent(false);
-                      setError('');
-                    }}
-                    className="w-full h-14 rounded-[2rem] text-[11px] font-black uppercase tracking-widest"
-                  >
-                    Back to Sign In
-                  </Button>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic leading-none">
+                    Account Recovery
+                  </h2>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                    Verify email to reset credentials
+                  </p>
                 </div>
-              ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-6">
-                  {error && (
-                    <div className="nm-inset p-4 rounded-2xl border border-rose-200/50 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center">
-                      {error}
+
+                {resetSent ? (
+                  <div className="space-y-8 py-4">
+                    <div className="p-6 rounded-3xl bg-emerald-50 border border-emerald-100 flex flex-col items-center text-center gap-4">
+                      <CheckCircle2 size={40} className="text-emerald-500" />
+                      <p className="text-xs font-bold text-emerald-800 leading-relaxed uppercase tracking-wider">
+                        {resetSuccessMessage}
+                      </p>
                     </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Account Email</label>
-                    <Input 
-                      type="email" 
-                      placeholder="name@arena.com" 
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    />
+                    <Button 
+                      onClick={() => {
+                        setIsForgotPassword(false);
+                        setResetSent(false);
+                        setError('');
+                      }}
+                      className="w-full h-16 rounded-[1.5rem]"
+                    >
+                      Return to Access Point
+                    </Button>
                   </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-8 pt-4">
+                    {error && (
+                      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest text-center shadow-sm">
+                        <AlertCircle size={16} className="mx-auto mb-2" />
+                        {error}
+                      </motion.div>
+                    )}
 
-                  <Button 
-                    type="submit" 
-                    className="w-full h-14 rounded-[2rem] text-[11px]"
-                    disabled={loading}
-                  >
-                    {loading ? 'Sending link...' : 'Send Reset Link'}
-                    <ArrowRight className="ml-2" />
-                  </Button>
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Registered Email</label>
+                      <Input 
+                        type="email" 
+                        placeholder="player@fcarena.pro" 
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        className="h-16"
+                      />
+                    </div>
 
-                  <div className="text-center pt-2">
+                    <Button type="submit" className="w-full h-16 rounded-[1.5rem]" disabled={loading}>
+                      {loading ? 'TRANSMITTING...' : 'INITIATE RECOVERY'}
+                      <ChevronRight size={18} className="ml-2" />
+                    </Button>
+
                     <button 
                       type="button"
                       onClick={() => {
                         setIsForgotPassword(false);
                         setError('');
                       }}
-                      className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                      className="w-full text-center text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
                     >
-                      Return to Sign In
+                      Cancel Recovery
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="auth"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="space-y-8"
+              >
+                {isSignUp && (
+                  <div className="flex bg-slate-100 p-1.5 rounded-[1.8rem] border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setRole('player')}
+                      className={cn(
+                        "flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-[1.3rem] transition-all relative z-10",
+                        role === 'player' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400"
+                      )}
+                    >
+                      Player
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole('publisher')}
+                      className={cn(
+                        "flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-[1.3rem] transition-all relative z-10",
+                        role === 'publisher' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400"
+                      )}
+                    >
+                      Host
                     </button>
                   </div>
-                </form>
-              )}
-            </div>
-          ) : (
-            /* Regular Sign In / Sign Up Form */
-            <>
-              {/* Role Toggle for Sign Up */}
-              {isSignUp && (
-                <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
-                  <button
-                    type="button"
-                    onClick={() => setRole('player')}
-                    className={cn(
-                      "flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                      role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
-                    )}
-                  >
-                    Player
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('publisher')}
-                    className={cn(
-                      "flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                      role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
-                    )}
-                  >
-                    Host / Organizer
-                  </button>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Feedback Messages */}
-                {error && (
-                  <div className="nm-inset p-3.5 rounded-2xl border border-rose-200/80 text-rose-600 text-[10px] font-bold leading-relaxed text-center">
-                    {error}
-                  </div>
-                )}
-                
-                {successInfo && (
-                  <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold text-center flex items-center justify-center gap-1.5">
-                    <CheckCircle size={14} className="text-emerald-600" />
-                    <span>{successInfo}</span>
-                  </div>
                 )}
 
-                {/* Email Field */}
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-1.5">
-                    <Mail size={12} className="text-indigo-500" />
-                    Email
-                  </label>
-                  <Input 
-                    type="email" 
-                    placeholder="name@arena.com" 
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-
-                {/* Password Field */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between ml-4 mr-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Lock size={12} className="text-indigo-500" />
-                      Password
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest text-center">
+                      {error}
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                      <Mail size={12} className="text-indigo-500" /> EMAIL
                     </label>
-                    {!isSignUp && (
+                    <Input 
+                      type="email" 
+                      placeholder="player@fcarena.pro" 
+                      required
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      className="h-16"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between ml-2 mr-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Lock size={12} className="text-indigo-500" /> PASSWORD
+                      </label>
+                      {!isSignUp && (
+                        <button 
+                          type="button"
+                          onClick={() => setIsForgotPassword(true)}
+                          className="text-[9px] font-black text-indigo-500 uppercase tracking-widest"
+                        >
+                          Forgot?
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Input 
+                        type={showPassword ? "text" : "password"} 
+                        placeholder="••••••••" 
+                        required
+                        value={formData.password}
+                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                        className="h-16 pr-14"
+                      />
                       <button 
                         type="button"
-                        onClick={() => {
-                           setIsForgotPassword(true);
-                           setError('');
-                        }}
-                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-wider transition-colors"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
                       >
-                        Forgot Password?
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
+                    </div>
+                  </div>
+
+                  <AnimatePresence>
+                    {isSignUp && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-6 overflow-hidden pt-2"
+                      >
+                        <div className="space-y-3">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Repeat Password</label>
+                          <Input 
+                            type={showPassword ? "text" : "password"} 
+                            placeholder="Confirm password" 
+                            required
+                            value={formData.confirmPassword}
+                            onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                            className="h-16"
+                          />
+                        </div>
+
+                        <div className="h-px bg-slate-100 my-8" />
+
+                        <div className="space-y-5">
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Display Name</label>
+                            <Input 
+                              placeholder="Your public handle"
+                              required
+                              value={formData.inGameName}
+                              onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
+                              className="h-16"
+                            />
+                          </div>
+                          
+                          {role === 'player' ? (
+                            <>
+                              <div className="space-y-3">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">In-Game UID</label>
+                                <Input placeholder="FC Mobile UID" required value={formData.inGameUID} onChange={(e) => setFormData({...formData, inGameUID: e.target.value})} className="h-16" />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-3">
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Organization/League Name</label>
+                              <Input placeholder="Official Title" required value={formData.leagueName} onChange={(e) => setFormData({...formData, leagueName: e.target.value})} className="h-16" />
+                            </div>
+                          )}
+
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Social Profile Link (FB/Web)</label>
+                            <Input placeholder="https://..." required value={formData.fbUrl} onChange={(e) => setFormData({...formData, fbUrl: e.target.value})} className="h-16" />
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Messenger Contact</label>
+                            <Input placeholder="https://m.me/..." required value={formData.messengerLink} onChange={(e) => setFormData({...formData, messengerLink: e.target.value})} className="h-16" />
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </div>
-                  <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Secret key" 
-                      required
-                      value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
+                  </AnimatePresence>
 
-                {/* Sign Up: Confirm Password */}
-                {isSignUp && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                      Confirm Password
-                    </label>
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Repeat key" 
-                      required
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    />
-                  </div>
-                )}
-
-                {/* Sign Up: Additional Fields */}
-                {isSignUp && (
-                  <div className="space-y-4 pt-2 border-t border-slate-200/80">
-                    {/* Role Specific Additional Fields */}
-                    {role === 'player' ? (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            IN Game Name
-                          </label>
-                          <Input 
-                            placeholder="e.g. ArenaMaster"
-                            required
-                            value={formData.inGameName}
-                            onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Game UID
-                          </label>
-                          <Input 
-                            placeholder="e.g. 12345678"
-                            required
-                            value={formData.inGameUID}
-                            onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Your Facebook profile link
-                          </label>
-                          <Input 
-                            placeholder="https://facebook.com/..."
-                            required
-                            value={formData.fbUrl}
-                            onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Your Messenger link
-                          </label>
-                          <Input 
-                            placeholder="https://m.me/..."
-                            required
-                            value={formData.messengerLink}
-                            onChange={(e) => setFormData({...formData, messengerLink: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            WhatsApp number (Optional)
-                          </label>
-                          <Input 
-                            placeholder="e.g. 017XXXXXXXX"
-                            value={formData.whatsappNumber}
-                            onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}
-                          />
-                        </div>
-                      </>
+                  <Button type="submit" className="w-full h-18 rounded-[2rem] mt-4" disabled={loading}>
+                    {loading ? (
+                      'ESTABLISHING CONNECTION...'
+                    ) : isSignUp ? (
+                      <span className="flex items-center gap-2 tracking-widest"><UserPlus size={18} /> CREATE ACCOUNT</span>
                     ) : (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Name
-                          </label>
-                          <Input 
-                            placeholder="Your Name"
-                            required
-                            value={formData.inGameName}
-                            onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            League Title
-                          </label>
-                          <Input 
-                            placeholder="e.g. Champions League"
-                            required
-                            value={formData.leagueName}
-                            onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Your Facebook profile link
-                          </label>
-                          <Input 
-                            placeholder="https://facebook.com/..."
-                            required
-                            value={formData.fbUrl}
-                            onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            Your Messenger link
-                          </label>
-                          <Input 
-                            placeholder="https://m.me/..."
-                            required
-                            value={formData.messengerLink}
-                            onChange={(e) => setFormData({...formData, messengerLink: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            WhatsApp number (Optional)
-                          </label>
-                          <Input 
-                            placeholder="e.g. 017XXXXXXXX"
-                            value={formData.whatsappNumber}
-                            onChange={(e) => setFormData({...formData, whatsappNumber: e.target.value})}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                            League Messenger group link
-                          </label>
-                          <Input 
-                            placeholder="https://m.me/j/..."
-                            required
-                            value={formData.leagueMessengerGroupLink}
-                            onChange={(e) => setFormData({...formData, leagueMessengerGroupLink: e.target.value})}
-                          />
-                        </div>
-                      </div>
+                      <span className="flex items-center gap-2 tracking-widest"><LogIn size={18} /> ACCESS ARENA</span>
                     )}
-                  </div>
-                )}
+                  </Button>
+                </form>
 
-                {/* Submit Action */}
-                <Button 
-                  type="submit" 
-                  className="w-full h-16 rounded-[2.2rem] mt-6 text-[11px] font-black uppercase tracking-wider"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    'Processing...'
-                  ) : isSignUp ? (
-                    'Initialize Profile'
-                  ) : (
-                    'Access Arena'
-                  )}
-                  <ArrowRight className="ml-2" />
-                </Button>
-              </form>
-
-              {/* Mode Switcher */}
-              <div className="text-center pt-2">
-                <button 
-                  onClick={() => handleToggleMode(!isSignUp)}
-                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-indigo-600 transition-colors"
-                >
-                  {isSignUp ? 'Already registered? Sign In' : 'New recruit? Sign Up'}
-                </button>
-              </div>
-            </>
-          )}
+                <div className="text-center">
+                  <button 
+                    onClick={() => handleToggleMode(!isSignUp)}
+                    className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors"
+                  >
+                    {isSignUp ? 'Back to Login Terminal' : 'No account? Enlist Now'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
 
-        {/* Footer Security Badge */}
-        <div className="flex items-center justify-center gap-2 opacity-40">
-          <Shield size={14} />
-          <span className="text-[8px] font-black uppercase tracking-[0.3em]">Official Field License & Esports Arena</span>
+        <div className="flex flex-col items-center gap-3 opacity-30 pt-4">
+           <div className="flex items-center gap-3">
+              <Shield size={16} />
+              <Key size={14} />
+              <Lock size={14} />
+           </div>
+           <span className="text-[8px] font-black uppercase tracking-[0.4em] text-center">
+              Secured Arena Protocol &copy; 2024 FC ARENA
+           </span>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
 
-const ArrowRight = ({ className }: { className?: string }) => (
-  <svg className={cn("w-5 h-5", className)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-  </svg>
-);

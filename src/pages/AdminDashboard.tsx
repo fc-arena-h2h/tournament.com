@@ -4,7 +4,7 @@ import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, 
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
-  X, LayoutDashboard, Gamepad2, Clock 
+  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon 
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -50,68 +50,83 @@ export const AdminDashboard = ({
   const [settings, setSettings] = useState({ telegramLink: 'https://t.me/your_admin_telegram' });
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !userProfile) return;
 
-    const fetchProfile = async () => {
-      const snap = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-      if (snap.exists()) {
-        const profile = snap.data() as UserProfile;
-        setUserProfile(profile);
+    // 1. Fetch Tournaments
+    const tQ = userProfile.role === 'admin' 
+      ? query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50))
+      : query(collection(db, 'tournaments'), where('publisherId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'), limit(50));
 
-        const tQ = profile.role === 'admin' 
-          ? query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(50))
-          : query(collection(db, 'tournaments'), where('publisherId', '==', auth.currentUser!.uid), orderBy('createdAt', 'desc'), limit(50));
+    const unsubTournaments = onSnapshot(tQ, (snapshot) => {
+      const tMap: Record<string, Tournament> = {};
+      snapshot.forEach(doc => tMap[doc.id] = { id: doc.id, ...doc.data() } as Tournament);
+      setTournaments(tMap);
 
-        const unsubTournaments = onSnapshot(tQ, (snapshot) => {
-          const tMap: Record<string, Tournament> = {};
-          snapshot.forEach(doc => tMap[doc.id] = { id: doc.id, ...doc.data() } as Tournament);
-          setTournaments(tMap);
-
-          const tournamentIds = Object.keys(tMap);
-          if (tournamentIds.length > 0) {
-            const rQ = profile.role === 'admin'
-              ? query(collection(db, 'registrations'), orderBy('createdAt', 'desc'), limit(100))
-              : query(collection(db, 'registrations'), where('tournamentId', 'in', tournamentIds.slice(0, 30)), limit(100));
-            
-            const unsubRegs = onSnapshot(rQ, (regSnap) => {
-              setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
-              setLoading(false);
-            }, (error) => {
-              console.error("Admin Regs Error:", error);
-              setLoading(false);
-            });
-            return () => unsubRegs();
-          } else {
-            setLoading(false);
-          }
+      const tournamentIds = Object.keys(tMap);
+      if (tournamentIds.length > 0 && userProfile.role !== 'admin') {
+        // Publishers only see registrations for their own tournaments
+        const rQ = query(collection(db, 'registrations'), where('tournamentId', 'in', tournamentIds.slice(0, 30)), limit(100));
+        const unsubRegs = onSnapshot(rQ, (regSnap) => {
+          setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
+          setLoading(false);
         }, (error) => {
-          console.error("Admin Tournaments Error:", error);
+          console.error("Admin Regs Error (Publisher):", error);
           setLoading(false);
         });
-
-        if (profile.role === 'admin') {
-          const kQ = query(collection(db, 'licenseKeys'), orderBy('createdAt', 'desc'), limit(50));
-          onSnapshot(kQ, (snapshot) => {
-            setLicenseKeys(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-          });
-
-          // Fetch Settings
-          onSnapshot(doc(db, 'settings', 'system'), (snap) => {
-            if (snap.exists()) {
-              setSettings(snap.data() as any);
-            }
-          });
-        }
-
-        return unsubTournaments;
+        return () => unsubRegs();
+      } else if (userProfile.role === 'admin') {
+        // Admins see all registrations
+        const rQ = query(collection(db, 'registrations'), orderBy('createdAt', 'desc'), limit(100));
+        const unsubRegs = onSnapshot(rQ, (regSnap) => {
+          setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
+          setLoading(false);
+        }, (error) => {
+          console.error("Admin Regs Error (Admin):", error);
+          setLoading(false);
+        });
+        return () => unsubRegs();
+      } else {
+        setLoading(false);
       }
-    };
+    }, (error) => {
+      console.error("Admin Tournaments Error:", error);
+      setLoading(false);
+    });
 
-    const unsubProfilePromise = fetchProfile();
+    // 2. Fetch Keys & Settings (Admin Only)
+    let unsubKeys: (() => void) | null = null;
+    let unsubSettings: (() => void) | null = null;
+
+    if (userProfile.role === 'admin') {
+      const kQ = query(collection(db, 'licenseKeys'), orderBy('createdAt', 'desc'), limit(50));
+      unsubKeys = onSnapshot(kQ, (snapshot) => {
+        setLicenseKeys(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      unsubSettings = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
+        if (snap.exists()) {
+          setSettings(snap.data() as any);
+        }
+      });
+    }
+
     return () => {
-      unsubProfilePromise.then(unsub => unsub?.());
+      unsubTournaments();
+      if (unsubKeys) unsubKeys();
+      if (unsubSettings) unsubSettings();
     };
-  }, []);
+  }, [userProfile?.role, auth.currentUser?.uid]);
+
+  // Separate effect to fetch the profile itself if not provided by props
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const unsub = onSnapshot(doc(db, 'users', auth.currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        setUserProfile(snap.data() as UserProfile);
+      }
+    });
+    return () => unsub();
+  }, [auth.currentUser?.uid]);
 
 
 
@@ -176,6 +191,18 @@ export const AdminDashboard = ({
       handleFirestoreError(error, OperationType.CREATE, 'licenseKeys');
     } finally {
       setIsGeneratingKey(false);
+    }
+  };
+
+  const handleDeleteKey = async (keyId: string) => {
+    try {
+      console.log('Admin Action: Deleting license key:', keyId);
+      await deleteDoc(doc(db, 'licenseKeys', keyId));
+      return true;
+    } catch (error) {
+      console.error('Failed to delete license key:', error);
+      handleFirestoreError(error, OperationType.DELETE, `licenseKeys/${keyId}`);
+      return false;
     }
   };
 
@@ -274,15 +301,30 @@ export const AdminDashboard = ({
                           )}
                         </span>
                       </div>
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(k.key);
-                          alert('Key copied to clipboard');
-                        }}
-                        className="w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-slate-400 hover:text-indigo-500"
-                      >
-                        <Plus className="rotate-45" size={18} />
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(k.key);
+                            alert('Key copied to clipboard');
+                          }}
+                          className="w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-slate-400 hover:text-indigo-500"
+                          title="Copy Key"
+                        >
+                          <CopyIcon size={16} />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to delete key ${k.key}?`)) {
+                              await handleDeleteKey(k.id);
+                              alert('Key deleted successfully');
+                            }
+                          }}
+                          className="w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-rose-400 hover:text-rose-600 transition-colors group"
+                          title="Delete Key"
+                        >
+                          <X size={18} className="pointer-events-none group-active:scale-90 transition-transform" />
+                        </button>
+                      </div>
                     </Card>
                   ))}
                 </div>
