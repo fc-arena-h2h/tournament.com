@@ -25,9 +25,13 @@ export function useAppUpdate() {
         setUpdateUrl(remoteUpdateUrl);
 
         // Check if local version or app ID is outdated
-        const needsUpdate = (APP_VERSION !== minVersion) || (APP_ID !== remoteAppId);
+        const versionMismatch = APP_VERSION !== minVersion;
+        const idMismatch = APP_ID !== remoteAppId;
+        const needsUpdate = versionMismatch || idMismatch;
         
-        if (needsUpdate && forceUpdate) {
+        // Show update overlay if version or ID mismatch
+        // If forceUpdate is true, it's mandatory (handled by UI overlay)
+        if (needsUpdate) {
           setUpdateRequired(true);
         } else {
           setUpdateRequired(false);

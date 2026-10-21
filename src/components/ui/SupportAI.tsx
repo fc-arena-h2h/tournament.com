@@ -154,12 +154,12 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[20001] bg-slate-950/40 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[20001] bg-slate-950/60 backdrop-blur-md flex flex-col items-center animate-in fade-in duration-300">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full sm:max-w-lg bg-[#f0f1f5] rounded-none sm:rounded-[3rem] h-full sm:h-[85vh] flex flex-col shadow-2xl border-t-2 border-white/50 relative overflow-hidden"
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        className="w-full h-full sm:h-[85vh] sm:max-w-lg sm:mt-[7.5vh] bg-[#f0f1f5] flex flex-col shadow-2xl relative overflow-hidden sm:rounded-[3rem] border-t sm:border border-white/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -314,7 +314,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         </div>
 
         {/* Input Area */}
-        <div className="p-6 sm:p-8 pb-10 sm:pb-8 border-t border-white/20 bg-white/30 shrink-0 pb-safe">
+        <div className="p-6 sm:p-8 border-t border-white/20 bg-white/50 shrink-0">
           <div className="relative flex items-center gap-3">
             <input 
               type="text"
@@ -323,13 +323,13 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               placeholder={dailyCount >= MAX_DAILY_MESSAGES ? "Limit reached..." : "Type your message..."}
               disabled={loading || dailyCount >= MAX_DAILY_MESSAGES}
-              className="w-full h-16 px-6 nm-inset bg-white rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+              className="flex-1 h-16 px-6 nm-inset bg-white rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
             />
             <button 
               onClick={handleSend}
               disabled={!input.trim() || loading || dailyCount >= MAX_DAILY_MESSAGES}
               className={cn(
-                "w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl",
+                "w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl shrink-0",
                 !input.trim() || loading || dailyCount >= MAX_DAILY_MESSAGES
                   ? "nm-flat bg-slate-100 text-slate-300 cursor-not-allowed"
                   : "nm-flat bg-indigo-600 text-white active:nm-pressed"
@@ -338,6 +338,8 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               <Send size={24} className={loading ? 'animate-pulse' : ''} />
             </button>
           </div>
+          {/* Safe area padding for mobile browsers */}
+          <div className="h-6 sm:hidden" /> 
         </div>
       </motion.div>
     </div>

@@ -50,21 +50,22 @@ export const Logo: React.FC<LogoProps> = ({ className, size = 64, variant = 'col
           filter="url(#glow_filter)"
         />
 
-        {/* Professional Monogram 'FC' */}
-        <g transform="translate(28, 30) scale(0.45)">
+        {/* Professional Monogram 'FC' with Speed Lines */}
+        <g transform="translate(25, 28) scale(0.5)">
           {/* Stylized F */}
           <path
-            d="M10 10H85V28H32V48H75V66H32V95H10V10Z"
+            d="M5 10H80V25H25V45H70V60H25V95H5V10Z"
             fill="white"
-            opacity="0.95"
           />
-          {/* Stylized C with open gap */}
+          {/* Stylized C */}
           <path
-            d="M95 10H145V28H117V77H145V95H95V10Z"
-            fill={variant === 'color' ? "#fbbf24" : "white"}
+            d="M90 10H140V25H110V80H140V95H90V10Z"
+            fill={variant === 'color' ? "#10b981" : "white"}
           />
-          {/* Bottom highlight bar */}
-          <rect x="10" y="105" width="135" height="12" rx="4" fill="url(#accent_grad)" />
+          {/* Speed Bars */}
+          <rect x="5" y="105" width="60" height="8" rx="4" fill="url(#accent_grad)" />
+          <rect x="75" y="105" width="30" height="8" rx="4" fill="#fbbf24" />
+          <rect x="115" y="105" width="20" height="8" rx="4" fill="white" opacity="0.5" />
         </g>
 
         {/* Dynamic Highlight */}
