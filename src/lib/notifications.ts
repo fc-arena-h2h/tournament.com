@@ -376,11 +376,16 @@ export async function markNotificationAsRead(id: string) {
 /**
  * Mark all notifications as read for current user
  */
-export async function markAllNotificationsAsRead(notifications: AppNotification[]) {
+export async function markAllNotificationsAsRead(notifications: AppNotification[], userId: string, isAdmin: boolean = false) {
   try {
-    const unread = notifications.filter(n => !n.read);
+    const targets = notifications.filter(n => 
+      !n.read && (n.recipientId === userId || (isAdmin && n.recipientId === 'admin'))
+    );
+    
+    if (targets.length === 0) return;
+
     const batch = writeBatch(db);
-    unread.forEach(n => {
+    targets.forEach(n => {
       batch.update(doc(db, 'notifications', n.id), { read: true });
     });
     await batch.commit();
@@ -401,12 +406,18 @@ export async function deleteNotification(id: string) {
 }
 
 /**
- * Clear all notifications
+ * Clear all notifications for current user
  */
-export async function clearAllNotifications(notifications: AppNotification[]) {
+export async function clearAllNotifications(notifications: AppNotification[], userId: string, isAdmin: boolean = false) {
   try {
+    const targets = notifications.filter(n => 
+      n.recipientId === userId || (isAdmin && n.recipientId === 'admin')
+    );
+
+    if (targets.length === 0) return;
+
     const batch = writeBatch(db);
-    notifications.forEach(n => {
+    targets.forEach(n => {
       batch.delete(doc(db, 'notifications', n.id));
     });
     await batch.commit();

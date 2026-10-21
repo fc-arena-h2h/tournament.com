@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar } from 'lucide-react';
+import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { GameLoader } from '@/src/components/ui/GameLoader';
@@ -325,6 +325,27 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </div>
 
               <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-50">
+                {/* Opponent Messenger Quick Contact */}
+                {!isAdminUser && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const isHome = auth.currentUser?.uid === match.homePlayerId;
+                      const opponentUid = isHome ? match.awayPlayerId : match.homePlayerId;
+                      const opponentProfile = profiles[opponentUid];
+                      if (opponentProfile?.messengerLink) {
+                        window.open(opponentProfile.messengerLink, '_blank');
+                      } else {
+                        alert('This opponent hasn\'t linked their Messenger profile yet.');
+                      }
+                    }}
+                    className="w-12 h-12 rounded-xl nm-flat bg-white flex items-center justify-center text-sky-500 border border-slate-100 hover:bg-sky-50 transition-colors shadow-sm shrink-0"
+                    title="Contact Opponent"
+                  >
+                    <MessageCircle size={20} fill="currentColor" className="opacity-80" />
+                  </button>
+                )}
+
                 {auth.currentUser?.uid === match.homePlayerId && match.status === 'scheduled' && (
                   <button onClick={() => { setReportingMatch(match); setReportFormData({ home: 0, away: 0 }); }} className="flex-1 h-12 rounded-xl bg-fc-green text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
                     <Upload size={14} /> Report Result

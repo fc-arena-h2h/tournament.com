@@ -50,15 +50,21 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
       const joinedIds = regSnap.docs.map(d => d.data().tournamentId);
       
       // Initial fetch or update featured tournaments list
-      const qT = query(collection(db, 'tournaments'), limit(10));
+      const qT = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(15));
       getDocs(qT).then(tSnap => {
         const all = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         // Filter: user is publisher, user is registered, or tournament is open
-        const filtered = all.filter(t => 
+        let filtered = all.filter(t => 
           joinedIds.includes(t.id) || 
           t.publisherId === profile.uid || 
           t.status === 'open'
         );
+
+        // Fallback: If no matches found, show the 3 most recent tournaments regardless of status
+        if (filtered.length === 0 && all.length > 0) {
+          filtered = all.slice(0, 3);
+        }
+        
         setFeaturedTournaments(filtered.slice(0, 3));
       }).catch(err => handleErr("Firestore Featured Tournaments Error", err));
 
@@ -288,6 +294,15 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         </Reveal>
 
         <div className="grid grid-cols-1 gap-8">
+          {featuredTournaments.length === 0 && (
+            <div className="py-20 text-center space-y-4 nm-inset rounded-[2.5rem] bg-slate-50/50">
+              <Trophy size={48} className="mx-auto text-slate-200" />
+              <div className="space-y-1">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">No Active Tournaments</p>
+                <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Check back later for new events</p>
+              </div>
+            </div>
+          )}
           {featuredTournaments.map((t, idx) => (
             <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
               <Card className="p-0 group active:scale-[0.98] overflow-hidden border-2 border-white hover:border-fc-green/20 transition-all shadow-xl" onClick={() => onEnterTournament(t)}>

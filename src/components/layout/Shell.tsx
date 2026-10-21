@@ -1,4 +1,4 @@
-import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut, Languages } from 'lucide-react';
+import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut, Languages, Send } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { usePWAInstall } from '@/src/hooks/usePWAInstall';
 import { useState, useEffect } from 'react';
@@ -8,6 +8,10 @@ import { Card } from '@/src/components/ui/Primitives';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { SupportAI } from '@/src/components/ui/SupportAI';
+import { Logo } from '@/src/components/ui/Logo';
 
 export type NavTab = 'arena' | 'matches' | 'tournament' | 'profile';
 
@@ -26,7 +30,7 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
   ];
 
   return (
-    <nav className="fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-lg px-1 sm:px-2">
+    <nav className="fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-[9000] w-[96%] max-w-lg px-1 sm:px-2">
       <div className="nm-flat rounded-[2.5rem] sm:rounded-[3rem] h-20 sm:h-24 flex items-center justify-around border-2 border-white/50 px-2 sm:px-4 shadow-2xl">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -76,6 +80,8 @@ export const Header = ({
   const { t } = useI18n();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showSupportAI, setShowSupportAI] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [hasNew, setHasNew] = useState(false);
 
@@ -96,7 +102,7 @@ export const Header = ({
   return (
     <header className={cn(
       "fixed top-0 left-0 right-0 px-3 sm:px-6 py-4 sm:py-6 transition-all duration-300",
-      showMenu ? "z-[3000]" : "z-50"
+      showMenu || showAbout || showSupportAI ? "z-[3000]" : "z-50"
     )}>
       <div className="nm-flat rounded-full h-18 sm:h-20 px-4 sm:px-8 flex items-center justify-between border-2 border-white/50 relative">
         <div className="flex items-center gap-4">
@@ -109,9 +115,7 @@ export const Header = ({
           ) : (
             <div className="relative group">
               <div className="w-14 h-14 rounded-[1.2rem] bg-fc-dark border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
-                <div className="relative z-10 flex items-center justify-center">
-                  <Trophy size={24} className="text-fc-gold drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" fill="currentColor" />
-                </div>
+                <Logo size={42} variant="color" className="relative z-10" />
                 
                 {/* Pro Badge */}
                 <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-600 text-white text-[6px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg border border-white/20 transform rotate-12 group-hover:rotate-0 transition-transform">
@@ -177,6 +181,112 @@ export const Header = ({
           </button>
         </div>
       </div>
+
+      <SupportAI 
+        isOpen={showSupportAI} 
+        onClose={() => setShowSupportAI(false)} 
+        userId={auth.currentUser?.uid || 'guest'} 
+      />
+
+      {/* About Arena Modal */}
+      <AnimatePresence>
+        {showAbout && (
+          <div className="fixed inset-0 z-[4000] bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-lg bg-[#f0f1f5] rounded-[3rem] border-2 border-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-white/20 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl nm-inset bg-[#e6e6e9] flex items-center justify-center text-indigo-600">
+                    <Info size={24} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">App Identity</span>
+                    <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">About <span className="text-indigo-600">Arena</span></h2>
+                  </div>
+                </div>
+                <button onClick={() => setShowAbout(false)} className="w-11 h-11 rounded-2xl nm-flat bg-white flex items-center justify-center text-slate-400 active:nm-pressed">
+                  <X size={22} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-8 overflow-y-auto no-scrollbar pb-12">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Welcome to the Arena
+                  </h3>
+                  <p className="text-xs font-bold text-slate-500 leading-relaxed uppercase tracking-tight">
+                    Thank you for joining <span className="text-indigo-600">FC ARENA VS</span>. We are honored to welcome you to the most professional eSports management platform for FC Mobile pro players. Our goal is to provide a seamless, competitive, and fair environment for the community to showcase their skills.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    Core Features
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { title: 'Tournament Tracking', desc: 'Real-time updates on active Cups and match schedules.' },
+                      { title: 'Automated Brackets', desc: 'Instant progression from group stages to knockout finals.' },
+                      { title: 'Digital Hub', desc: 'Direct Messenger & WhatsApp contact for opponent coordination.' },
+                      { title: 'Official Results', desc: 'Direct score reporting and host verification for all matches.' },
+                      { title: 'Smart Alerts', desc: 'Push notifications for match schedules and tournament news.' }
+                    ].map((f) => (
+                      <div key={f.title} className="p-4 rounded-2xl nm-inset bg-white/40 border border-white/50 space-y-1">
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{f.title}</span>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight leading-normal">{f.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-fc-green" />
+                    How It Works
+                  </h3>
+                  <div className="p-6 rounded-[2rem] nm-flat bg-white border border-white/50 space-y-4">
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Phase 1: Enlistment</span>
+                      <p className="text-[10px] font-bold text-slate-600 leading-relaxed uppercase italic">
+                        Verified Hosts create tournaments with unique prize pools and rules. Players enlist in public or invited Cups using their FC Mobile credentials.
+                      </p>
+                    </div>
+                    <div className="h-px bg-slate-100" />
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Phase 2: Battle</span>
+                      <p className="text-[10px] font-bold text-slate-600 leading-relaxed uppercase italic">
+                        Once approved, you enter the Arena. Matches are automatically scheduled. Connect with your opponent via the integrated Messenger links to coordinate the game.
+                      </p>
+                    </div>
+                    <div className="h-px bg-slate-100" />
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Phase 3: Victory</span>
+                      <p className="text-[10px] font-bold text-slate-600 leading-relaxed uppercase italic">
+                        Report your match score directly in the app. Once confirmed by the host, winners advance through the bracket until a champion is crowned.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-indigo-50/50 border-t border-white/20 text-center shrink-0">
+                <button 
+                  onClick={() => setShowAbout(false)}
+                  className="w-full h-14 nm-flat bg-indigo-600 rounded-2xl text-white font-black uppercase tracking-widest italic active:nm-pressed shadow-xl"
+                >
+                  Return to Menu
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Notification Panel Overlay */}
       {showNotifications && (
@@ -265,8 +375,36 @@ export const Header = ({
                         alert(res.message);
                       }
                     },
-                    { label: 'Support Center', icon: HeartHandshake, color: 'text-indigo-500', sub: '24/7 Player Assistance' },
-                    { label: 'About Arena', icon: Info, color: 'text-slate-800', sub: 'FC Mobile eSports Platform' }
+                    { 
+                      label: 'Support Center', 
+                      icon: HeartHandshake, 
+                      color: 'text-indigo-500', 
+                      sub: '24/7 Player Assistance',
+                      onClick: () => {
+                        setShowMenu(false);
+                        setShowSupportAI(true);
+                      }
+                    },
+                    { 
+                      label: 'About Arena', 
+                      icon: Info, 
+                      color: 'text-slate-800', 
+                      sub: 'FC Mobile eSports Platform',
+                      onClick: () => {
+                        setShowMenu(false);
+                        setShowAbout(true);
+                      }
+                    },
+                    { 
+                      label: 'Contact Us', 
+                      icon: Send, 
+                      color: 'text-sky-500', 
+                      sub: 'Join our Telegram community',
+                      onClick: () => {
+                        setShowMenu(false);
+                        window.open('https://t.me/fcarenavs', '_blank');
+                      }
+                    }
                   ].map((item) => (
                     <button 
                       key={item.label} 

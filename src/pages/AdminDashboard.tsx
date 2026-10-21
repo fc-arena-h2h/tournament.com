@@ -4,7 +4,7 @@ import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, 
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
-  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon 
+  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon, Download
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -48,6 +48,12 @@ export const AdminDashboard = ({
   const [licenseKeys, setLicenseKeys] = useState<any[]>([]);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [settings, setSettings] = useState({ telegramLink: 'https://t.me/your_admin_telegram' });
+  const [appSettings, setAppSettings] = useState({ 
+    min_version: '2.4.1', 
+    app_id: 'fc-arena-vs-2024', 
+    force_update: true,
+    update_url: 'https://t.me/fcarenavsofficial'
+  });
 
   useEffect(() => {
     if (!auth.currentUser || !userProfile) return;
@@ -96,6 +102,7 @@ export const AdminDashboard = ({
     // 2. Fetch Keys & Settings (Admin Only)
     let unsubKeys: (() => void) | null = null;
     let unsubSettings: (() => void) | null = null;
+    let unsubAppSettings: (() => void) | null = null;
 
     if (userProfile.role === 'admin') {
       const kQ = query(collection(db, 'licenseKeys'), orderBy('createdAt', 'desc'), limit(50));
@@ -108,12 +115,27 @@ export const AdminDashboard = ({
           setSettings(snap.data() as any);
         }
       });
+
+      unsubAppSettings = onSnapshot(doc(db, 'system_config', 'app_settings'), (snap) => {
+        if (snap.exists()) {
+          setAppSettings(snap.data() as any);
+        } else {
+          // Initialize with current app defaults if missing
+          setDoc(doc(db, 'system_config', 'app_settings'), {
+            min_version: '2.4.1',
+            app_id: 'fc-arena-vs-2024',
+            force_update: true,
+            update_url: 'https://t.me/fcarenavsofficial'
+          }).catch(console.error);
+        }
+      });
     }
 
     return () => {
       unsubTournaments();
       if (unsubKeys) unsubKeys();
       if (unsubSettings) unsubSettings();
+      if (unsubAppSettings) unsubAppSettings();
     };
   }, [userProfile?.role, auth.currentUser?.uid]);
 
@@ -247,6 +269,12 @@ export const AdminDashboard = ({
                     <Button onClick={handleBroadcast} className="w-full h-12 rounded-xl flex items-center gap-2"><Megaphone size={16} /> Broadcast Update</Button>
                   </Card>
                 )}
+                {Object.values(tournaments).length === 0 && (
+                  <div className="py-20 text-center space-y-4 nm-inset rounded-[2.5rem] bg-slate-50/50 mx-2">
+                    <Trophy size={48} className="mx-auto text-slate-200" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">No Tournaments Created</p>
+                  </div>
+                )}
                 {Object.values(tournaments).map(t => (
                   <Card key={t.id} className="p-6 border-none mx-2 group">
                     <div className="flex items-center justify-between">
@@ -266,19 +294,91 @@ export const AdminDashboard = ({
             <section className="space-y-12 animate-in fade-in">
               <div className="space-y-6">
                 <div className="px-4 flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-800 uppercase italic">System Settings</h3>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Platform Control</h3>
                 </div>
-                <Card className="p-6 border-none mx-2 space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Admin Telegram Link</label>
+                
+                {/* Admin Links */}
+                <Card className="p-6 border-none mx-2 space-y-6 bg-white shadow-sm">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2">
+                      <Megaphone size={12} /> Communication Links
+                    </label>
                     <div className="flex gap-2">
                       <Input 
-                        placeholder="https://t.me/username"
+                        placeholder="Admin Telegram Link"
                         value={settings.telegramLink}
                         onChange={(e) => setSettings({ ...settings, telegramLink: e.target.value })}
+                        className="h-14"
                       />
-                      <Button onClick={handleSaveSettings} className="h-12 px-6">Save</Button>
+                      <Button onClick={handleSaveSettings} className="h-14 px-8 nm-flat bg-indigo-600 text-white font-black uppercase">Update</Button>
                     </div>
+                  </div>
+
+                  <div className="h-px bg-slate-100" />
+
+                  {/* App Update Management */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2">
+                      <Download size={12} /> App Update Protocol
+                    </label>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                       <div className="space-y-1.5">
+                          <span className="text-[8px] font-black text-slate-400 uppercase ml-2">Min Version</span>
+                          <Input 
+                            value={appSettings.min_version}
+                            onChange={(e) => setAppSettings({...appSettings, min_version: e.target.value})}
+                            placeholder="e.g. 2.4.1"
+                          />
+                       </div>
+                       <div className="space-y-1.5">
+                          <span className="text-[8px] font-black text-slate-400 uppercase ml-2">Application ID</span>
+                          <Input 
+                            value={appSettings.app_id}
+                            onChange={(e) => setAppSettings({...appSettings, app_id: e.target.value})}
+                            placeholder="fc-arena-vs-2024"
+                          />
+                       </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                       <span className="text-[8px] font-black text-slate-400 uppercase ml-2">Official Update URL</span>
+                       <Input 
+                         value={appSettings.update_url}
+                         onChange={(e) => setAppSettings({...appSettings, update_url: e.target.value})}
+                         placeholder="https://t.me/..."
+                       />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-2xl nm-inset bg-slate-50">
+                       <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Enforce Mandatory Update</span>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase">Blocks app usage if version mismatch</span>
+                       </div>
+                       <button 
+                         onClick={() => setAppSettings({...appSettings, force_update: !appSettings.force_update})}
+                         className={cn(
+                           "w-14 h-8 rounded-full transition-all relative flex items-center px-1",
+                           appSettings.force_update ? "bg-emerald-500" : "bg-slate-300"
+                         )}
+                       >
+                          <div className={cn("w-6 h-6 rounded-full bg-white shadow-md transition-all", appSettings.force_update ? "translate-x-6" : "translate-x-0")} />
+                       </button>
+                    </div>
+
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          await setDoc(doc(db, 'system_config', 'app_settings'), appSettings, { merge: true });
+                          alert('App Update Settings Deployment Successful!');
+                        } catch (e) {
+                          alert('Deployment Failed!');
+                        }
+                      }}
+                      className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-widest shadow-xl"
+                    >
+                      Deploy Update Protocol
+                    </Button>
                   </div>
                 </Card>
               </div>

@@ -961,7 +961,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 <div>
                    <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">REPORT RESULT</h3>
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                     {isKnockout ? 'Knockout Stage · Decisive Winner Required' : 'Submit proof and final scoreline'}
+                     {isKnockout ? 'Knockout Stage · Decisive Winner Required' : 'Submit final match scoreline'}
                    </p>
                 </div>
              </div>
@@ -1911,7 +1911,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <Trophy size={20} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">১. অটো নকআউট প্রগ্রেস</span>
+                    <span className="text-[10px] font-black text-fc-dark uppercase block">1. AUTO-PROGRESSION</span>
                     <span className="text-[8px] font-bold text-slate-400 uppercase">Auto-Progression System</span>
                   </div>
                 </div>
@@ -1923,11 +1923,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     isAutoProgressionActive ? "bg-indigo-600 text-white border-indigo-700" : "bg-slate-100 text-slate-400 border-slate-200"
                   )}
                 >
-                  {isAutoProgressionActive ? "চালু আছে" : "বন্ধ আছে"}
+                  {isAutoProgressionActive ? "ACTIVE" : "INACTIVE"}
                 </button>
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed italic">
-                গ্রুপ পর্বের বিজয়ীরা স্বয়ংক্রিয়ভাবে নকআউট পর্বে যাবে এবং পরবর্তী রাউন্ডে অগ্রসর হবে।
+                Group winners automatically advance to knockout stages and progress to the next rounds.
               </p>
             </div>
 
@@ -1946,14 +1946,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     {isStep1Done ? <CheckCircle size={20} /> : <Users size={20} />}
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">২. অটোমেটিক গ্রুপ সেটাপ</span>
+                    <span className="text-[10px] font-black text-fc-dark uppercase block">2. AUTO GROUP SETUP</span>
                     <span className="text-[8px] font-bold text-slate-400 uppercase">Auto Group Setup</span>
                   </div>
                 </div>
                 {isStep1Done && <span className="text-[9px] font-black text-emerald-600 uppercase italic">Done</span>}
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                প্লেয়ার লিস্টে থাকা প্লেয়ারদের স্বয়ংক্রিয়ভাবে গ্রুপে ভাগ করে দিবে। (প্রতি গ্রুপে ৪ জন)
+                Automatically distribute players from the list into groups. (4 players per group)
               </p>
             </button>
 
@@ -1972,14 +1972,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     {isStep2Done ? <CheckCircle size={20} /> : <Zap size={20} />}
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">৩. অটোমেটিক ম্যাচ ডিপ্লয়</span>
+                    <span className="text-[10px] font-black text-fc-dark uppercase block">3. AUTO MATCH DEPLOY</span>
                     <span className="text-[8px] font-bold text-slate-400 uppercase">Auto Match Deploy</span>
                   </div>
                 </div>
                 {isStep2Done && <span className="text-[9px] font-black text-emerald-600 uppercase italic">Done</span>}
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                চালু করলে গ্রুপ ও নকআউট পর্বের ম্যাচগুলো অটোমেটিক তৈরি হবে।
+                Generate all group and knockout stage matches automatically based on assignments.
               </p>
             </button>
 
@@ -1997,12 +1997,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   <Edit3 size={20} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black text-fc-dark uppercase block">৪. ম্যানুয়াল গ্রুপ সেটাপ</span>
+                  <span className="text-[10px] font-black text-fc-dark uppercase block">4. MANUAL GROUP SETUP</span>
                   <span className="text-[8px] font-bold text-slate-400 uppercase">Manual Group Setup</span>
                 </div>
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                পাবলিশার ম্যানুয়ালি প্রতিটি প্লেয়ারের গ্রুপ সিলেক্ট করে দিতে পারবেন।
+                Host can manually select and assign a group for every registered player.
               </p>
             </button>
 
@@ -2017,19 +2017,19 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   <Plus size={20} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black text-fc-dark uppercase block">৫. ম্যানুয়াল ম্যাচ ডিপ্লয়</span>
+                  <span className="text-[10px] font-black text-fc-dark uppercase block">5. MANUAL MATCH DEPLOY</span>
                   <span className="text-[8px] font-bold text-slate-400 uppercase">Manual Match Creation</span>
                 </div>
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                পাবলিশার ম্যানুয়ালি যেকোনো দুটি প্লেয়ারের মধ্যে ম্যাচ তৈরি করতে পারবেন।
+                Host can manually create custom matches between any two specific players.
               </p>
             </button>
 
             {/* 6. Match Result Upload Type */}
             <div className="p-6 nm-flat rounded-[2rem] space-y-4">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-indigo-900 uppercase">৬. ম্যাচ রেজাল্ট আপলোড টাইপ</span>
+                <span className="text-[10px] font-black text-indigo-900 uppercase">6. RESULT UPLOAD TYPE</span>
                 <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest">Result Upload Authority</span>
               </div>
               
@@ -2041,7 +2041,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     currentUploadType === 'players' ? "bg-white border-indigo-200 text-indigo-600 shadow-sm" : "bg-transparent border-transparent text-slate-400"
                   )}
                 >
-                  প্লেয়ার আপলোড
+                  PLAYER UPLOAD
                 </button>
                 <button 
                   onClick={() => currentUploadType !== 'publisher' && handleToggleResultUploadType()}
@@ -2050,11 +2050,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     currentUploadType === 'publisher' ? "bg-white border-indigo-200 text-indigo-600 shadow-sm" : "bg-transparent border-transparent text-slate-400"
                   )}
                 >
-                  অনলি পাবলিশার
+                  ONLY PUBLISHER
                 </button>
               </div>
               <p className="text-[8px] font-bold text-indigo-400/80 uppercase text-center">
-                {currentUploadType === 'players' ? "প্লেয়াররা নিজেরাই ম্যাচ রেজাল্ট সাবমিট করতে পারবে।" : "শুধুমাত্র টুর্নামেন্ট পাবলিশার রেজাল্ট দিতে পারবেন।"}
+                {currentUploadType === 'players' ? "Players are allowed to report their own match scores directly." : "Only the tournament host has authority to record match results."}
               </p>
             </div>
           </div>
@@ -2100,7 +2100,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    onClick={handleResetTournament}
                    className="w-full py-4 rounded-2xl bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
                  >
-                   Emergency Reset (টুর্নামেন্ট রিসেট)
+                   Emergency Reset (Tournament Reset)
                  </button>
                  <p className="text-[7px] font-bold text-slate-400 uppercase px-4">
                    Clears all matches and scores while keeping the player roster intact
@@ -2115,7 +2115,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           <div className="p-8 rounded-[2.5rem] bg-rose-50 border-2 border-rose-100 space-y-5 shadow-sm">
              <div className="flex items-center gap-3">
                 <AlertTriangle size={20} className="text-rose-500" />
-                <span className="text-[10px] font-black text-rose-900 uppercase tracking-widest italic">Danger Zone (বিপদজনক এলাকা)</span>
+                <span className="text-[10px] font-black text-rose-900 uppercase tracking-widest italic">Danger Zone</span>
              </div>
              <button 
                onClick={handleDeleteTournament}
@@ -2174,7 +2174,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
                   {selectedPlayerProfile.inGameName}
                 </h3>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+                {(profile?.role === 'admin' || selectedPlayerProfile.email === auth.currentUser?.email) && (
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+                )}
               </div>
 
               <div className="w-full grid grid-cols-1 gap-3">
@@ -2373,6 +2375,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           {/* Action Buttons & Two-Step Verification */}
           <div className="flex flex-wrap gap-3 pt-4 relative z-10 border-t border-slate-50">
+            {/* Opponent Messenger Quick Contact */}
+            {isParticipant && !isAdminUser && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const opponentProfile = isHome ? awayProfile : homeProfile;
+                  if (opponentProfile?.messengerLink) {
+                    window.open(opponentProfile.messengerLink, '_blank');
+                  } else {
+                    alert('This opponent hasn\'t linked their Messenger profile yet.');
+                  }
+                }}
+                className="w-12 h-12 rounded-xl nm-flat bg-white flex items-center justify-center text-sky-500 border border-slate-100 hover:bg-sky-50 transition-colors shadow-sm shrink-0"
+                title="Contact Opponent"
+              >
+                <MessageCircle size={20} fill="currentColor" className="opacity-80" />
+              </button>
+            )}
+
             {/* Step 1: Upload Result (Any Participant can report) */}
             {/* Step 1: Upload Result (Participant or Admin depending on setting) */}
             {match.status === 'scheduled' && (
@@ -2385,7 +2406,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   isAdminUser ? "bg-fc-dark shadow-fc-dark/20" : "bg-fc-green shadow-fc-green/20"
                 )}
               >
-                <Upload size={14} /> {isAdminUser ? 'Admin: Report Result' : 'Step 1: Upload Score & Proof'}
+                <Upload size={14} /> {isAdminUser ? 'Admin: Report Result' : 'Step 1: Report Final Score'}
               </button>
             )}
             

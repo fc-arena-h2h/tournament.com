@@ -11,11 +11,13 @@ import { ArenaDetail } from '@/src/pages/ArenaDetail';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useFraudProtection } from '@/src/hooks/useFraudProtection';
 import { useI18n } from '@/src/lib/i18n';
+import { useAppUpdate } from '@/src/hooks/useAppUpdate';
 import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
 import { SetupProfile } from '@/src/components/auth/SetupProfile';
 import { GameLoader } from '@/src/components/ui/GameLoader';
+import { UpdateOverlay } from '@/src/components/ui/UpdateOverlay';
 import { Button } from '@/src/components/ui/Primitives';
-import { collection, query, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/src/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
@@ -30,11 +32,13 @@ import {
 import { NotificationCenter } from '@/src/components/ui/NotificationCenter';
 import { NotificationToast } from '@/src/components/ui/NotificationToast';
 import { Bell, BellRing, X, ShieldAlert } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 
 export default function App() {
   const { t } = useI18n();
   const { user, profile, loading } = useAuth();
+  const { updateRequired, serverVersion, isMandatory, updateUrl, loading: updateLoading } = useAppUpdate();
   const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
@@ -66,10 +70,14 @@ export default function App() {
       }, 2000);
     }
 
+    const recipientIds = [user.uid, 'all'];
+    if (isAdmin) recipientIds.push('admin');
+
     const q = query(
       collection(db, 'notifications'),
+      where('recipientId', 'in', recipientIds),
       orderBy('createdAt', 'desc'),
-      limit(25)
+      limit(30)
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
@@ -79,16 +87,12 @@ export default function App() {
       snapshot.docs.forEach((d) => {
         const data = d.data();
         const n: AppNotification = { id: d.id, ...data } as AppNotification;
+        list.push(n);
 
-        const isForUser = n.recipientId === user.uid || n.recipientId === 'all' || (isAdmin && n.recipientId === 'admin');
-        if (isForUser) {
-          list.push(n);
-
-          if (initialNotifLoadRef.current && !n.read && !knownNotifIdsRef.current.has(n.id)) {
-            newItems.push(n);
-          }
-          knownNotifIdsRef.current.add(n.id);
+        if (initialNotifLoadRef.current && !n.read && !knownNotifIdsRef.current.has(n.id)) {
+          newItems.push(n);
         }
+        knownNotifIdsRef.current.add(n.id);
       });
 
       setNotifications(list);
@@ -171,8 +175,12 @@ export default function App() {
     }
   };
 
-  if (loading || !hasStartedApp) {
+  if (loading || !hasStartedApp || updateLoading) {
     return <GameLoader onComplete={() => setHasStartedApp(true)} />;
+  }
+
+  if (updateRequired) {
+    return <UpdateOverlay serverVersion={serverVersion} isMandatory={isMandatory} updateUrl={updateUrl} />;
   }
 
   if (!user) {
@@ -252,12 +260,12 @@ export default function App() {
       return isAdminCreating ? 'CREATE TOURNAMENT' : (profile.role === 'admin' ? 'COMMAND CENTER' : 'PUBLISHER PORTAL');
     }
     switch (activeTab) {
-      case 'arena': return 'Dashboard';
+      case 'arena': return 'DASHBOARD';
       case 'matches': return 'My Matches';
 
       case 'tournament': return 'ARENA';
-      case 'profile': return 'Settings';
-      default: return 'Dashboard';
+      case 'profile': return 'SETTINGS';
+      default: return 'DASHBOARD';
     }
   };
 
@@ -285,13 +293,22 @@ export default function App() {
         />
 
         {/* Phone Notification Enable Banner */}
-        <main className="max-w-lg mx-auto px-4 sm:px-6 pt-28 pb-36 min-h-screen animate-slide-left" key={activeTab}>
-          {content}
-        </main>
+        <AnimatePresence mode="wait">
+          <motion.main 
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="max-w-lg mx-auto px-4 sm:px-6 pt-28 pb-36 min-h-screen"
+          >
+            {content}
+          </motion.main>
+        </AnimatePresence>
 
         {/* Tournament Arena Window - Outside main to prevent transform issues */}
         {selectedTournament && (
-          <div className="fixed inset-0 z-[4000] bg-soft-bg overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
+          <div className="fixed inset-0 z-[8000] bg-soft-bg overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
             <ArenaDetail 
               tournament={selectedTournament} 
               profile={profile} 
@@ -300,13 +317,15 @@ export default function App() {
           </div>
         )}
 
-        <BottomNav 
-          activeTab={activeTab} 
-          onTabChange={(tab) => {
-            setSelectedTournament(null);
-            setActiveTab(tab);
-          }} 
-        />
+        <div className="relative z-[9000]">
+          <BottomNav 
+            activeTab={activeTab} 
+            onTabChange={(tab) => {
+              setSelectedTournament(null);
+              setActiveTab(tab);
+            }} 
+          />
+        </div>
 
 
         {/* Real-time Notification Center Modal */}

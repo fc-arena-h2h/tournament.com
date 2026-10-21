@@ -146,11 +146,11 @@ export const AuthPage = () => {
             <h1 className="text-4xl sm:text-5xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">
               FC ARENA
             </h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center justify-center gap-2">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center justify-center gap-2">
               <span>EST. 2024</span>
               <div className="w-1 h-1 rounded-full bg-indigo-500" />
               <span className="text-indigo-600">Pro Esports Management</span>
-            </p>
+            </div>
           </div>
         </div>
 

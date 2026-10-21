@@ -133,166 +133,191 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
+  const isAdmin = notifications.some(n => n.recipientId === 'admin'); // Rough check or pass via props
+
+  const handleMarkAllRead = () => {
+    if (!userId) return;
+    markAllNotificationsAsRead(notifications, userId, isAdmin);
+  };
+
+  const handleClearAll = () => {
+    if (!userId) return;
+    if (window.confirm('Clear all personal notifications?')) {
+      clearAllNotifications(notifications, userId, isAdmin);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[5000] bg-slate-900/60 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[5000] bg-slate-950/40 backdrop-blur-sm flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-300">
       <div 
-        className="w-full sm:max-w-lg bg-[#f0f0f3] rounded-t-[2.5rem] sm:rounded-[2.5rem] h-[90vh] sm:h-[85vh] flex flex-col shadow-2xl border-2 border-white/80 overflow-hidden relative"
+        className="w-full sm:max-w-lg bg-[#f0f0f3] rounded-t-[3rem] sm:rounded-[3rem] h-[92vh] sm:h-[85vh] flex flex-col shadow-2xl border-t-2 border-white/50 relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Top Handle for Mobile Drag Feel */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-300/50 rounded-full mx-auto mt-4 mb-2 shrink-0" />
+
         {/* Header */}
-        <div className="p-5 sm:p-6 pb-4 border-b border-slate-200 bg-white/70 backdrop-blur-md flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl nm-inset bg-[#e6e6e9] flex items-center justify-center text-indigo-600 relative">
-              <BellRing size={22} className="animate-wiggle" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black border-2 border-white shadow-sm">
-                  {unreadCount}
-                </span>
-              )}
+        <div className="p-6 sm:p-8 pb-5 flex flex-col gap-6 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl nm-inset bg-[#e6e6e9] flex items-center justify-center text-indigo-600 relative">
+                <BellRing size={26} className={unreadCount > 0 ? "animate-wiggle" : ""} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black border-2 border-[#f0f0f3] flex items-center justify-center shadow-lg">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-black text-indigo-500/70 uppercase tracking-[0.3em] block">Real-time alerts</span>
+                <h2 className="text-2xl font-black text-slate-800 uppercase italic leading-none tracking-tighter">Notification <span className="text-indigo-600">Center</span></h2>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Real-time alerts</span>
-              <h2 className="text-xl font-black text-slate-900 uppercase italic">Notification Center</h2>
+
+            <div className="flex items-center gap-3">
+               <button
+                onClick={() => playNotificationSound()}
+                className="w-11 h-11 rounded-2xl nm-flat bg-white/50 text-slate-400 hover:text-indigo-500 flex items-center justify-center active:nm-pressed transition-all"
+                title="Test sound"
+              >
+                <Volume2 size={20} />
+              </button>
+              <button 
+                onClick={onClose}
+                className="w-11 h-11 rounded-2xl nm-flat bg-white/50 text-slate-400 hover:text-rose-500 flex items-center justify-center active:nm-pressed transition-all"
+              >
+                <X size={22} />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={async () => {
-                setPushLoading(true);
-                try {
-                  const res = await requestPushNotificationToken(userId);
-                  if (res.success) {
-                    await sendTestPhoneNotification();
-                    alert('Push notifications successfully activated!');
-                  } else {
-                    alert(res.error || 'Permission not granted');
+          {/* Quick Push Access */}
+          <div className="nm-inset p-3.5 rounded-[1.8rem] bg-white/30 flex items-center justify-between border border-white/40">
+             <div className="flex items-center gap-3 pl-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">SYSTEM CHANNEL ACTIVE</span>
+             </div>
+             <button
+                onClick={async () => {
+                  setPushLoading(true);
+                  try {
+                    const res = await requestPushNotificationToken(userId);
+                    if (res.success) {
+                      await sendTestPhoneNotification();
+                    } else {
+                      alert(res.error || 'Permission Denied');
+                    }
+                  } finally {
+                    setPushLoading(false);
                   }
-                } finally {
-                  setPushLoading(false);
-                }
-              }}
-              disabled={pushLoading}
-              className="px-2.5 py-1.5 rounded-xl nm-flat text-indigo-600 hover:text-indigo-700 flex items-center gap-1 active:nm-pressed text-[10px] font-black uppercase tracking-wider"
-              title="Enable / Test background push notifications"
+                }}
+                disabled={pushLoading}
+                className="px-5 py-2.5 rounded-[1.2rem] nm-flat bg-white text-indigo-600 active:nm-pressed text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm"
+              >
+                <ShieldAlert size={14} className={pushLoading ? 'animate-spin' : ''} />
+                <span>{pushLoading ? 'WAIT...' : 'ENABLE PUSH'}</span>
+              </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="px-6 pb-2 shrink-0">
+          <div className="flex nm-inset p-1.5 rounded-[1.8rem] bg-[#e6e6e9] border border-white/50">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={cn(
+                "flex-1 py-3 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2",
+                activeTab === 'all' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
+              )}
             >
-              <BellRing size={14} className={pushLoading ? 'animate-spin' : 'animate-wiggle text-amber-500'} />
-              <span>{pushLoading ? '...' : 'Push'}</span>
+              ALL <span className="opacity-50">({notifications.length})</span>
             </button>
             <button
-              onClick={() => playNotificationSound()}
-              className="w-9 h-9 rounded-xl nm-flat text-slate-500 hover:text-indigo-600 flex items-center justify-center active:nm-pressed"
-              title="Test notification sound"
+              onClick={() => setActiveTab('unread')}
+              className={cn(
+                "flex-1 py-3 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2",
+                activeTab === 'unread' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
+              )}
             >
-              <Volume2 size={16} />
+              UNREAD
+              {unreadCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] font-black flex items-center justify-center shadow-sm">
+                  {unreadCount}
+                </span>
+              )}
             </button>
-            <button 
-              onClick={onClose}
-              className="w-10 h-10 rounded-full nm-flat flex items-center justify-center text-slate-500 hover:text-slate-900 active:nm-pressed"
+            <button
+              onClick={() => setActiveTab('announcements')}
+              className={cn(
+                "flex-1 py-3 rounded-[1.4rem] text-[10px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2",
+                activeTab === 'announcements' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
+              )}
             >
-              <X size={20} />
+              ANNOUNCEMENTS <span className="opacity-50">({announcements.length})</span>
             </button>
           </div>
         </div>
 
-        {/* Tab Switcher & Quick Actions */}
-        <div className="px-4 pt-3 pb-2 flex flex-col gap-2 shrink-0">
-          <div className="flex items-center justify-between">
-            {/* Tabs */}
-            <div className="flex nm-inset p-1 rounded-2xl bg-[#e6e6e9] border border-white/50 w-full sm:w-auto">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={cn(
-                  "flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                  activeTab === 'all' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                )}
-              >
-                All ({notifications.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('unread')}
-                className={cn(
-                  "flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5",
-                  activeTab === 'unread' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                )}
-              >
-                Unread
-                {unreadCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('announcements')}
-                className={cn(
-                  "flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                  activeTab === 'announcements' ? "nm-flat bg-white text-indigo-600 shadow-sm" : "text-slate-500"
-                )}
-              >
-                Announcements ({announcements.length})
-              </button>
-            </div>
-          </div>
-
-          {/* Action Row */}
-          {activeTab !== 'announcements' && notifications.length > 0 && (
-            <div className="flex items-center justify-between px-1 text-[10px] font-bold text-slate-500">
-              <span>{filteredNotifications.length} Notifications</span>
-              <div className="flex items-center gap-3">
+        {/* Global Controls Row */}
+        {activeTab !== 'announcements' && notifications.length > 0 && (
+          <div className="px-8 py-4 flex items-center justify-between shrink-0">
+             <div className="flex flex-col">
+                <span className="text-[11px] font-black text-slate-800 uppercase italic">{filteredNotifications.length} Alerts</span>
+                <div className="w-8 h-1 bg-indigo-200 rounded-full mt-1" />
+             </div>
+             <div className="flex items-center gap-4">
                 {unreadCount > 0 && (
                   <button 
-                    onClick={() => markAllNotificationsAsRead(notifications)}
-                    className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-black uppercase"
+                    onClick={handleMarkAllRead}
+                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-[10px] font-black uppercase tracking-widest transition-colors group"
                   >
-                    <CheckCheck size={12} />
+                    <CheckCheck size={14} className="group-hover:scale-110 transition-transform" />
                     Mark all read
                   </button>
                 )}
                 <button 
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete all notifications?')) {
-                      clearAllNotifications(notifications);
-                    }
-                  }}
-                  className="flex items-center gap-1 text-rose-500 hover:text-rose-600 font-black uppercase"
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1.5 text-rose-500 hover:text-rose-600 text-[10px] font-black uppercase tracking-widest transition-colors group"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
                   Clear all
                 </button>
-              </div>
-            </div>
-          )}
-        </div>
+             </div>
+          </div>
+        )}
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto px-4 pb-12 space-y-2.5 no-scrollbar">
+        {/* Content Scroll Area */}
+        <div className="flex-1 overflow-y-auto px-6 pb-20 space-y-3.5 no-scrollbar custom-scrollbar pt-2">
           {activeTab === 'announcements' ? (
             // Announcements Tab
             announcements.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center opacity-40">
-                <Megaphone size={40} className="text-slate-400 mb-2" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-500">No Announcements</p>
+              <div className="h-64 flex flex-col items-center justify-center text-center opacity-30">
+                <div className="w-20 h-20 rounded-3xl nm-inset flex items-center justify-center mb-4">
+                  <Megaphone size={32} className="text-slate-400" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 italic">No Official Announcements</p>
               </div>
             ) : (
               announcements.map((a) => (
                 <div 
                   key={a.id} 
-                  className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm space-y-2 hover:shadow-md transition-all"
+                  className="p-5 rounded-[2rem] nm-flat bg-white space-y-3 hover:shadow-md transition-all group"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-                        <Megaphone size={14} />
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl nm-inset bg-purple-50 flex items-center justify-center text-purple-600">
+                        <Megaphone size={18} />
                       </div>
-                      <span className="text-xs font-black text-slate-800 uppercase">{a.senderName || 'Admin'}</span>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{a.senderName || 'System Admin'}</span>
+                        <div className="flex items-center gap-1 text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                          <Clock size={10} />
+                          {formatTimestamp(a.createdAt)}
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
-                      <Clock size={10} />
-                      {formatTimestamp(a.createdAt)}
-                    </span>
                   </div>
-                  <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                  <p className="text-xs font-bold text-slate-600 leading-relaxed italic border-l-4 border-purple-200 pl-4 py-1">
                     {a.text}
                   </p>
                 </div>
@@ -301,10 +326,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           ) : (
             // Notifications Tab
             filteredNotifications.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center opacity-40">
-                <Bell size={40} className="text-slate-400 mb-2" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                  {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+              <div className="h-64 flex flex-col items-center justify-center text-center opacity-30">
+                <div className="w-20 h-20 rounded-3xl nm-inset flex items-center justify-center mb-4">
+                  <Bell size={32} className="text-slate-400" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 italic">
+                  {activeTab === 'unread' ? 'Clean Slate – No Unread Alerts' : 'No Activity Logs Yet'}
                 </p>
               </div>
             ) : (
@@ -317,52 +344,57 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     key={n.id}
                     onClick={() => handleNotificationClick(n)}
                     className={cn(
-                      "p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer relative group",
+                      "p-5 rounded-[2.2rem] transition-all cursor-pointer relative group border-2",
                       n.read 
-                        ? "bg-white/70 border-slate-200/80 hover:bg-white" 
-                        : "bg-white border-indigo-200 shadow-md ring-1 ring-indigo-400/30 hover:shadow-lg"
+                        ? "nm-flat bg-white/40 border-transparent hover:bg-white" 
+                        : "nm-flat bg-white border-indigo-200/50 shadow-xl shadow-indigo-500/5 ring-1 ring-indigo-500/10"
                     )}
                   >
-                    {/* Unread dot */}
+                    {/* Unread Highlight Bar */}
                     {!n.read && (
-                      <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse border-2 border-white shadow-sm" />
+                      <div className="absolute left-0 top-10 bottom-10 w-1 bg-indigo-500 rounded-r-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
                     )}
 
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-4">
                       {/* Icon */}
-                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border", style.color)}>
-                        <IconComponent size={18} />
+                      <div className={cn("w-12 h-12 rounded-[1.2rem] flex items-center justify-center shrink-0 nm-inset bg-white", style.color)}>
+                        <IconComponent size={22} />
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className={cn("text-xs font-black tracking-tight truncate", n.read ? "text-slate-800" : "text-indigo-950")}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className={cn("text-sm font-black tracking-tight uppercase italic leading-tight truncate", n.read ? "text-slate-700" : "text-indigo-950")}>
                             {n.title}
                           </h4>
+                          {!n.read && (
+                             <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] shrink-0 mt-1.5" />
+                          )}
                         </div>
-                        <p className="text-[11px] font-semibold text-slate-600 line-clamp-2 leading-relaxed">
+                        <p className="text-[11px] font-bold text-slate-500 line-clamp-2 leading-relaxed tracking-tight mb-3">
                           {n.message}
                         </p>
                         
-                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 text-[10px]">
-                          <span className="text-slate-400 font-mono flex items-center gap-1">
-                            <Clock size={10} />
-                            {formatTimestamp(n.createdAt)}
-                          </span>
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100/50">
+                          <div className="flex items-center gap-1.5">
+                             <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                {formatTimestamp(n.createdAt)}
+                             </span>
+                          </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {n.linkTab && (
-                              <span className="text-indigo-600 font-black flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                View <ArrowRight size={10} />
-                              </span>
+                              <div className="text-indigo-600 font-black text-[9px] uppercase tracking-widest flex items-center gap-1 group-hover:translate-x-1 transition-all">
+                                View <ArrowRight size={12} />
+                              </div>
                             )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 deleteNotification(n.id);
                               }}
-                              className="text-slate-300 hover:text-rose-500 p-1 rounded-md transition-colors"
+                              className="w-8 h-8 rounded-xl nm-inset bg-white text-slate-300 hover:text-rose-500 flex items-center justify-center transition-colors"
                               title="Delete"
                             >
                               <Trash2 size={12} />
