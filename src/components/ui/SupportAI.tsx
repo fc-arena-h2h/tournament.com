@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Bot, User, MessageCircle, AlertTriangle, ExternalLink, Trash2, Clock } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Card } from '@/src/components/ui/Primitives';
+import { API_BASE_URL } from '@/src/lib/constants';
 
 interface Message {
   role: 'user' | 'model';
@@ -98,7 +99,8 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     }
 
     try {
-      const response = await fetch('/api/ai/support', {
+      const apiUrl = `${API_BASE_URL}/api/ai/support`;
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -134,7 +136,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       // Fallback message if AI fails
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: "I'm having trouble connecting to the Arena Assistant right now. If you need immediate help, please contact our team via Telegram." }],
+        parts: [{ text: "[CONNECTION ERROR] I'm currently unable to reach the Arena servers from your device. This is usually due to network restrictions or being offline. Please check your internet or reach our team on Telegram for direct support." }],
         timestamp: Date.now(),
         isError: true
       };

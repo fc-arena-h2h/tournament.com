@@ -10,8 +10,15 @@ interface UpdateOverlayProps {
 }
 
 export const UpdateOverlay: React.FC<UpdateOverlayProps> = ({ serverVersion, isMandatory, updateUrl }) => {
-  const handleUpdate = () => {
-    window.open(updateUrl, '_blank');
+  const handleUpdate = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      // Use _system to force open in external browser/app on mobile
+      window.open(updateUrl, '_system');
+    } else {
+      window.open(updateUrl, '_blank');
+    }
   };
 
   return (
@@ -67,14 +74,12 @@ export const UpdateOverlay: React.FC<UpdateOverlayProps> = ({ serverVersion, isM
         </div>
 
         <div className="space-y-4">
-          <a 
-            href={updateUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full h-18 rounded-[1.5rem] bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform group no-underline"
+          <button 
+            onClick={handleUpdate}
+            className="w-full h-18 rounded-[1.5rem] bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform group"
           >
             Update & Continue <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </a>
+          </button>
           
           <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.3em]">
             FC Arena Protocol Integration

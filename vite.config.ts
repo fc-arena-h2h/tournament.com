@@ -12,19 +12,25 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['fc_arena_icon.jpg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'sw-push-handler.js'],
+        includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'sw-push-handler.js'],
         manifest: {
           id: '/',
-          name: 'FC Arena VS – FC Mobile Tournaments',
-          short_name: 'FC Arena',
-          description: 'Tournament and 1v1 battle platform for FC Mobile gamers.',
-          theme_color: '#fdfbf7',
+          name: 'FC Arena VS – Pro Tournament Platform',
+          short_name: 'FC Arena VS',
+          description: 'The ultimate professional tournament and 1v1 battle platform for FC Mobile gamers.',
+          theme_color: '#1e293b',
           background_color: '#fdfbf7',
           display: 'standalone',
           orientation: 'portrait',
           start_url: '/',
           scope: '/',
           icons: [
+            {
+              src: '/favicon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+              purpose: 'any',
+            },
             {
               src: '/pwa-192x192.png',
               sizes: '192x192',
