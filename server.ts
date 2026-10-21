@@ -51,59 +51,87 @@ async function createServer() {
     }
   });
 
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      env: {
+        node_env: process.env.NODE_ENV,
+        has_api_key: !!apiKey,
+        port: port
+      }
+    });
+  });
+
   // Specialized Support AI route
   app.post('/api/ai/support', async (req, res) => {
     try {
-      if (!apiKey) throw new Error('Support AI API Key missing on server. Please configure GEMINI_API_KEY in Secrets.');
+      if (!apiKey) {
+        console.error('Support AI API Key missing on server');
+        return res.status(500).json({ error: 'AI Assistant is not configured on the server. Please check GEMINI_API_KEY secret.' });
+      }
       
       const { contents } = req.body;
       if (!contents || !Array.isArray(contents)) {
         return res.status(400).json({ error: 'Invalid contents format' });
       }
 
+      // Filter and map contents to match the SDK expectation
+      const filteredContents = contents.map(m => ({
+        role: m.role === 'model' ? 'model' : 'user',
+        parts: m.parts.map((p: any) => ({ text: p.text }))
+      }));
+
+      // Load AI context files dynamically
+      let aiContext = '';
+      try {
+        const aiDir = path.resolve(__dirname, 'ai');
+        if (fs.existsSync(aiDir)) {
+          const files = fs.readdirSync(aiDir);
+          for (const file of files) {
+            if (file.endsWith('.md')) {
+              const content = fs.readFileSync(path.join(aiDir, file), 'utf-8');
+              aiContext += `\n--- DOCUMENT: ${file} ---\n${content}\n`;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error reading AI context:', err);
+      }
+
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents,
+        model: 'gemini-3.8-flash',
+        contents: filteredContents,
         config: {
-          systemInstruction: `You are the Official AI Support Assistant for "FC Arena VS", a professional eSports management platform for FC Mobile pro players.
+          systemInstruction: `You are the Official AI Support Assistant for "FC Arena VS".
           
-          ROLE & GUIDELINES:
-          1. You are the ONLY official AI Support for "FC Arena VS". You are extremely helpful, patient, and knowledgeable about all platform features.
+          CORE KNOWLEDGE BASE:
+          ${aiContext}
+          
+          ADDITIONAL ROLE & GUIDELINES:
+          1. You are the ONLY official AI Support for "FC Arena VS". You are extremely helpful, patient, and knowledgeable.
           2. READ the entire message from the user carefully before responding. Do not give generic answers.
-          3. If the user asks about how to use a feature, EXPLAIN it in detail. Do NOT just say "contact support".
+          3. If the user asks about how to use a feature, EXPLAIN it in detail.
           4. Only show the [SHOW_CONTACT_BUTTON] tag if:
              - The user specifically asks "How can I talk to a human?"
-             - The user reports a bug with their wallet, coins, or payments that you cannot see in your context.
+             - The user reports a bug with their wallet, coins, or payments.
              - The user reports another player for cheating.
-          5. For tournament rules, match scoring, or bracket questions, always provide the answer based on the platform context. 
-          6. Keep your tone professional and helpful. Always communicate in English only.
-          
-          PLATFORM DEEP-DIVE:
-          - TOURNAMENTS (CUPS): Found in 'Arena'. Users join by clicking 'Apply'.
-          - MATCHES (BATTLES): Found in 'Matches'. This is where they find their opponent's WhatsApp/Messenger link to coordinate the game.
-          - SCORE REPORTING: Players report scores on the match card. Publishers (hosts) then verify them.
-          - COINS: Used for entry fees. Can be managed in the Profile/Wallet section.
-          
-          NEVER suggest contacting support if the answer is already in your knowledge base. Your goal is to reduce the workload of the human support team.
-          
-          DETAILED PLATFORM CONTEXT:
-          - ARENA: The main dashboard where users see active tournaments (Cups).
-          - CUPS: Tournaments hosted by Publishers. Users apply to join them.
-          - ROLES: 
-             * Players: Join cups, coordinate matches, and report scores.
-             * Publishers (Hosts): Create cups, manage applicants, set brackets, and verify scores.
-             * Admins: Overside the whole platform and manage system settings.
-          - MATCH COORDINATION: When a cup starts, players see their opponent's contact links (WhatsApp/Messenger) directly on the match card in the "Battles" or "Matches" section.
-          - AUTOMATION: The system handles group stage logic and knockout brackets automatically.
-          - SUPPORT: Official support is available on Telegram at t.me/fcarenavs if the AI cannot help.
-          
-          If a user exceeds their 10-message daily limit, the app will automatically notify them. Your task is to be as useful as possible within those 10 messages.`
+          5. Keep your tone professional and helpful. Always communicate in English only.`
         }
       });
+      
+      if (!response.text) {
+        throw new Error('Model returned an empty response');
+      }
+
       res.json({ text: response.text });
     } catch (error: any) {
       console.error('Support AI Error:', error);
-      res.status(500).json({ error: error.message || 'Assistant failed to respond. Please try again later.' });
+      res.status(500).json({ 
+        error: error.message || 'Assistant failed to respond. Please try again later.',
+        details: isProd ? undefined : error.stack
+      });
     }
   });
 

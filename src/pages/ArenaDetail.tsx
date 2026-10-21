@@ -2150,12 +2150,38 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const handleRemoveParticipant = async (reg: any) => {
-    if (!confirm(`DANGER: Are you sure you want to PERMANENTLY REMOVE ${reg.gameName || 'this player'} from the tournament? This will delete their registration record.`)) return;
+    if (!confirm(`DANGER: Are you sure you want to PERMANENTLY REMOVE ${reg.gameName || 'this player'} from the tournament? This will delete their registration record and clear them from any assigned matches.`)) return;
     
     try {
+      // 1. Delete the registration
       await deleteDoc(doc(db, 'registrations', reg.id));
       
-      // If the player was approved, decrement filledSlots
+      // 2. Clear from matches where they are assigned
+      const matchQueries = [
+        query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('homePlayerId', '==', reg.userId)),
+        query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('awayPlayerId', '==', reg.userId))
+      ];
+
+      for (const q of matchQueries) {
+        const snap = await getDocs(q);
+        for (const matchDoc of snap.docs) {
+          const mData = matchDoc.data();
+          const update: any = {};
+          if (mData.homePlayerId === reg.userId) {
+            update.homePlayerId = '';
+            update.homePlayerName = '';
+          }
+          if (mData.awayPlayerId === reg.userId) {
+            update.awayPlayerId = '';
+            update.awayPlayerName = '';
+          }
+          if (Object.keys(update).length > 0) {
+            await updateDoc(matchDoc.ref, update);
+          }
+        }
+      }
+
+      // 3. If the player was approved, decrement filledSlots
       if (reg.status === 'approved') {
         const tRef = doc(db, 'tournaments', tournament.id);
         const tSnap = await getDoc(tRef);
@@ -2167,7 +2193,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         }
       }
       
-      alert('Player permanently removed from tournament.');
+      alert('Player permanently removed and cleared from matches.');
     } catch (err) {
       console.error('Error removing player:', err);
       alert('Failed to remove player.');
@@ -3160,20 +3186,126 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const renderThirdPlaceMatch = () => {
     const match = matches.find(m => m.stage === '3RD_PLACE') || 
                   matches.find(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
-    if (!match) return null;
+    
+    // Fallback match object for UI purposes if not found in DB
+    const displayMatch = match || {
+      stage: 'FINAL',
+      matchId: 'FINAL_M2',
+      status: 'draft',
+      homePlayerId: '',
+      awayPlayerId: '',
+      homePlayerName: 'TBD',
+      awayPlayerName: 'TBD',
+      homeScore: 0,
+      awayScore: 0
+    };
+
+    const homeProfile = displayMatch.homePlayerId ? profiles[displayMatch.homePlayerId] : null;
+    const awayProfile = displayMatch.awayPlayerId ? profiles[displayMatch.awayPlayerId] : null;
+    const homePlayerName = homeProfile?.inGameName || displayMatch.homePlayerName || 'TBD';
+    const awayPlayerName = awayProfile?.inGameName || displayMatch.awayPlayerName || 'TBD';
+    const isCompleted = displayMatch.status === 'completed';
+    const homeScore = displayMatch.homeScore ?? 0;
+    const awayScore = displayMatch.awayScore ?? 0;
+    const isHomeWinner = isCompleted && homeScore > awayScore;
+    const isAwayWinner = isCompleted && awayScore > homeScore;
 
     return (
-      <div className="pt-12 border-t border-slate-100 mt-12 space-y-8 ">
+      <div className="pt-16 border-t border-slate-100 mt-16 space-y-10 flex flex-col items-center">
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-3">
-             <div className="h-px w-8 bg-slate-200" />
-             <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.25em] italic">3rd Place Match</h4>
-             <div className="h-px w-8 bg-slate-200" />
+          <div className="flex items-center justify-center gap-4">
+             <div className="h-px w-10 bg-slate-200" />
+             <h4 className="text-[12px] font-black text-slate-500 uppercase tracking-[0.3em] italic">3rd Place Match</h4>
+             <div className="h-px w-10 bg-slate-200" />
           </div>
-          <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Bronze Medal Battle</span>
+          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Bronze Medal Battle</span>
         </div>
-        <div className="px-4">
-           {renderMatchCard(match)}
+        
+        <div className="w-[280px] xs:w-[320px] sm:w-[380px] nm-flat bg-white/50 p-6 rounded-[2.5rem] border-2 border-white/40 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <Trophy size={48} className="text-indigo-400" />
+          </div>
+          
+          <div className="space-y-3 relative z-10">
+            {/* Home Player */}
+            <div 
+              onClick={() => handleSlotClick('FINAL_M2', 'home', 2, match)}
+              className={cn(
+                "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
+                isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
+                isHomeWinner ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-white/80 border-slate-100"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center border-2",
+                  isHomeWinner ? "bg-amber-500 text-white border-white" : 
+                  (isAdminUser && !displayMatch.homePlayerId ? "bg-emerald-50 text-emerald-500 border-emerald-100" : "bg-slate-100 text-slate-400 border-white")
+                )}>
+                  {isAdminUser && !displayMatch.homePlayerId ? <Plus size={16} /> : <UserIcon size={16} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">HOME</span>
+                  <span className={cn(
+                    "text-xs font-black uppercase italic truncate max-w-[120px]",
+                    isHomeWinner ? "text-amber-700" : 
+                    (!displayMatch.homePlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
+                  )}>
+                    {!displayMatch.homePlayerId && isAdminUser ? "Assign Player" : homePlayerName}
+                  </span>
+                </div>
+              </div>
+              <div className={cn(
+                "w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-sm font-black italic",
+                isHomeWinner ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-400"
+              )}>
+                {displayMatch.homeScore ?? '-'}
+              </div>
+            </div>
+
+            {/* VS Divider */}
+            <div className="flex items-center justify-center gap-2 py-1">
+              <div className="h-px flex-1 bg-slate-100" />
+              <span className="text-[8px] font-black text-slate-300 italic uppercase">VS</span>
+              <div className="h-px flex-1 bg-slate-100" />
+            </div>
+
+            {/* Away Player */}
+            <div 
+              onClick={() => handleSlotClick('FINAL_M2', 'away', 2, match)}
+              className={cn(
+                "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
+                isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
+                isAwayWinner ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-white/80 border-slate-100"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center border-2",
+                  isAwayWinner ? "bg-amber-500 text-white border-white" : 
+                  (isAdminUser && !displayMatch.awayPlayerId ? "bg-emerald-50 text-emerald-500 border-emerald-100" : "bg-slate-100 text-slate-400 border-white")
+                )}>
+                  {isAdminUser && !displayMatch.awayPlayerId ? <Plus size={16} /> : <UserIcon size={16} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">AWAY</span>
+                  <span className={cn(
+                    "text-xs font-black uppercase italic truncate max-w-[120px]",
+                    isAwayWinner ? "text-amber-700" : 
+                    (!displayMatch.awayPlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
+                  )}>
+                    {!displayMatch.awayPlayerId && isAdminUser ? "Assign Player" : awayPlayerName}
+                  </span>
+                </div>
+              </div>
+              <div className={cn(
+                "w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-sm font-black italic",
+                isAwayWinner ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-400"
+              )}>
+                {displayMatch.awayScore ?? '-'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -12,7 +12,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'sw-push-handler.js'],
+        includeAssets: ['assets/aistudio/20261021_140921_56efc859.png', 'sw-push-handler.js'],
         manifest: {
           id: '/',
           name: 'FC Arena VS – Pro Tournament Platform',
@@ -26,22 +26,22 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: '/favicon.svg',
-              sizes: 'any',
-              type: 'image/svg+xml',
+              src: '/assets/aistudio/20261021_140921_56efc859.png',
+              sizes: '512x512',
+              type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-192x192.png',
+              src: '/assets/aistudio/20261021_140921_56efc859.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: '/assets/aistudio/20261021_140921_56efc859.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any',
+              purpose: 'maskable',
             },
           ],
         },

@@ -110,7 +110,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server returned ${response.status}`);
+        throw new Error(errorData.error || `Server Error (${response.status})`);
       }
 
       const data = await response.json();
@@ -134,23 +134,20 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         setMessages(updatedHistory);
         localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(updatedHistory));
       } else {
-        throw new Error(data.error || 'Failed to get response');
+        throw new Error('Failed to get a valid response from the AI.');
       }
     } catch (err: any) {
       console.error('Chat Error:', err);
-      // Fallback message if AI fails
-      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TypeError';
+      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TypeError' || err.message.includes('NetworkError');
       
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: `[${isNetworkError ? 'CONNECTIVITY' : 'SERVER'} ISSUE] ${isNetworkError ? "I'm currently unable to reach the Arena servers from this device APK." : (err.message || "Something went wrong.")}
+        parts: [{ text: `[${isNetworkError ? 'CONNECTIVITY' : 'SERVER'} ISSUE] ${isNetworkError ? "I'm currently unable to reach the Arena servers. This usually happens if your internet is restricted or the server is temporarily offline." : (err.message || "Something went wrong.")}
 
-Possible causes:
-1. ${isNetworkError ? "Your device is blocking the connection or has no internet." : "The server encountered an error processing your request."}
-2. ${isNetworkError ? "The Shared App URL has changed since your APK was built." : "The AI service is temporarily unavailable."}
-3. The server is temporarily offline or undergoing maintenance.
-
-Please check your connection or reach our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
+Possible next steps:
+1. ${isNetworkError ? "Check if your internet connection is active." : "The server encountered an error. This might be a temporary issue."}
+2. ${isNetworkError ? "If you are using the APK, ensure you have the latest version from our official channel." : "Wait a few minutes and try again."}
+3. Contact our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
         timestamp: Date.now(),
         isError: true
       };
