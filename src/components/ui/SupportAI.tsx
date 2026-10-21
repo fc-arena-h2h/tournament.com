@@ -136,7 +136,14 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       // Fallback message if AI fails
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: "[CONNECTION ERROR] I'm currently unable to reach the Arena servers from your device. This is usually due to network restrictions or being offline. Please check your internet or reach our team on Telegram for direct support." }],
+        parts: [{ text: `[CONNECTIVITY ISSUE] I'm currently unable to reach the Arena servers from this device APK.
+
+Possible causes:
+1. The shared app needs to be deployed/updated in AI Studio.
+2. Your device is blocking the connection.
+3. The server is temporarily offline.
+
+Please check your internet or reach our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
         timestamp: Date.now(),
         isError: true
       };
