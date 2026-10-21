@@ -14,9 +14,12 @@ import { getDatabase } from 'firebase/database';
 // Obfuscated Firebase Config for enhanced security as requested
 const secureGet = (b64: string) => {
   try {
-    return typeof window !== 'undefined' ? window.atob(b64) : Buffer.from(b64, 'base64').toString();
+    if (typeof window !== 'undefined') {
+      return window.atob(b64);
+    }
+    // Fallback for non-browser environments if needed
+    return Buffer.from(b64, 'base64').toString();
   } catch (e) {
-    console.error('Security decryption error:', e);
     return '';
   }
 };
@@ -40,15 +43,11 @@ try {
 const app = initializeApp(firebaseConfig);
 const databaseId = (firebaseConfig as any).firestoreDatabaseId;
 
-// Configure Firestore with persistent local cache (Idea 1)
-// and experimentalForceLongPolling for proxy stability
+// Use standard persistence for mobile stability
 export const db = initializeFirestore(
   app,
   {
     experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
   },
   databaseId || undefined
 );

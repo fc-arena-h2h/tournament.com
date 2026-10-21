@@ -39,6 +39,11 @@ export async function registerPushNotifications(userId: string) {
   }
 
   try {
+    if (!PushNotifications) {
+      console.warn('PushNotifications plugin not available');
+      return;
+    }
+
     // 1. Request permission
     let perm = await PushNotifications.checkPermissions();
     if (perm.receive === 'prompt') {

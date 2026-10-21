@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { cn } from '@/src/lib/utils';
 import { ArenaPage } from '@/src/pages/Arena';
 import { AuthPage } from '@/src/pages/Auth';
@@ -128,13 +129,23 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     
-    // Register for native push notifications (Android/Capacitor)
-    registerPushNotifications(user.uid).catch(console.error);
+    // Register for native push notifications (Android/Capacitor) with a slight delay
+    // to ensure app stability during the login/auth transition.
+    const timer = setTimeout(() => {
+      if (Capacitor.isNativePlatform()) {
+        console.log('Registering for push notifications...');
+        registerPushNotifications(user.uid).catch(err => {
+          console.error('Push registration error handled:', err);
+        });
+      }
+    }, 5000); // 5 second delay
 
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       requestPhoneNotificationPermission().catch(() => {});
     }
-  }, [user]);
+
+    return () => clearTimeout(timer);
+  }, [user?.uid]);
 
   // Scroll to top on navigation or modal open
   useEffect(() => {
