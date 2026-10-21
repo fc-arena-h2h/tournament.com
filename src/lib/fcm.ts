@@ -1,8 +1,7 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db, auth } from '@/src/lib/firebase';
 import { initializeApp } from 'firebase/app';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { db, auth, firebaseConfig } from '@/src/lib/firebase';
 import { showSystemNotification, playNotificationSound } from '@/src/lib/notifications';
 
 let messagingInstance: any = null;

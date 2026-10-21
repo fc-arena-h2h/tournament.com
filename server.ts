@@ -15,12 +15,19 @@ const __dirname = path.dirname(__filename);
 async function createServer() {
   const app = express();
   const port = process.env.PORT || 3000;
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
 
   app.use(cors());
+  app.use(express.json());
 
   // Initialize Gemini
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  if (!apiKey) {
+    console.warn('WARNING: GEMINI_API_KEY is not set. AI features will fail.');
+  }
+
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || '',
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -28,25 +35,10 @@ async function createServer() {
     }
   });
 
-  // Vite integration
-  const vite = await createViteServer({
-    server: {
-      middlewareMode: true,
-      hmr: false,
-    },
-    appType: 'custom',
-    optimizeDeps: {
-      include: [],
-    },
-  });
-
-  app.use(vite.middlewares);
-
-  app.use(express.json());
-
   // API Proxy for Gemini (Server-side)
   app.post('/api/generate', async (req, res) => {
     try {
+      if (!apiKey) throw new Error('AI API Key missing on server');
       const {prompt, model = 'gemini-flash-latest'} = req.body;
       const response = await ai.models.generateContent({
         model,
@@ -55,16 +47,22 @@ async function createServer() {
       res.json({text: response.text});
     } catch (error: any) {
       console.error('Gemini API Error:', error);
-      res.status(500).json({error: error.message});
+      res.status(500).json({error: error.message || 'Internal Server Error'});
     }
   });
 
   // Specialized Support AI route
   app.post('/api/ai/support', async (req, res) => {
     try {
+      if (!apiKey) throw new Error('Support AI API Key missing on server. Please configure GEMINI_API_KEY in Secrets.');
+      
       const { contents } = req.body;
+      if (!contents || !Array.isArray(contents)) {
+        return res.status(400).json({ error: 'Invalid contents format' });
+      }
+
       const response = await ai.models.generateContent({
-        model: 'gemini-flash-latest',
+        model: 'gemini-1.5-flash',
         contents,
         config: {
           systemInstruction: `You are the Official AI Support Assistant for "FC Arena VS", a professional eSports management platform for FC Mobile pro players.
@@ -109,24 +107,39 @@ async function createServer() {
     }
   });
 
-  // Serve index.html for all non-API routes
-  app.use('*', async (req, res, next) => {
-    const url = req.originalUrl;
-    try {
-      let template = fs.readFileSync(
-        path.resolve(__dirname, 'index.html'),
-        'utf-8'
-      );
-      template = await vite.transformIndexHtml(url, template);
-      res.status(200).set({'Content-Type': 'text/html'}).end(template);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
-    }
-  });
+  if (!isProd) {
+    // Vite integration for development
+    const vite = await createViteServer({
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
+      appType: 'custom',
+    });
+    app.use(vite.middlewares);
+    
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({'Content-Type': 'text/html'}).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
+  } else {
+    // Production serving
+    const distPath = path.resolve(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
+    });
+  }
 
   app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running at http://localhost:${port} in ${isProd ? 'production' : 'development'} mode`);
   });
 }
 

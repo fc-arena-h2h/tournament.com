@@ -76,6 +76,7 @@ export const UpdateOverlay: React.FC<UpdateOverlayProps> = ({ serverVersion, isM
         <div className="space-y-4">
           <a 
             href={updateUrl}
+            onClick={handleUpdate}
             target="_system"
             rel="noopener noreferrer"
             className="w-full h-18 rounded-[1.5rem] bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform group"

@@ -7,6 +7,7 @@ import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
+import { motion, AnimatePresence } from 'framer-motion';
 
 
 
@@ -2148,6 +2149,31 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
+  const handleRemoveParticipant = async (reg: any) => {
+    if (!confirm(`DANGER: Are you sure you want to PERMANENTLY REMOVE ${reg.gameName || 'this player'} from the tournament? This will delete their registration record.`)) return;
+    
+    try {
+      await deleteDoc(doc(db, 'registrations', reg.id));
+      
+      // If the player was approved, decrement filledSlots
+      if (reg.status === 'approved') {
+        const tRef = doc(db, 'tournaments', tournament.id);
+        const tSnap = await getDoc(tRef);
+        if (tSnap.exists()) {
+          const currentFilled = tSnap.data()?.filledSlots || 0;
+          await updateDoc(tRef, {
+            filledSlots: Math.max(0, currentFilled - 1)
+          });
+        }
+      }
+      
+      alert('Player permanently removed from tournament.');
+    } catch (err) {
+      console.error('Error removing player:', err);
+      alert('Failed to remove player.');
+    }
+  };
+
   const renderPlayerModal = () => {
     if (!selectedPlayerProfile) return null;
 
@@ -3132,7 +3158,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const renderThirdPlaceMatch = () => {
-    const match = matches.find(m => m.stage === '3RD_PLACE');
+    const match = matches.find(m => m.stage === '3RD_PLACE') || 
+                  matches.find(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
     if (!match) return null;
 
     return (
@@ -3225,6 +3252,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                          </div>
                        )}
 
+                       {isAdminUser && (
+                         <button 
+                           onClick={() => handleRemoveParticipant(reg)}
+                           className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-100 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                           title="Permanently Remove Player"
+                         >
+                           <Trash2 size={18} />
+                         </button>
+                       )}
+
                        {isPublisher && reg.status === 'pending' && (
                          <div className="flex gap-2">
                            <button 
@@ -3278,6 +3315,24 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   Group {g}
                 </button>
               ))}
+            </div>
+
+            {/* Group Header Info */}
+            <div className="flex flex-col items-center justify-center gap-1 py-2">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.3em]">Active Tournament Group</span>
+              <AnimatePresence mode="wait">
+                <motion.h3
+                  key={activeGroup}
+                  initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, scale: 1.1, filter: 'blur(10px)' }}
+                  transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                  className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter"
+                >
+                  Group {activeGroup}
+                </motion.h3>
+              </AnimatePresence>
+              <div className="w-12 h-1 bg-red-600 rounded-full mt-1 opacity-20" />
             </div>
 
             {/* Points Table */}
@@ -3403,8 +3458,33 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
             </div>
 
+            <div className="flex flex-col items-center justify-center gap-1 mt-2">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.3em]">Current Tournament Stage</span>
+              <AnimatePresence mode="wait">
+                <motion.h3
+                  key={activeKnockoutStage}
+                  initial={{ opacity: 0, y: 10, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -10, filter: 'blur(8px)' }}
+                  transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                  className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter"
+                >
+                  {activeKnockoutStage === 'R32' ? 'Round of 32' :
+                   activeKnockoutStage === 'R16' ? 'Round of 16' :
+                   activeKnockoutStage === 'QTR' ? 'Quarter Finals' :
+                   activeKnockoutStage === 'SEMI' ? 'Semi Finals' :
+                   activeKnockoutStage === 'FINAL' ? 'Grand Final' : 
+                   activeKnockoutStage}
+                </motion.h3>
+              </AnimatePresence>
+              <div className="w-12 h-1 bg-indigo-500 rounded-full mt-1 opacity-20" />
+            </div>
+
             <div className="overflow-x-auto no-scrollbar pb-3">
-              <div className="relative min-w-[320px] xs:min-w-[360px] sm:min-w-[500px] flex justify-between items-center min-h-[400px] sm:min-h-[500px] pt-2 sm:pt-6 px-0.5 sm:px-1">
+              <div className={cn(
+                "relative min-w-[320px] xs:min-w-[360px] sm:min-w-[500px] flex items-center min-h-[400px] sm:min-h-[500px] pt-2 sm:pt-6 px-0.5 sm:px-1",
+                activeKnockoutStage === 'FINAL' ? "justify-center gap-6 sm:gap-12" : "justify-between"
+              )}>
                 {/* Left Bracket */}
                 {renderBracketSide('left', 
                   activeKnockoutStage === 'R32' ? 8 :
@@ -3452,7 +3532,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
 
                 {/* Right Bracket */}
-                {renderBracketSide('right', 
+                {activeKnockoutStage !== 'FINAL' && renderBracketSide('right', 
                   activeKnockoutStage === 'R32' ? 8 :
                   activeKnockoutStage === 'R16' ? 4 : 
                   activeKnockoutStage === 'QTR' ? 2 : 1
@@ -3472,7 +3552,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   {matches.filter(m => {
                     if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                     if (activeKnockoutStage === 'FINAL') {
-                      return m.stage === 'FINAL'; // Only show Final in the bottom list if 3rd place has its own section
+                      return m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId); // Only show Grand Final in the main list
                     }
                     return m.stage === activeKnockoutStage;
                   }).length === 0 ? (
@@ -3482,7 +3562,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   ) : (
                     matches.filter(m => {
                       if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
-                      if (activeKnockoutStage === 'FINAL') return m.stage === 'FINAL';
+                      if (activeKnockoutStage === 'FINAL') return m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
                       return m.stage === activeKnockoutStage;
                     }).map(m => renderMatchCard(m))
                   )}

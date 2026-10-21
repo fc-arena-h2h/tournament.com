@@ -108,6 +108,11 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server returned ${response.status}`);
+      }
+
       const data = await response.json();
       
       if (data.text) {
@@ -131,19 +136,21 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       } else {
         throw new Error(data.error || 'Failed to get response');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Chat Error:', err);
       // Fallback message if AI fails
+      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TypeError';
+      
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: `[CONNECTIVITY ISSUE] I'm currently unable to reach the Arena servers from this device APK.
+        parts: [{ text: `[${isNetworkError ? 'CONNECTIVITY' : 'SERVER'} ISSUE] ${isNetworkError ? "I'm currently unable to reach the Arena servers from this device APK." : (err.message || "Something went wrong.")}
 
 Possible causes:
-1. The shared app needs to be deployed/updated in AI Studio.
-2. Your device is blocking the connection.
-3. The server is temporarily offline.
+1. ${isNetworkError ? "Your device is blocking the connection or has no internet." : "The server encountered an error processing your request."}
+2. ${isNetworkError ? "The Shared App URL has changed since your APK was built." : "The AI service is temporarily unavailable."}
+3. The server is temporarily offline or undergoing maintenance.
 
-Please check your internet or reach our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
+Please check your connection or reach our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
         timestamp: Date.now(),
         isError: true
       };
