@@ -27,7 +27,8 @@ import {
   markNotificationAsRead,
   requestPhoneNotificationPermission,
   sendTestPhoneNotification,
-  updateAppBadge
+  updateAppBadge,
+  registerPushNotifications
 } from '@/src/lib/notifications';
 import { NotificationCenter } from '@/src/components/ui/NotificationCenter';
 import { NotificationToast } from '@/src/components/ui/NotificationToast';
@@ -126,6 +127,10 @@ export default function App() {
   // Automatically enable notification mode in background if supported
   useEffect(() => {
     if (!user) return;
+    
+    // Register for native push notifications (Android/Capacitor)
+    registerPushNotifications(user.uid).catch(console.error);
+
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       requestPhoneNotificationPermission().catch(() => {});
     }

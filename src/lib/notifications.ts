@@ -1,7 +1,8 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 
 export type NotificationType = 
   | 'match_scheduled'
@@ -25,6 +26,73 @@ export interface AppNotification {
   read: boolean;
   createdAt: any;
   extra?: Record<string, any>;
+}
+
+/**
+ * Register for Push Notifications (FCM) on native platforms (Android/iOS).
+ * This allows notifications to arrive even if the app is killed/backgrounded.
+ */
+export async function registerPushNotifications(userId: string) {
+  if (!Capacitor.isNativePlatform()) {
+    console.log('Push notifications registration skipped: Not a native platform');
+    return;
+  }
+
+  try {
+    // 1. Request permission
+    let perm = await PushNotifications.checkPermissions();
+    if (perm.receive === 'prompt') {
+      perm = await PushNotifications.requestPermissions();
+    }
+
+    if (perm.receive !== 'granted') {
+      console.warn('Push notification permission denied');
+      return;
+    }
+
+    // 2. Register with FCM/APNS
+    await PushNotifications.register();
+
+    // 3. Handle Registration Success (get token)
+    PushNotifications.addListener('registration', async (token: Token) => {
+      console.log('Push registration success, token:', token.value);
+      // Save FCM token to user's Firestore profile for background targeting
+      if (userId) {
+        try {
+          await updateDoc(doc(db, 'users', userId), {
+            fcmTokens: arrayUnion(token.value),
+            lastTokenUpdate: Timestamp.now()
+          });
+        } catch (e) {
+          console.error('Failed to save FCM token to Firestore:', e);
+        }
+      }
+    });
+
+    // 4. Handle Registration Error
+    PushNotifications.addListener('registrationError', (error: any) => {
+      console.error('Push registration error: ' + JSON.stringify(error));
+    });
+
+    // 5. Handle Notification Received (while app is in foreground)
+    PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+      console.log('Push notification received:', notification);
+      // We can also trigger a local notification or toast here if we want
+      playNotificationSound();
+    });
+
+    // 6. Handle Notification Action (when user taps notification)
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+      console.log('Push notification action performed:', notification);
+      const data = notification.notification.data;
+      if (data && data.url) {
+        window.location.href = data.url;
+      }
+    });
+
+  } catch (e) {
+    console.error('Error during push notification registration:', e);
+  }
 }
 
 /**
@@ -78,10 +146,10 @@ export async function requestPhoneNotificationPermission(): Promise<Notification
   // If running in native Android/iOS Capacitor
   if (Capacitor.isNativePlatform()) {
     try {
-      const perm = await LocalNotifications.requestPermissions();
-      return perm.display === 'granted' ? 'granted' : 'denied';
+      const perm = await PushNotifications.requestPermissions();
+      return perm.receive === 'granted' ? 'granted' : 'denied';
     } catch (e) {
-      console.warn('Capacitor LocalNotifications permission error:', e);
+      console.warn('Capacitor PushNotifications permission error:', e);
     }
   }
 
