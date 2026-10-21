@@ -154,12 +154,12 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[5000] bg-slate-950/40 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[20001] bg-slate-950/40 backdrop-blur-md flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-300">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full sm:max-w-lg bg-[#f0f1f5] rounded-t-[3rem] sm:rounded-[3rem] h-[92vh] sm:h-[85vh] flex flex-col shadow-2xl border-t-2 border-white/50 relative overflow-hidden"
+        className="w-full sm:max-w-lg bg-[#f0f1f5] rounded-none sm:rounded-[3rem] h-full sm:h-[85vh] flex flex-col shadow-2xl border-t-2 border-white/50 relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -314,7 +314,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         </div>
 
         {/* Input Area */}
-        <div className="p-6 sm:p-8 border-t border-white/20 bg-white/30 shrink-0">
+        <div className="p-6 sm:p-8 pb-10 sm:pb-8 border-t border-white/20 bg-white/30 shrink-0 pb-safe">
           <div className="relative flex items-center gap-3">
             <input 
               type="text"

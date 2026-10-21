@@ -12,7 +12,7 @@ export function useAppUpdate() {
 
   useEffect(() => {
     // Listen to system configuration for app versioning
-    const unsub = onSnapshot(doc(db, 'system_config', 'app_settings'), (snap) => {
+    const unsub = onSnapshot(doc(db, 'settings', 'app_update'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         const minVersion = data.min_version || APP_VERSION;

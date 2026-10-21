@@ -263,6 +263,12 @@ service cloud.firestore {
       allow delete: if isAdmin() || isPublisherOf(resource.data.tournamentId);
     }
 
+    // system_config
+    match /system_config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Test Connection
     match /test/{testId} {
       allow read, write: if isSignedIn();

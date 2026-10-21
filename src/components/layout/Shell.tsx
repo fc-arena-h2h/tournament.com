@@ -102,7 +102,7 @@ export const Header = ({
   return (
     <header className={cn(
       "fixed top-0 left-0 right-0 px-3 sm:px-6 py-4 sm:py-6 transition-all duration-300",
-      showMenu || showAbout || showSupportAI ? "z-[3000]" : "z-50"
+      showMenu || showAbout || showSupportAI ? "z-[20000]" : "z-50"
     )}>
       <div className="nm-flat rounded-full h-18 sm:h-20 px-4 sm:px-8 flex items-center justify-between border-2 border-white/50 relative">
         <div className="flex items-center gap-4">

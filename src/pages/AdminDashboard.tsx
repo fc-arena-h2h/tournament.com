@@ -116,12 +116,12 @@ export const AdminDashboard = ({
         }
       });
 
-      unsubAppSettings = onSnapshot(doc(db, 'system_config', 'app_settings'), (snap) => {
+      unsubAppSettings = onSnapshot(doc(db, 'settings', 'app_update'), (snap) => {
         if (snap.exists()) {
           setAppSettings(snap.data() as any);
         } else {
           // Initialize with current app defaults if missing
-          setDoc(doc(db, 'system_config', 'app_settings'), {
+          setDoc(doc(db, 'settings', 'app_update'), {
             min_version: '2.4.1',
             app_id: 'fc-arena-vs-2024',
             force_update: true,
@@ -369,7 +369,7 @@ export const AdminDashboard = ({
                     <Button 
                       onClick={async () => {
                         try {
-                          await setDoc(doc(db, 'system_config', 'app_settings'), appSettings, { merge: true });
+                          await setDoc(doc(db, 'settings', 'app_update'), appSettings, { merge: true });
                           alert('App Update Settings Deployment Successful!');
                         } catch (e) {
                           alert('Deployment Failed!');
