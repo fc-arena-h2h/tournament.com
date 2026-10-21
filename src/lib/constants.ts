@@ -12,6 +12,7 @@ export const API_BASE_URL = (() => {
   }
   
   // For native apps or local dev, we need the full URL of the backend
-  // We prioritize the known production/dev URL structure
-  return 'https://ais-dev-xh5yosbcwnt2hs6yzdzls6-483012074842.asia-southeast1.run.app';
+  // We prioritize the stable Shared/Pre-production URL
+  const sharedUrl = 'https://ais-pre-xh5yosbcwnt2hs6yzdzls6-483012074842.asia-southeast1.run.app';
+  return sharedUrl;
 })();

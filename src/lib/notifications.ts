@@ -51,7 +51,12 @@ export async function registerPushNotifications(userId: string) {
     }
 
     // 2. Register with FCM/APNS
-    await PushNotifications.register();
+    try {
+      await PushNotifications.register();
+    } catch (regErr) {
+      console.warn('Native push registration failed (check google-services.json):', regErr);
+      return;
+    }
 
     // 3. Handle Registration Success (get token)
     PushNotifications.addListener('registration', async (token: Token) => {
@@ -61,7 +66,8 @@ export async function registerPushNotifications(userId: string) {
         try {
           await updateDoc(doc(db, 'users', userId), {
             fcmTokens: arrayUnion(token.value),
-            lastTokenUpdate: Timestamp.now()
+            lastTokenUpdate: Timestamp.now(),
+            pushEnabled: true // Mark push as active once we have a token
           });
         } catch (e) {
           console.error('Failed to save FCM token to Firestore:', e);
@@ -77,7 +83,6 @@ export async function registerPushNotifications(userId: string) {
     // 5. Handle Notification Received (while app is in foreground)
     PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
       console.log('Push notification received:', notification);
-      // We can also trigger a local notification or toast here if we want
       playNotificationSound();
     });
 
@@ -86,12 +91,15 @@ export async function registerPushNotifications(userId: string) {
       console.log('Push notification action performed:', notification);
       const data = notification.notification.data;
       if (data && data.url) {
-        window.location.href = data.url;
+        // Use a more robust navigation if possible
+        if (typeof window !== 'undefined') {
+          window.location.href = data.url;
+        }
       }
     });
 
   } catch (e) {
-    console.error('Error during push notification registration:', e);
+    console.error('Critical error during push notification initialization:', e);
   }
 }
 
