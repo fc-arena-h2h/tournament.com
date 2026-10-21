@@ -1,8 +1,5 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
-import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
-import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 
 export type NotificationType = 
   | 'match_scheduled'
@@ -28,85 +25,6 @@ export interface AppNotification {
   extra?: Record<string, any>;
 }
 
-/**
- * Register for Push Notifications (FCM) on native platforms (Android/iOS).
- * This allows notifications to arrive even if the app is killed/backgrounded.
- */
-export async function registerPushNotifications(userId: string) {
-  if (!Capacitor.isNativePlatform()) {
-    console.log('Push notifications registration skipped: Not a native platform');
-    return;
-  }
-
-  try {
-    if (!PushNotifications) {
-      console.warn('PushNotifications plugin not available');
-      return;
-    }
-
-    // 1. Request permission
-    let perm = await PushNotifications.checkPermissions();
-    if (perm.receive === 'prompt') {
-      perm = await PushNotifications.requestPermissions();
-    }
-
-    if (perm.receive !== 'granted') {
-      console.warn('Push notification permission denied');
-      return;
-    }
-
-    // 2. Register with FCM/APNS
-    try {
-      await PushNotifications.register();
-    } catch (regErr) {
-      console.warn('Native push registration failed (check google-services.json):', regErr);
-      return;
-    }
-
-    // 3. Handle Registration Success (get token)
-    PushNotifications.addListener('registration', async (token: Token) => {
-      console.log('Push registration success, token:', token.value);
-      // Save FCM token to user's Firestore profile for background targeting
-      if (userId) {
-        try {
-          await updateDoc(doc(db, 'users', userId), {
-            fcmTokens: arrayUnion(token.value),
-            lastTokenUpdate: Timestamp.now(),
-            pushEnabled: true // Mark push as active once we have a token
-          });
-        } catch (e) {
-          console.error('Failed to save FCM token to Firestore:', e);
-        }
-      }
-    });
-
-    // 4. Handle Registration Error
-    PushNotifications.addListener('registrationError', (error: any) => {
-      console.error('Push registration error: ' + JSON.stringify(error));
-    });
-
-    // 5. Handle Notification Received (while app is in foreground)
-    PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-      console.log('Push notification received:', notification);
-      playNotificationSound();
-    });
-
-    // 6. Handle Notification Action (when user taps notification)
-    PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-      console.log('Push notification action performed:', notification);
-      const data = notification.notification.data;
-      if (data && data.url) {
-        // Use a more robust navigation if possible
-        if (typeof window !== 'undefined') {
-          window.location.href = data.url;
-        }
-      }
-    });
-
-  } catch (e) {
-    console.error('Critical error during push notification initialization:', e);
-  }
-}
 
 /**
  * Play a gentle, crisp audio chime via Web Audio API.
@@ -156,15 +74,6 @@ export function playNotificationSound() {
  * Request system/phone notification permission from user's browser or device.
  */
 export async function requestPhoneNotificationPermission(): Promise<NotificationPermission> {
-  // If running in native Android/iOS Capacitor
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const perm = await PushNotifications.requestPermissions();
-      return perm.receive === 'granted' ? 'granted' : 'denied';
-    } catch (e) {
-      console.warn('Capacitor PushNotifications permission error:', e);
-    }
-  }
 
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'denied';
@@ -200,25 +109,6 @@ export function updateAppBadge(count: number) {
  * Uses ServiceWorker registration so it shows in the Android/mobile notification tray.
  */
 export function showSystemNotification(title: string, options?: { body?: string; icon?: string; tag?: string; url?: string }) {
-  // If running on native Capacitor Android
-  if (Capacitor.isNativePlatform()) {
-    try {
-      LocalNotifications.schedule({
-        notifications: [
-          {
-            id: Math.floor(Math.random() * 2147483647),
-            title,
-            body: options?.body || '',
-            schedule: { at: new Date(Date.now() + 100) },
-            extra: { url: options?.url || '/' }
-          }
-        ]
-      }).catch((e) => console.warn('Capacitor schedule error:', e));
-      return;
-    } catch (e) {
-      console.warn('Capacitor LocalNotifications failed:', e);
-    }
-  }
 
   if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
     return;

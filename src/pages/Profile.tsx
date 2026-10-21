@@ -11,9 +11,8 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/src/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
-import { Capacitor } from '@capacitor/core';
 import { requestPushNotificationToken } from '@/src/lib/fcm';
-import { sendTestPhoneNotification, registerPushNotifications } from '@/src/lib/notifications';
+import { sendTestPhoneNotification } from '@/src/lib/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 import { APP_VERSION } from '@/src/lib/constants';
 
@@ -250,13 +249,9 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               onClick={async () => {
                 setPushLoading(true);
                 try {
-                  if (Capacitor.isNativePlatform()) {
-                    await registerPushNotifications(user?.uid);
-                  } else {
-                    const res = await requestPushNotificationToken(user?.uid);
-                    if (!res.success) {
-                      alert(res.error || 'Permission Denied');
-                    }
+                  const res = await requestPushNotificationToken(user?.uid);
+                  if (!res.success) {
+                    alert(res.error || 'Permission Denied');
                   }
                   await sendTestPhoneNotification();
                 } finally {
