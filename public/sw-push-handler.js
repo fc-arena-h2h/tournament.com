@@ -6,12 +6,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-comp
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  projectId: "gen-lang-client-0849074075",
-  appId: "1:370274994500:web:3729c2ca722b8b9113af11",
-  apiKey: "AIzaSyB81FoDkheH_XbmKUjK2s-LegUjkmCWDpE",
-  authDomain: "gen-lang-client-0849074075.firebaseapp.com",
-  messagingSenderId: "370274994500",
-  storageBucket: "gen-lang-client-0849074075.firebasestorage.app"
+  apiKey: "AIzaSyA0VsKfvVShcPISYBsK6siGQ7xiHhuq4olY",
+  authDomain: "zzzx-cc7e2.firebaseapp.com",
+  projectId: "zzzx-cc7e2",
+  storageBucket: "zzzx-cc7e2.firebasestorage.app",
+  messagingSenderId: "868401490778",
+  appId: "1:868401490778:web:5dda0d883f7b824258a163"
 };
 
 // Initialize Firebase in Service Worker

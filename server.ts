@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 async function createServer() {
   const app = express();
-  const port = process.env.PORT || 3000;
+  const port = 3000;
   const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
 
   app.use(cors());
@@ -39,7 +39,7 @@ async function createServer() {
   app.post('/api/generate', async (req, res) => {
     try {
       if (!apiKey) throw new Error('AI API Key missing on server');
-      const {prompt, model = 'gemini-flash-latest'} = req.body;
+      const {prompt, model = 'gemini-3.8-flash'} = req.body;
       const response = await ai.models.generateContent({
         model,
         contents: prompt
@@ -78,7 +78,8 @@ async function createServer() {
       }
 
       // Filter and map contents to match the SDK expectation
-      const filteredContents = contents.map(m => ({
+      // The SDK expects contents as an array of Content objects
+      const formattedContents = contents.map(m => ({
         role: m.role === 'model' ? 'model' : 'user',
         parts: m.parts.map((p: any) => ({ text: p.text }))
       }));
@@ -102,7 +103,7 @@ async function createServer() {
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
-        contents: filteredContents,
+        contents: formattedContents,
         config: {
           systemInstruction: `You are the Official AI Support Assistant for "FC Arena VS".
           
@@ -121,11 +122,12 @@ async function createServer() {
         }
       });
       
-      if (!response.text) {
+      const text = response.text;
+      if (!text) {
         throw new Error('Model returned an empty response');
       }
 
-      res.json({ text: response.text });
+      res.json({ text });
     } catch (error: any) {
       console.error('Support AI Error:', error);
       res.status(500).json({ 

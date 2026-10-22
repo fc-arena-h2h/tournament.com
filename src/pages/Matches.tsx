@@ -68,6 +68,7 @@ interface Match {
   disputeReason?: string;
   stage?: string;
   groupId?: string;
+  matchId?: string;
   scheduledTime?: Timestamp;
 }
 
@@ -278,11 +279,28 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   {tournaments[match.tournamentId]?.title || 'Tournament'}
                 </span>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full", match.status === 'completed' ? "bg-fc-green" : "bg-amber-500 animate-pulse")} />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      {match.stage === 'group' ? `Group Stage · Group ${match.groupId}` : match.stage || 'Match'}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-2 h-2 rounded-full", match.status === 'completed' ? "bg-fc-green" : "bg-amber-500 animate-pulse")} />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {match.stage === 'group' ? `Group Stage · Group ${match.groupId}` : match.stage || 'Match'}
+                      </span>
+                    </div>
+                    {match.matchId && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-bold text-slate-400">ID: {match.matchId}</span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(match.matchId || '');
+                            alert('Match ID copied to clipboard!');
+                          }}
+                          className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-indigo-500"
+                        >
+                          <Copy size={10} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   {match.status === 'completed' && <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] bg-fc-dark px-5 py-2 rounded-lg shadow-xl">RESULT FINAL</span>}
                 </div>

@@ -99,7 +99,10 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     }
 
     try {
-      const apiUrl = `${API_BASE_URL}/api/ai/support`;
+      // Robust API URL detection for mobile/browser
+      const base = API_BASE_URL || window.location.origin;
+      const apiUrl = `${base.replace(/\/$/, '')}/api/ai/support`;
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +112,14 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        let errorData = { error: 'Unknown server error' };
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If response is not JSON, it might be an HTML error page from the proxy/server
+          const text = await response.text().catch(() => '');
+          console.warn('Non-JSON error response:', text);
+        }
         throw new Error(errorData.error || `Server Error (${response.status})`);
       }
 
@@ -142,12 +152,12 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: `[${isNetworkError ? 'CONNECTIVITY' : 'SERVER'} ISSUE] ${isNetworkError ? "I'm currently unable to reach the Arena servers. This usually happens if your internet is restricted or the server is temporarily offline." : (err.message || "Something went wrong.")}
-
-Possible next steps:
-1. ${isNetworkError ? "Check if your internet connection is active." : "The server encountered an error. This might be a temporary issue."}
-2. ${isNetworkError ? "If you are using the APK, ensure you have the latest version from our official channel." : "Wait a few minutes and try again."}
-3. Contact our team on Telegram (${TELEGRAM_LINK}) for direct support.` }],
+        parts: [{ text: `[SYSTEM NOTICE] ${isNetworkError ? "I'm having trouble reaching the FC Arena servers. This can happen if your internet connection is unstable or if you are using an older version of the app. Please ensure you have an active data connection." : (err.message || "Something went wrong while processing your request.")}
+ 
+ Possible solutions:
+ 1. Check your internet connection (Wi-Fi or Mobile Data).
+ 2. Refresh the page or restart the app.
+ 3. If the problem persists, contact our technical team on Telegram (${TELEGRAM_LINK}).` }],
         timestamp: Date.now(),
         isError: true
       };

@@ -204,6 +204,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setPlayerSearchQuery('');
   };
 
+  const [matchSearchQuery, setMatchSearchQuery] = useState('');
+
+  const generateMatchId = () => {
+    return 'M-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
   const handleAssignPlayerToSlot = async (selectedPlayer: any) => {
     if (!slotAssignModal) return;
     const { stage, matchSlotId, role, matchNumber } = slotAssignModal;
@@ -473,15 +479,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           newMatches.push({
             tournamentId: tournament.id,
-            matchId: `${stage}_M${Math.floor(i / 2) + 1}`,
+            matchId: generateMatchId(),
+            stage: stage,
+            groupId: 'knockout',
             homePlayerId: p1.userId,
             awayPlayerId: p2.userId,
             homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
             awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
             participants: [p1.userId, p2.userId],
             status: 'scheduled',
-            stage: stage,
-            groupId: 'knockout',
             scheduledTime: serverTimestamp(),
             createdAt: serverTimestamp()
           });
@@ -503,6 +509,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
               newMatches.push({
                 tournamentId: tournament.id,
+                matchId: generateMatchId(),
                 homePlayerId: p1.userId,
                 awayPlayerId: p2.userId,
                 homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
@@ -572,6 +579,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
       const matchRef = await addDoc(collection(db, 'matches'), {
         tournamentId: tournament.id,
+        matchId: generateMatchId(),
         homePlayerId: manualMatchForm.homeUserId,
         awayPlayerId: manualMatchForm.awayUserId,
         homePlayerName: homeName,
@@ -1680,6 +1688,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             if (i === j) continue;
             matchBatch.push(addDoc(collection(db, 'matches'), {
               tournamentId: tournament.id,
+              matchId: generateMatchId(),
               homePlayerId: gPlayers[i].userId,
               awayPlayerId: gPlayers[j].userId,
               participants: [gPlayers[i].userId, gPlayers[j].userId],
@@ -2314,10 +2323,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
         <div className="p-4 sm:p-8 space-y-4 sm:space-y-8 relative z-10">
           <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 ")} />
-                <span className="text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
-             </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 ")} />
+                  <span className="text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
+                </div>
+                {match.matchId && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[9px] font-bold text-slate-400">ID: {match.matchId}</span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(match.matchId || '');
+                        alert('Match ID copied to clipboard!');
+                      }}
+                      className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-indigo-500"
+                    >
+                      <Copy size={10} />
+                    </button>
+                  </div>
+                )}
+              </div>
              {isCompleted && (
                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase tracking-[0.2em] bg-fc-dark px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg shadow-md">RESULT FINAL</span>
              )}
@@ -3561,7 +3587,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="px-2 pt-4">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] italic">GROUP FIXTURES</h4>
               <div className="space-y-4 pt-6">
-                 {matches.filter(m => m.stage === 'group' && m.groupId === activeGroup).map(renderMatchCard)}
+                 {matches
+                   .filter(m => m.stage === 'group' && m.groupId === activeGroup)
+                   .filter(m => !matchSearchQuery || (m.matchId && m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase())))
+                   .map(renderMatchCard)}
               </div>
             </div>
           </div>
@@ -3681,12 +3710,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  {activeKnockoutStage} FIXTURES & RESULTS
                </h4>
                <div className="space-y-6">
-                  {matches.filter(m => {
+                   {matches.filter(m => {
                     if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                     if (activeKnockoutStage === 'FINAL') {
-                      return m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId); // Only show Grand Final in the main list
+                      if (!(m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))) return false;
+                    } else if (m.stage !== activeKnockoutStage) {
+                      return false;
                     }
-                    return m.stage === activeKnockoutStage;
+                    if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
+                    return true;
                   }).length === 0 ? (
                     <div className="nm-flat rounded-[2.5rem] p-12 text-center border-2 border-white/20">
                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">No matches scheduled for this stage</p>
@@ -3694,8 +3726,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   ) : (
                     matches.filter(m => {
                       if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
-                      if (activeKnockoutStage === 'FINAL') return m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
-                      return m.stage === activeKnockoutStage;
+                      if (activeKnockoutStage === 'FINAL') {
+                        if (!(m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))) return false;
+                      } else if (m.stage !== activeKnockoutStage) {
+                        return false;
+                      }
+                      if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
+                      return true;
                     }).map(m => renderMatchCard(m))
                   )}
                </div>
@@ -4033,6 +4070,30 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              );
            })}
         </div>
+
+        {/* Match Search Bar */}
+        {(activeTab === 'group' || activeTab === 'knockout') && (
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+              <Search size={18} />
+            </div>
+            <input 
+              type="text"
+              placeholder="Search by Match ID..."
+              value={matchSearchQuery}
+              onChange={(e) => setMatchSearchQuery(e.target.value)}
+              className="w-full h-14 pl-14 pr-6 rounded-2xl bg-white border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm font-bold text-slate-700 transition-all shadow-sm placeholder:text-slate-400"
+            />
+            {matchSearchQuery && (
+              <button 
+                onClick={() => setMatchSearchQuery('')}
+                className="absolute inset-y-0 right-5 flex items-center text-slate-300 hover:text-slate-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Main Content Area */}
         <div className="min-h-[400px]">

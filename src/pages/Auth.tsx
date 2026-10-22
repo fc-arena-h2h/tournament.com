@@ -37,11 +37,13 @@ export const AuthPage = () => {
   const [successInfo, setSuccessInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+  const [failedAttempts, setFailedAttempts] = useState(0);
 
   const handleToggleMode = (signUp: boolean) => {
     setIsSignUp(signUp);
     setError('');
     setSuccessInfo('');
+    setFailedAttempts(0);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -57,6 +59,7 @@ export const AuthPage = () => {
       await sendPasswordResetEmail(auth, formData.email.trim());
       setResetSent(true);
       setResetSuccessMessage(`Password reset link sent to ${formData.email}. Please check your inbox.`);
+      setFailedAttempts(0); // Reset count on successful reset initiation
     } catch (err: any) {
       if (err.code === 'auth/user-not-found') {
         setError('No account found with this email.');
@@ -105,13 +108,25 @@ export const AuthPage = () => {
           throw new Error('Please enter email and password.');
         }
         await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+        setFailedAttempts(0); // Success, clear attempts
       }
     } catch (err: any) {
       const code = err?.code;
-      if (code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
+      if (code === 'auth/wrong-password') {
+        const nextCount = failedAttempts + 1;
+        setFailedAttempts(nextCount);
+        
+        if (nextCount >= 10) {
+          setError('Security Alert: 10 failed attempts detected. For your safety, please reset your password.');
+          setTimeout(() => {
+            setIsForgotPassword(true);
+            setError('');
+          }, 3000);
+        } else {
+          setError(`Incorrect password. Attempt ${nextCount} of 10. Try again or reset.`);
+        }
+      } else if (code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
         setError('Incorrect email or password. Verify credentials or sign up.');
-      } else if (code === 'auth/wrong-password') {
-        setError('Incorrect password. Try again or reset.');
       } else if (code === 'auth/email-already-in-use') {
         setError('This email is already registered.');
       } else {
@@ -154,7 +169,7 @@ export const AuthPage = () => {
           </div>
         </div>
 
-        <Card className="p-8 sm:p-10 shadow-2xl border-white bg-white/90" hover={false}>
+        <Card className="p-8 sm:p-10 shadow-2xl border-white bg-white/90 ring-1 ring-black/5" hover={false}>
           <AnimatePresence mode="wait">
             {isForgotPassword ? (
               <motion.div 
@@ -310,7 +325,10 @@ export const AuthPage = () => {
                         required
                         value={formData.password}
                         onChange={(e) => setFormData({...formData, password: e.target.value})}
-                        className="h-16 pr-14"
+                        className={cn(
+                          "h-16 pr-14 transition-all duration-300",
+                          failedAttempts > 0 && failedAttempts < 10 ? "border-rose-200 bg-rose-50/10" : ""
+                        )}
                       />
                       <button 
                         type="button"
@@ -320,6 +338,15 @@ export const AuthPage = () => {
                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
                     </div>
+                    {failedAttempts > 0 && failedAttempts < 10 && (
+                      <motion.p 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-[9px] font-black text-rose-500 uppercase tracking-widest ml-2"
+                      >
+                        {10 - failedAttempts} attempts remaining before mandatory reset
+                      </motion.p>
+                    )}
                   </div>
 
                   <AnimatePresence>

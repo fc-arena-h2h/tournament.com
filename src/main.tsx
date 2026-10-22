@@ -3,8 +3,8 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
-import { I18nProvider } from '@/src/lib/i18n';
-import { setupBackgroundPushWorker } from '@/src/lib/fcm';
+import { I18nProvider } from './lib/i18n';
+import { setupBackgroundPushWorker } from './lib/fcm';
 
 // Setup background Push & FCM Service Worker
 setupBackgroundPushWorker().catch(() => {});

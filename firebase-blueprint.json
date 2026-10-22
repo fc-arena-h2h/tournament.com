@@ -74,6 +74,7 @@
         "homePlayerName": { "type": "string", "maxLength": 50 },
         "awayPlayerName": { "type": "string", "maxLength": 50 },
         "participants": { "type": "array", "items": { "type": "string" } },
+        "matchId": { "type": "string" },
         "status": { "type": "string", "enum": ["scheduled", "ongoing", "reported", "completed", "disputed"] },
         "stage": { "type": "string", "enum": ["group", "r16", "qtr", "semi", "final"] },
         "homeScore": { "type": "number", "nullable": true },

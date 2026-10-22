@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/src/lib/utils';
-import { ArenaPage } from '@/src/pages/Arena';
-import { AuthPage } from '@/src/pages/Auth';
-import { MatchesPage } from '@/src/pages/Matches';
-import { TournamentListPage } from '@/src/pages/TournamentList';
-import { AdminDashboard } from '@/src/pages/AdminDashboard';
-import { CreateTournamentPage } from '@/src/pages/CreateTournament';
-import { ProfilePage } from '@/src/pages/Profile';
-import { ArenaDetail } from '@/src/pages/ArenaDetail';
-import { useAuth } from '@/src/hooks/useAuth';
-import { useFraudProtection } from '@/src/hooks/useFraudProtection';
-import { useI18n } from '@/src/lib/i18n';
-import { useAppUpdate } from '@/src/hooks/useAppUpdate';
-import { Header, BottomNav, NavTab } from '@/src/components/layout/Shell';
-import { SetupProfile } from '@/src/components/auth/SetupProfile';
-import { GameLoader } from '@/src/components/ui/GameLoader';
-import { UpdateOverlay } from '@/src/components/ui/UpdateOverlay';
+import { ArenaPage } from './pages/Arena';
+import { AuthPage } from './pages/Auth';
+import { MatchesPage } from './pages/Matches';
+import { TournamentListPage } from './pages/TournamentList';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { CreateTournamentPage } from './pages/CreateTournament';
+import { ProfilePage } from './pages/Profile';
+import { ArenaDetail } from './pages/ArenaDetail';
+import { useAuth } from './hooks/useAuth';
+import { useFraudProtection } from './hooks/useFraudProtection';
+import { useI18n } from './lib/i18n';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { Header, BottomNav, NavTab } from './components/layout/Shell';
+import { SetupProfile } from './components/auth/SetupProfile';
+import { GameLoader } from './components/ui/GameLoader';
+import { UpdateOverlay } from './components/ui/UpdateOverlay';
 import { Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '@/src/lib/firebase';
+import { db, auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
   AppNotification, 
@@ -28,9 +28,9 @@ import {
   requestPhoneNotificationPermission,
   sendTestPhoneNotification,
   updateAppBadge,
-} from '@/src/lib/notifications';
-import { NotificationCenter } from '@/src/components/ui/NotificationCenter';
-import { NotificationToast } from '@/src/components/ui/NotificationToast';
+} from './lib/notifications';
+import { NotificationCenter } from './components/ui/NotificationCenter';
+import { NotificationToast } from './components/ui/NotificationToast';
 import { Bell, BellRing, X, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
