@@ -32,31 +32,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Role check from user document (Source of Truth)
-    function getUserRole() {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(userPath) ? get(userPath).data.get('role', 'none') : 'none';
-    }
-
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'sperkplay@gmail.com' || 
         request.auth.token.get('email', '') == 'sperkplay@gmail.com' ||
-        getUserRole() == 'admin'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'none') == 'admin')
       );
     }
 
     function isPublisherOf(tournamentId) {
-      if (!isSignedIn()) return false;
-      if (isAdmin()) return true;
-      let tPath = /databases/$(database)/documents/tournaments/$(tournamentId);
-      return exists(tPath) && get(tPath).data.publisherId == request.auth.uid;
+      return isSignedIn() && (
+        isAdmin() || 
+        (exists(/databases/$(database)/documents/tournaments/$(tournamentId)) && 
+         get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.get('publisherId', '') == request.auth.uid)
+      );
     }
 
     function isPublisher() {
       return isSignedIn() && (
         isAdmin() || 
-        getUserRole() == 'publisher'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'none') == 'publisher')
       );
     }
 
@@ -174,17 +170,19 @@ service cloud.firestore {
 
     // Registrations Collection
     match /registrations/{registrationId} {
-      allow get, list: if isAdmin() || (isSignedIn() && (
+      allow list: if isAdmin();
+      allow get: if isAdmin() || (isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        get(/databases/$(database)/documents/tournaments/$(resource.data.tournamentId)).data.publisherId == request.auth.uid ||
+        isPublisherOf(resource.data.tournamentId) ||
         isParticipantOf(resource.data.tournamentId)
       ));
-      allow create: if isSignedIn() && isValidRegistration(incoming());
-      allow update: if isAdmin() || (
-        // Action: Approval (by publisher of tournament)
-        get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isPublisherOf(resource.data.tournamentId)
       );
-      allow delete: if isAdmin() || (isPublisher() && get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.publisherId == request.auth.uid);
+      allow create: if isSignedIn() && isValidRegistration(incoming());
+      allow update: if isAdmin() || isPublisherOf(existing().tournamentId);
+      allow delete: if isAdmin() || isPublisherOf(existing().tournamentId);
     }
 
     // Matches Collection

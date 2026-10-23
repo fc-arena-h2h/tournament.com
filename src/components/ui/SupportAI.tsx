@@ -233,19 +233,6 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
           </div>
         </div>
 
-        {/* Usage Info */}
-        <div className="px-8 py-3 bg-indigo-50/50 border-b border-indigo-100/50 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
-              LOCAL AI ACTIVE (NO LIMIT)
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            <MessageCircle size={10} />
-            Offline Mode
-          </div>
-        </div>
 
         {/* Chat Area */}
         <div 

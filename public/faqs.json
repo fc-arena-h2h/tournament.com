@@ -507,5 +507,80 @@
     "answer_bn": "রুল সেটআপ বা এডিট করতে:\n১. টুর্নামেন্ট ডিটেইলসের 'Rules' ট্যাবে যান।\n২. আপনি হোস্ট হলে সেখানে 'Edit Rules' বাটন দেখতে পাবেন।\n৩. নতুন নিয়ম যোগ করুন বা আগেরগুলো পরিবর্তন করুন।\n৪. 'Save Rules' বাটনে ক্লিক করে আপডেট করুন।",
     "related_en": ["How to add players?", "How to deploy matches?", "How to create a tournament?"],
     "related_bn": ["প্লেয়ার এড করব কীভাবে?", "ম্যাচ ডিপ্লয় করব কীভাবে?", "টুর্নামেন্ট তৈরি করব কীভাবে?"]
+  },
+  {
+    "id": "match_deployment_methods",
+    "keywords": ["deployment", "auto vs manual", "ম্যাচ তৈরি", "manual match", "auto deploy", "fixture creation"],
+    "questions": [
+      "Auto vs Manual Match Deployment?",
+      "অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?",
+      "Kivabe match deploy korbo?",
+      "Which deployment method should I use?",
+      "ম্যানুয়ালি ম্যাচ তৈরি করা যায়?"
+    ],
+    "answer_en": "You have two ways to deploy matches in your arena:\n\n1. **Auto Match Deploy (Recommended):** This system automatically generates all group or knockout fixtures based on your player list. It's fast and error-free.\n2. **Manual Match Deploy:** Best for custom events or friendly matches. You manually select Home and Away players, set a specific time, and create individual fixtures.\n\nTo access these, go to the 'Manage' tab in your tournament dashboard.",
+    "answer_bn": "আপনার এরিনাতে ম্যাচ ডিপ্লয় করার দুটি উপায় আছে:\n\n১. **অটো ম্যাচ ডিপ্লয় (সুপারিশকৃত):** এই সিস্টেমটি আপনার প্লেয়ার লিস্টের ওপর ভিত্তি করে গ্রুপ বা নকআউটের সব ম্যাচ স্বয়ংক্রিয়ভাবে তৈরি করে দেয়। এটি দ্রুত এবং নির্ভুল।\n২. **ম্যানুয়াল ম্যাচ ডিপ্লয়:** কাস্টম ইভেন্ট বা ফ্রেন্ডলি ম্যাচের জন্য এটি সেরা। আপনি নিজেই হোম এবং অ্যাওয়ে প্লেয়ার সিলেক্ট করতে পারেন এবং নির্দিষ্ট সময় সেট করে আলাদা আলাদা ফিক্সচার তৈরি করতে পারেন।\n\nএই অপশনগুলো পেতে আপনার টুর্নামেন্ট ড্যাশবোর্ডের 'Manage' ট্যাবে যান।",
+    "related_en": ["How to deploy matches?", "How automatic progression works?", "How to add players?"],
+    "related_bn": ["ম্যাচ ডিপ্লয় করব কীভাবে?", "অটো প্রগ্রেশন কীভাবে কাজ করে?", "প্লেয়ার এড করব কীভাবে?"]
+  },
+  {
+    "id": "automatic_progression",
+    "keywords": ["progression", "winners", "next round", "বিজয়ীরা কীভাবে যাবে", "পরের রাউন্ড", "advancement", "bracket update"],
+    "questions": [
+      "How do players move to the next round?",
+      "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?",
+      "Kivabe winner ra porer round e jabe?",
+      "Does the bracket update automatically?",
+      "বিজয়ীদের নাম কীভাবে পরের ম্যাচে আসবে?"
+    ],
+    "answer_en": "Our system features a 'Smart Auto-Progression' logic:\n\n*   **Group to Knockout:** Once all group matches are completed, the system automatically identifies the Top 2 players from each group (based on PTS and GD) and generates the Round of 16/Quarter-Final fixtures.\n*   **Knockout Advancement:** After a knockout match result is confirmed, the winner is automatically moved to the corresponding slot in the next stage (e.g., SEMI to FINAL).\n\n**Note:** Progression triggers immediately after the host confirms the match results. Ensure the 'Auto-Progression' toggle is ACTIVE in the Manage tab.",
+    "answer_bn": "আমাদের অ্যাপে 'স্মার্ট অটো-প্রগ্রেশন' লজিক ব্যবহার করা হয়েছে:\n\n*   **গ্রুপ থেকে নকআউট:** গ্রুপ পর্বের সব ম্যাচ শেষ হওয়ার পর, সিস্টেম স্বয়ংক্রিয়ভাবে প্রতি গ্রুপের সেরা ২ জন প্লেয়ারকে (পয়েন্ট এবং গোল ডিফারেন্সের ভিত্তিতে) খুঁজে বের করে এবং পরবর্তী রাউন্ডের ফিক্সচার তৈরি করে দেয়।\n*   **নকআউট প্রগ্রেশন:** নকআউট ম্যাচের রেজাল্ট কনফার্ম হওয়ার সাথে সাথে বিজয়ী প্লেয়ার স্বয়ংক্রিয়ভাবে পরবর্তী স্টেজের নির্ধারিত স্লটে (যেমন: সেমি থেকে ফাইনাল) চলে যায়।\n\n**দ্রষ্টব্য:** হোস্ট রেজাল্ট কনফার্ম করার সাথে সাথেই এই প্রগ্রেশন কাজ করে। নিশ্চিত করুন যে 'Manage' ট্যাবে 'Auto-Progression' অপশনটি চালু (ACTIVE) আছে।",
+    "related_en": ["What is GD and Pts?", "How to deploy matches?", "Auto vs Manual Match Deployment?"],
+    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "ম্যাচ ডিপ্লয় করব কীভাবে?", "অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?"]
+  },
+  {
+    "id": "demo_vs_live",
+    "keywords": ["demo", "local storage", "লাইভ টুর্নামেন্ট", "practice", "offline mode", "demo mode", "difference"],
+    "questions": [
+      "Difference between Demo and Live tournaments?",
+      "ডেমো এবং লাইভ টুর্নামেন্টের মধ্যে পার্থক্য কী?",
+      "Kivabe demo tournament khelbo?",
+      "Is demo tournament data saved online?",
+      "ডেমো কি সবাই দেখতে পাবে?"
+    ],
+    "answer_en": "Arena VS offers two types of tournament environments:\n\n1. **Live Tournament:** All data is saved on our secure Firebase cloud database. These are public, and results affect the global leaderboard.\n2. **Demo Tournament:** These are saved ONLY on your device's Local Storage. They are intended for practice or simulation. Other users cannot see your demo tournaments, and they do not require an activation key.\n\nDemo mode is perfect for hosts who want to test their bracket logic before hosting a real prize-pool event.",
+    "answer_bn": "Arena VS-এ দুই ধরনের টুর্নামেন্ট এনভায়রনমেন্ট আছে:\n\n১. **লাইভ টুর্নামেন্ট:** সব ডাটা আমাদের সুরক্ষিত ফায়ারবেস ক্লাউড ডাটাবেসে সেভ হয়। এগুলো পাবলিক টুর্নামেন্ট এবং এর ফলাফল গ্লোবাল লিডারবোর্ডে প্রভাব ফেলে।\n২. **ডেমো টুর্নামেন্ট:** এগুলোর তথ্য শুধুমাত্র আপনার ডিভাইসের লোকাল স্টোরেজে (Local Storage) সেভ হয়। এগুলো মূলত প্র্যাকটিস বা সিমুলেশনের জন্য। অন্য কোনো ইউজার আপনার ডেমো টুর্নামেন্ট দেখতে পাবে না এবং এটি তৈরি করতে কোনো এক্টিভেশন কি লাগে না।\n\nডেমো মোড সেই সব হোস্টদের জন্য সেরা যারা আসল টুর্নামেন্ট করার আগে ব্র্যাকেট লজিক টেস্ট করে নিতে চান।",
+    "related_en": ["How to create a tournament?", "How automatic progression works?", "Why is my account frozen?"],
+    "related_bn": ["টুর্নামেন্ট তৈরি করব কীভাবে?", "অটো প্রগ্রেশন কীভাবে কাজ করে?", "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?"]
+  },
+  {
+    "id": "tournament_status_guide",
+    "keywords": ["status", "open", "ongoing", "finished", "টুর্নামেন্ট স্ট্যাটাস", "অবস্থা", "ended"],
+    "questions": [
+      "What do different tournament statuses mean?",
+      "টুর্নামেন্টের স্ট্যাটাসগুলোর মানে কী?",
+      "Keno ongoing dekhasse?",
+      "When does a cup finish?",
+      "Open vs Ongoing?"
+    ],
+    "answer_en": "A tournament goes through three main stages:\n\n*   **OPEN:** Registration is currently active. Players can join the arena using the 'Join' button.\n*   **ONGOING:** Registration is closed, and matches have been deployed. Players are actively competing in fixtures.\n*   **FINISHED:** The Grand Final has been played, and a champion has been crowned. No more matches can be played in this cup.\n\nYou can see the current status of any cup at the top-left corner of the tournament card.",
+    "answer_bn": "একটি টুর্নামেন্ট তিনটি প্রধান ধাপের মধ্য দিয়ে যায়:\n\n*   **OPEN:** বর্তমানে রেজিস্ট্রেশন চলছে। প্লেয়াররা 'Join' বাটন ব্যবহার করে অংশগ্রহণ করতে পারবে।\n*   **ONGOING:** রেজিস্ট্রেশন বন্ধ এবং ম্যাচ শুরু হয়ে গেছে। প্লেয়াররা এখন টুর্নামেন্টে একে অপরের সাথে খেলছে।\n*   **FINISHED:** গ্র্যান্ড ফাইনাল শেষ এবং একজন চ্যাম্পিয়ন নির্ধারিত হয়ে গেছে। এই কাপে আর কোনো ম্যাচ বাকি নেই।\n\nযেকোনো কাপের কার্ডের উপরে বাম কোণায় আপনি বর্তমান স্ট্যাটাস দেখতে পাবেন।",
+    "related_en": ["How to join a tournament?", "How to get prize money?", "Where are my matches?"],
+    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "পুরস্কারের টাকা কীভাবে পাব?", "আমার ম্যাচগুলো কোথায় পাব?"]
+  },
+  {
+    "id": "security_fairplay_policy",
+    "keywords": ["fairplay", "cheating", "ban", "সিকিউরিটি", "নীতিমালা", "নিরাপত্তা", "report player", "fake score"],
+    "questions": [
+      "Security and Fair-Play Policy?",
+      "নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা কী?",
+      "Amr id safe?",
+      "How to report fake scores?",
+      "অ্যাপের রুলস কী কী?"
+    ],
+    "answer_en": "To maintain a professional environment, Arena VS enforces strict rules:\n\n*   **Anti-Cheat:** Using game hacks or mods in FC Mobile will result in a permanent ban from Arena VS.\n*   **Fake Scores:** Submitting fake scores or screenshots is a major violation. Hosts verify every result before finalizing.\n*   **Multiple Accounts:** One player can only have one Arena ID. Multiple accounts linked to the same person will be frozen.\n*   **Reporting:** If you suspect unfair play, record the game and contact an Admin immediately via Telegram with the Match ID.",
+    "answer_bn": "একটি প্রফেশনাল পরিবেশ বজায় রাখতে, Arena VS কঠোর নিয়ম মেনে চলে:\n\n*   **অ্যান্টি-চিট:** FC Mobile-এ কোনো হ্যাক বা মড ব্যবহার করলে Arena VS থেকে স্থায়ীভাবে ব্যান করা হবে।\n*   **ফেক স্কোর:** মিথ্যে স্কোর বা এডিট করা স্ক্রিনশট জমা দেওয়া একটি বড় অপরাধ। হোস্ট প্রতিটি রেজাল্ট ভালো করে চেক করে কনফার্ম করেন।\n*   **একাধিক অ্যাকাউন্ট:** একজন প্লেয়ারের শুধুমাত্র একটি এরিনা আইডি থাকতে পারবে। একই ব্যক্তির একাধিক আইডি পাওয়া গেলে সেগুলো বন্ধ করে দেওয়া হবে।\n*   **রিপোর্টিং:** আপনি যদি কোনো অন্যায়ের সন্দেহ করেন, তবে খেলার ভিডিও রেকর্ড করুন এবং ম্যাচ আইডিসহ টেলিগ্রামে অ্যাডমিনের সাথে যোগাযোগ করুন।",
+    "related_en": ["Why is my account frozen?", "How to contact support?", "How to report a cheater?"],
+    "related_bn": ["অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "চিটার রিপোর্ট করব কীভাবে?"]
   }
 ]

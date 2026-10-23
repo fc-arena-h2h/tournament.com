@@ -563,10 +563,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           const p2 = shuffled[i + 1];
           const p1Profile = profiles[p1.userId];
           const p2Profile = profiles[p2.userId];
+          const matchId = `${stage}_M${(i / 2) + 1}`;
 
           newMatches.push({
             tournamentId: tournament.id,
-            matchId: generateMatchId(),
+            matchId: matchId,
             stage: stage,
             groupId: 'knockout',
             homePlayerId: p1.userId,
@@ -1383,6 +1384,49 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     return null;
   };
 
+  const getQualifiedPlayerIds = (targetStage: string): string[] | null => {
+    if (targetStage === 'group') return null;
+
+    if (targetStage === '3RD_PLACE') {
+      const semiMatches = matches.filter(m => m.stage === 'SEMI');
+      const losers: string[] = [];
+      semiMatches.forEach(m => {
+        const lId = getLoserId(m);
+        if (lId) losers.push(lId);
+      });
+      return losers;
+    }
+
+    const stageIdx = knockoutStages.indexOf(targetStage);
+    if (stageIdx === -1) return null;
+
+    // First knockout stage
+    if (stageIdx === 0) {
+      if (isKnockoutOnly) {
+        return participants.filter(p => p.status === 'approved').map(p => p.userId);
+      } else {
+        const activeGroups = Array.from(new Set(participants.map(p => p.groupId).filter(Boolean))).sort() as string[];
+        const qualified: string[] = [];
+        activeGroups.forEach(gId => {
+          const table = calculateGroupTable(gId, matches);
+          if (table.length >= 1) qualified.push(table[0].userId);
+          if (table.length >= 2) qualified.push(table[1].userId);
+        });
+        return qualified;
+      }
+    }
+
+    // Subsequent stages: winners of previous stage
+    const prevStage = knockoutStages[stageIdx - 1];
+    const prevMatches = matches.filter(m => m.stage === prevStage);
+    const winners: string[] = [];
+    prevMatches.forEach(m => {
+      const wId = getWinnerId(m);
+      if (wId) winners.push(wId);
+    });
+    return winners;
+  };
+
   const upsertStageMatch = async (
     allActiveMatches: Match[],
     matchId: string,
@@ -1392,56 +1436,55 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   ) => {
     const existing = allActiveMatches.find(m => m.matchId === matchId || (m.stage === stage && m.matchId === matchId));
     if (existing) {
-      if (isDemo) {
-        updateDemoMatch(tournament.id, existing.id, {
-          homePlayerId: homePlayer.userId,
-          awayPlayerId: awayPlayer.userId,
-          homePlayerName: homePlayer.name,
-          awayPlayerName: awayPlayer.name,
-          stage: stage,
-          groupId: 'knockout',
-          status: 'scheduled',
-        });
-        return;
-      }
-      await updateDoc(doc(db, 'matches', existing.id), {
+      const updates = {
         homePlayerId: homePlayer.userId,
         awayPlayerId: awayPlayer.userId,
         homePlayerName: homePlayer.name,
         awayPlayerName: awayPlayer.name,
-        participants: [homePlayer.userId, awayPlayer.userId],
-        status: 'scheduled',
         stage: stage,
         groupId: 'knockout',
+        status: 'scheduled' as const,
+        homeScore: undefined,
+        awayScore: undefined,
+        penaltyWinnerId: null
+      };
+
+      if (isDemo) {
+        updateDemoMatch(tournament.id, existing.id, updates as any);
+        setMatches(prev => prev.map(m => m.id === existing.id ? { ...m, ...updates } : m));
+        return;
+      }
+      await updateDoc(doc(db, 'matches', existing.id), {
+        ...updates,
+        participants: [homePlayer.userId, awayPlayer.userId],
+        homeScore: null,
+        awayScore: null,
         updatedAt: Timestamp.now()
       });
     } else {
-      if (isDemo) {
-        addDemoMatch(tournament.id, {
-          tournamentId: tournament.id,
-          matchId: matchId,
-          homePlayerId: homePlayer.userId,
-          awayPlayerId: awayPlayer.userId,
-          homePlayerName: homePlayer.name,
-          awayPlayerName: awayPlayer.name,
-          status: 'scheduled',
-          stage: stage,
-          groupId: 'knockout',
-          scheduledTime: { toMillis: () => Date.now() }
-        });
-        return;
-      }
-      await addDoc(collection(db, 'matches'), {
+      const matchData = {
         tournamentId: tournament.id,
         matchId: matchId,
         homePlayerId: homePlayer.userId,
         awayPlayerId: awayPlayer.userId,
         homePlayerName: homePlayer.name,
         awayPlayerName: awayPlayer.name,
-        participants: [homePlayer.userId, awayPlayer.userId],
-        status: 'scheduled',
+        status: 'scheduled' as const,
         stage: stage,
-        groupId: 'knockout',
+        groupId: 'knockout'
+      };
+
+      if (isDemo) {
+        const newMatch = addDemoMatch(tournament.id, {
+          ...matchData,
+          scheduledTime: { toMillis: () => Date.now() }
+        });
+        setMatches(prev => [...prev, newMatch as any]);
+        return;
+      }
+      await addDoc(collection(db, 'matches'), {
+        ...matchData,
+        participants: [homePlayer.userId, awayPlayer.userId],
         publisherId: tournament.publisherId,
         scheduledTime: serverTimestamp(),
         createdAt: serverTimestamp()
@@ -1457,7 +1500,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       const allActiveMatches = currentMatchList || matches;
       const groupRankings: Record<string, { rank1: { userId: string, name: string }, rank2: { userId: string, name: string } }> = {};
 
-      groups.forEach(gId => {
+      const activeGroups = Array.from(new Set(participants.map(p => p.groupId).filter(Boolean))).sort() as string[];
+      
+      activeGroups.forEach(gId => {
         const table = calculateGroupTable(gId, allActiveMatches);
         if (table.length >= 2) {
           groupRankings[gId] = {
@@ -1473,63 +1518,65 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       });
 
       const rankedGroupKeys = Object.keys(groupRankings).sort();
-      if (rankedGroupKeys.length < 2) {
-        throw new Error("Need at least 2 active groups with participants to generate knockout fixtures.");
+      if (rankedGroupKeys.length === 0) {
+        throw new Error("No active groups found. Please deploy groups first.");
       }
 
       let targetStage = 'R16';
       let pairings: { matchId: string; home: { userId: string, name: string }; away: { userId: string, name: string } }[] = [];
 
-      // 8 Groups (A, B, C, D, E, F, G, H) -> FIFA World Cup Round of 16
-      if (rankedGroupKeys.length >= 8 && ['A','B','C','D','E','F','G','H'].every(k => groupRankings[k])) {
+      const numGroups = rankedGroupKeys.length;
+
+      // Deterministic World Cup Style pairing logic
+      if (numGroups === 8) {
         targetStage = 'R16';
         const wc8 = [
-          { matchId: 'R16_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
-          { matchId: 'R16_M2', hG: 'C', hR: 1, aG: 'D', aR: 2 },
-          { matchId: 'R16_M3', hG: 'E', hR: 1, aG: 'F', aR: 2 },
-          { matchId: 'R16_M4', hG: 'G', hR: 1, aG: 'H', aR: 2 },
-          { matchId: 'R16_M5', hG: 'B', hR: 1, aG: 'A', aR: 2 },
-          { matchId: 'R16_M6', hG: 'D', hR: 1, aG: 'C', aR: 2 },
-          { matchId: 'R16_M7', hG: 'F', hR: 1, aG: 'E', aR: 2 },
-          { matchId: 'R16_M8', hG: 'H', hR: 1, aG: 'G', aR: 2 },
+          { m: 1, hG: 'A', hR: 1, aG: 'B', aR: 2 },
+          { m: 2, hG: 'C', hR: 1, aG: 'D', aR: 2 },
+          { m: 3, hG: 'E', hR: 1, aG: 'F', aR: 2 },
+          { m: 4, hG: 'G', hR: 1, aG: 'H', aR: 2 },
+          { m: 5, hG: 'B', hR: 1, aG: 'A', aR: 2 },
+          { m: 6, hG: 'D', hR: 1, aG: 'C', aR: 2 },
+          { m: 7, hG: 'F', hR: 1, aG: 'E', aR: 2 },
+          { m: 8, hG: 'H', hR: 1, aG: 'G', aR: 2 },
         ];
         pairings = wc8.map(p => ({
-          matchId: p.matchId,
+          matchId: `R16_M${p.m}`,
           home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
           away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
         }));
-      } else if (rankedGroupKeys.length >= 4 && ['A','B','C','D'].every(k => groupRankings[k])) {
-        // 4 Groups (A, B, C, D) -> Quarter Finals
+      } else if (numGroups === 4) {
         targetStage = 'QTR';
         const wc4 = [
-          { matchId: 'QTR_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
-          { matchId: 'QTR_M2', hG: 'C', hR: 1, aG: 'D', aR: 2 },
-          { matchId: 'QTR_M3', hG: 'B', hR: 1, aG: 'A', aR: 2 },
-          { matchId: 'QTR_M4', hG: 'D', hR: 1, aG: 'C', aR: 2 },
+          { m: 1, hG: 'A', hR: 1, aG: 'B', aR: 2 },
+          { m: 2, hG: 'C', hR: 1, aG: 'D', aR: 2 },
+          { m: 3, hG: 'B', hR: 1, aG: 'A', aR: 2 },
+          { m: 4, hG: 'D', hR: 1, aG: 'C', aR: 2 },
         ];
         pairings = wc4.map(p => ({
-          matchId: p.matchId,
+          matchId: `QTR_M${p.m}`,
           home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
           away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
         }));
-      } else if (rankedGroupKeys.length >= 2 && ['A','B'].every(k => groupRankings[k])) {
-        // 2 Groups (A, B) -> Semi Finals
+      } else if (numGroups === 2) {
         targetStage = 'SEMI';
-        const wc2 = [
-          { matchId: 'SEMI_M1', hG: 'A', hR: 1, aG: 'B', aR: 2 },
-          { matchId: 'SEMI_M2', hG: 'B', hR: 1, aG: 'A', aR: 2 },
+        pairings = [
+          { matchId: 'SEMI_M1', home: groupRankings['A'].rank1, away: groupRankings['B'].rank2 },
+          { matchId: 'SEMI_M2', home: groupRankings['B'].rank1, away: groupRankings['A'].rank2 }
         ];
-        pairings = wc2.map(p => ({
-          matchId: p.matchId,
-          home: p.hR === 1 ? groupRankings[p.hG].rank1 : groupRankings[p.hG].rank2,
-          away: p.aR === 1 ? groupRankings[p.aG].rank1 : groupRankings[p.aG].rank2,
-        }));
+      } else if (numGroups === 1) {
+        targetStage = 'FINAL';
+        pairings = [
+          { matchId: 'FINAL_M1', home: groupRankings[rankedGroupKeys[0]].rank1, away: groupRankings[rankedGroupKeys[0]].rank2 }
+        ];
       } else {
-        const totalQualifiers = rankedGroupKeys.length * 2;
-        targetStage = totalQualifiers <= 2 ? 'FINAL' : totalQualifiers <= 4 ? 'SEMI' : totalQualifiers <= 8 ? 'QTR' : 'R16';
-        for (let i = 0; i < rankedGroupKeys.length; i++) {
+        // Fallback for non-standard group counts
+        const totalAdvancing = numGroups * 2;
+        targetStage = totalAdvancing <= 2 ? 'FINAL' : totalAdvancing <= 4 ? 'SEMI' : totalAdvancing <= 8 ? 'QTR' : 'R16';
+        
+        for (let i = 0; i < numGroups; i++) {
           const g1 = rankedGroupKeys[i];
-          const g2 = rankedGroupKeys[(i + 1) % rankedGroupKeys.length];
+          const g2 = rankedGroupKeys[(i + 1) % numGroups];
           pairings.push({
             matchId: `${targetStage}_M${i + 1}`,
             home: groupRankings[g1].rank1,
@@ -1543,155 +1590,70 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       setActiveTab('knockout');
       setActiveKnockoutStage(targetStage as any);
       setAutoMatchToast({
-        title: 'KNOCKOUT BRACKET ACTIVATED',
-        subtitle: `Group stage concluded! Top 2 from each group advanced to ${targetStage} (World Cup format).`
+        title: 'KNOCKOUT BRACKET UPDATED',
+        subtitle: `Group stage standings processed! Top players advanced to ${targetStage}.`
       });
     } catch (err: any) {
       console.error('Error generating knockout matches:', err);
-      handleFirestoreError(err, OperationType.WRITE, 'matches');
+      if (!isDemo) handleFirestoreError(err, OperationType.WRITE, 'matches');
     } finally {
       setDeploying(false);
     }
   };
 
-  // 0. Advance R32 -> R16
-  const advanceR32ToR16 = async (r32Matches: Match[], allMatches: Match[]) => {
-    const getWinner = (mNumber: number) => {
-      const m = r32Matches.find(x => x.matchId === `R32_M${mNumber}`) || r32Matches[mNumber - 1];
-      if (!m) return null;
-      const wId = getWinnerId(m);
-      if (!wId) return null;
-      const name = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
-      return { userId: wId, name };
-    };
 
-    const pairs = [
-      [1, 2], [3, 4], [5, 6], [7, 8],
-      [9, 10], [11, 12], [13, 14], [15, 16]
-    ];
+  const advanceStage = async (currentStage: string, nextStage: string, allMatches: Match[]) => {
+    const currentStageMatches = allMatches.filter(m => m.stage === currentStage).sort((a, b) => {
+      const aNum = parseInt(a.matchId?.split('_M')[1] || '0');
+      const bNum = parseInt(b.matchId?.split('_M')[1] || '0');
+      return aNum - bNum;
+    });
+
+    if (currentStageMatches.length === 0) return;
+    if (!currentStageMatches.every(m => m.status === 'completed')) return;
+
+    const winners: { userId: string, name: string }[] = [];
+    const losers: { userId: string, name: string }[] = [];
+
+    currentStageMatches.forEach(m => {
+      const wId = getWinnerId(m);
+      const lId = getLoserId(m);
+      if (wId) {
+        winners.push({
+          userId: wId,
+          name: (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player'
+        });
+      }
+      if (lId) {
+        losers.push({
+          userId: lId,
+          name: (lId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[lId]?.inGameName || 'Player'
+        });
+      }
+    });
+
+    if (winners.length < 2) return;
 
     const updates = [];
-    for (let i = 0; i < pairs.length; i++) {
-      const h = getWinner(pairs[i][0]);
-      const a = getWinner(pairs[i][1]);
-      if (h && a) {
-        updates.push(upsertStageMatch(allMatches, `R16_M${i + 1}`, 'R16', h, a));
+    if (nextStage === 'FINAL' && winners.length === 2) {
+      updates.push(upsertStageMatch(allMatches, 'FINAL_M1', 'FINAL', winners[0], winners[1]));
+      if (losers.length === 2) {
+        updates.push(upsertStageMatch(allMatches, '3RD_PLACE_M1', '3RD_PLACE', losers[0], losers[1]));
+      }
+    } else {
+      for (let i = 0; i < winners.length - 1; i += 2) {
+        const matchNum = (i / 2) + 1;
+        updates.push(upsertStageMatch(allMatches, `${nextStage}_M${matchNum}`, nextStage, winners[i], winners[i + 1]));
       }
     }
 
     if (updates.length > 0) {
       await Promise.all(updates);
-      if (updates.length === 8) {
-        setActiveTab('knockout');
-        setActiveKnockoutStage('R16');
-        setAutoMatchToast({
-          title: 'ROUND OF 16 UNLOCKED',
-          subtitle: 'Round of 32 completed! Winners have advanced to Round of 16.'
-        });
-      }
-    }
-  };
-
-  // 1. Advance R16 -> QTR
-  const advanceR16ToQTR = async (r16Matches: Match[], allMatches: Match[]) => {
-    const getWinner = (mNumber: number) => {
-      const m = r16Matches.find(x => x.matchId === `R16_M${mNumber}`) || r16Matches[mNumber - 1];
-      if (!m) return null;
-      const wId = getWinnerId(m);
-      if (!wId) return null;
-      const name = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
-      return { userId: wId, name };
-    };
-
-    const q1H = getWinner(1);
-    const q1A = getWinner(2);
-    const q2H = getWinner(3);
-    const q2A = getWinner(4);
-    const q3H = getWinner(5);
-    const q3A = getWinner(6);
-    const q4H = getWinner(7);
-    const q4A = getWinner(8);
-
-    if (q1H && q1A && q2H && q2A && q3H && q3A && q4H && q4A) {
-      await Promise.all([
-        upsertStageMatch(allMatches, 'QTR_M1', 'QTR', q1H, q1A),
-        upsertStageMatch(allMatches, 'QTR_M2', 'QTR', q2H, q2A),
-        upsertStageMatch(allMatches, 'QTR_M3', 'QTR', q3H, q3A),
-        upsertStageMatch(allMatches, 'QTR_M4', 'QTR', q4H, q4A),
-      ]);
       setActiveTab('knockout');
-      setActiveKnockoutStage('QTR');
+      setActiveKnockoutStage(nextStage as any);
       setAutoMatchToast({
-        title: 'QUARTER-FINALS UNLOCKED',
-        subtitle: 'Round of 16 completed! Winners have advanced to Quarter-Finals.'
-      });
-    }
-  };
-
-  // 2. Advance QTR -> SEMI
-  const advanceQTRToSEMI = async (qtrMatches: Match[], allMatches: Match[]) => {
-    const getWinner = (mNumber: number) => {
-      const m = qtrMatches.find(x => x.matchId === `QTR_M${mNumber}`) || qtrMatches[mNumber - 1];
-      if (!m) return null;
-      const wId = getWinnerId(m);
-      if (!wId) return null;
-      const name = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
-      return { userId: wId, name };
-    };
-
-    const s1H = getWinner(1);
-    const s1A = getWinner(2);
-    const s2H = getWinner(3);
-    const s2A = getWinner(4);
-
-    if (s1H && s1A && s2H && s2A) {
-      await Promise.all([
-        upsertStageMatch(allMatches, 'SEMI_M1', 'SEMI', s1H, s1A),
-        upsertStageMatch(allMatches, 'SEMI_M2', 'SEMI', s2H, s2A),
-      ]);
-      setActiveTab('knockout');
-      setActiveKnockoutStage('SEMI');
-      setAutoMatchToast({
-        title: 'SEMI-FINALS UNLOCKED',
-        subtitle: 'Quarter-Finals completed! Winners have advanced to Semi-Finals.'
-      });
-    }
-  };
-
-  // 3. Advance SEMI -> FINAL & 3RD_PLACE
-  const advanceSEMIToFINAL = async (semiMatches: Match[], allMatches: Match[]) => {
-    const getWinnerAndLoser = (mNumber: number) => {
-      const m = semiMatches.find(x => x.matchId === `SEMI_M${mNumber}`) || semiMatches[mNumber - 1];
-      if (!m) return null;
-      const wId = getWinnerId(m);
-      const lId = getLoserId(m);
-      if (!wId) return null;
-      const wName = (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player';
-      const lName = lId ? ((lId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[lId]?.inGameName || 'Player') : '';
-      return {
-        winner: { userId: wId, name: wName },
-        loser: lId ? { userId: lId, name: lName } : null
-      };
-    };
-
-    const s1 = getWinnerAndLoser(1);
-    const s2 = getWinnerAndLoser(2);
-
-    if (s1 && s2) {
-      const updates = [
-        upsertStageMatch(allMatches, 'FINAL_M1', 'FINAL', s1.winner, s2.winner)
-      ];
-      if (s1.loser && s2.loser) {
-        updates.push(
-          upsertStageMatch(allMatches, '3RD_PLACE_M1', '3RD_PLACE', s1.loser, s2.loser)
-        );
-      }
-      await Promise.all(updates);
-      setActiveTab('knockout');
-      setActiveKnockoutStage('FINAL');
-      setAutoMatchToast({
-        title: 'GRAND FINAL UNLOCKED',
-        subtitle: 'Semi-Finals completed! Finalists are set for the championship match.'
+        title: `${nextStage} UNLOCKED`,
+        subtitle: `${currentStage} completed! Winners have advanced to ${nextStage}.`
       });
     }
   };
@@ -1706,66 +1668,38 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     // 1. Group Stage -> Knockout
     const groupMatches = currentList.filter(m => m.stage === 'group');
-    const knockoutMatches = currentList.filter(m => m.stage !== 'group' && m.status !== 'draft');
+    const knockoutMatches = currentList.filter(m => m.stage !== 'group' && m.groupId === 'knockout');
 
     if (groupMatches.length > 0 && groupMatches.every(m => m.status === 'completed')) {
-      if (knockoutMatches.length === 0) {
-        await generateKnockoutMatches(currentList);
-        return;
+      // Re-evaluate knockout matches even if they exist, to handle score corrections
+      await generateKnockoutMatches(currentList);
+      // After generating/updating knockout matches, we should check if we can advance further
+      // But we'll wait for the next report/confirm to keep it simple and avoid infinite loops
+      return;
+    }
+
+    // 2. Progression through Knockout Stages
+    const stages = ['R32', 'R16', 'QTR', 'SEMI', 'FINAL'];
+    for (let i = 0; i < stages.length - 1; i++) {
+      const currentStage = stages[i];
+      const nextStage = stages[i + 1];
+      const stageMatches = currentList.filter(m => m.stage === currentStage);
+      
+      if (stageMatches.length > 0 && stageMatches.every(m => m.status === 'completed')) {
+        await advanceStage(currentStage, nextStage, currentList);
+        // If we advanced to the next stage, we stop here for this cycle
+        const nextStageMatches = currentList.filter(m => m.stage === nextStage);
+        if (nextStageMatches.length > 0) break; 
       }
     }
 
-    // 2. R32 -> R16
-    const r32Matches = currentList.filter(m => m.stage === 'R32');
-    if (r32Matches.length > 0 && r32Matches.every(m => m.status === 'completed')) {
-      const r16Matches = currentList.filter(m => m.stage === 'R16');
-      const r16NeedsUpdate = r16Matches.length === 0 || r16Matches.some(m => !m.homePlayerId || !m.awayPlayerId);
-      if (r16NeedsUpdate) {
-        await advanceR32ToR16(r32Matches, currentList);
-        return;
-      }
-    }
-
-    // 3. R16 -> QTR
-    const r16Matches = currentList.filter(m => m.stage === 'R16');
-    if (r16Matches.length > 0 && r16Matches.every(m => m.status === 'completed')) {
-      const qtrMatches = currentList.filter(m => m.stage === 'QTR');
-      const qtrNeedsUpdate = qtrMatches.length === 0 || qtrMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
-      if (qtrNeedsUpdate) {
-        await advanceR16ToQTR(r16Matches, currentList);
-        return;
-      }
-    }
-
-    // 4. QTR -> SEMI
-    const qtrMatches = currentList.filter(m => m.stage === 'QTR');
-    if (qtrMatches.length > 0 && qtrMatches.every(m => m.status === 'completed')) {
-      const semiMatches = currentList.filter(m => m.stage === 'SEMI');
-      const semiNeedsUpdate = semiMatches.length === 0 || semiMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
-      if (semiNeedsUpdate) {
-        await advanceQTRToSEMI(qtrMatches, currentList);
-        return;
-      }
-    }
-
-    // 5. SEMI -> FINAL
-    const semiMatches = currentList.filter(m => m.stage === 'SEMI');
-    if (semiMatches.length > 0 && semiMatches.every(m => m.status === 'completed')) {
-      const finalMatches = currentList.filter(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M1');
-      const finalNeedsUpdate = finalMatches.length === 0 || finalMatches.some(m => !m.homePlayerId || !m.awayPlayerId);
-      if (finalNeedsUpdate) {
-        await advanceSEMIToFINAL(semiMatches, currentList);
-        return;
-      }
-    }
-
-    // 6. FINAL -> CHAMPION
+    // 3. FINAL -> CHAMPION
     const finalMatch = currentList.find(m => m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId));
     if (finalMatch && finalMatch.status === 'completed') {
       const champId = getWinnerId(finalMatch);
       if (champId && (!currentTournament?.winnerId || currentTournament?.status !== 'finished')) {
         const champProfile = profiles[champId];
-        const champName = champProfile?.inGameName || (champId === finalMatch.homePlayerId ? finalMatch.homePlayerName : finalMatch.awayPlayerName) || 'Champion';
+        const champName = (champId === finalMatch.homePlayerId ? finalMatch.homePlayerName : finalMatch.awayPlayerName) || champProfile?.inGameName || 'Champion';
         
         if (isDemo) {
           updateDemoTournament(tournament.id, {
@@ -3159,8 +3093,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       profile: profiles[currentMatchDoc.awayPlayerId]
     } : null;
 
+    const qualifiedIds = getQualifiedPlayerIds(stage);
     const approvedPlayers = participants.filter(p => p.status === 'approved');
     const filteredPlayers = approvedPlayers.filter(p => {
+      if (qualifiedIds && !qualifiedIds.includes(p.userId)) return false;
+      
       const prof = profiles[p.userId];
       const name = (prof?.inGameName || p.gameName || '').toLowerCase();
       const q = playerSearchQuery.toLowerCase().trim();
@@ -3314,14 +3251,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             )}
           </div>
 
+          {qualifiedIds && (
+            <div className="mx-1 px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-2">
+               <Shield size={12} className="text-indigo-500" />
+               <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Strict Filter: Showing only qualified players for this stage</span>
+            </div>
+          )}
+
           {/* Approved Players List */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[220px] max-h-[340px]">
             {filteredPlayers.length === 0 ? (
               <div className="text-center py-10 space-y-2">
                 <Users size={32} className="text-slate-300 mx-auto" />
-                <p className="text-xs font-black uppercase text-slate-400">No approved players found</p>
+                <p className="text-xs font-black uppercase text-slate-400">
+                  {qualifiedIds ? "No qualified players found" : "No approved players found"}
+                </p>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  Approve player registrations in the Manage tab first
+                  {qualifiedIds 
+                    ? "Only players who qualified based on match results are shown here"
+                    : "Approve player registrations in the Manage tab first"}
                 </p>
               </div>
             ) : (
