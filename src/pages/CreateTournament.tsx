@@ -5,8 +5,17 @@ import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebas
 import { Trophy, ArrowLeft, Shield, Lock } from 'lucide-react';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { cn } from '@/src/lib/utils';
+import { saveDemoTournament, saveDemoParticipants, generateDemoPlayers, DemoTournament } from '@/src/lib/localTournaments';
 
-export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfile | null; onBack: () => void }) => {
+export const CreateTournamentPage = ({ 
+  profile, 
+  onBack,
+  isDemo = false 
+}: { 
+  profile?: UserProfile | null; 
+  onBack: () => void;
+  isDemo?: boolean;
+}) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -75,6 +84,45 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
     setLoading(true);
 
     try {
+      const finalOrganizer = formData.organizerName.trim() || profile?.inGameName || profile?.leagueName || 'Official Host';
+      
+      if (isDemo) {
+        // --- Handle Demo Creation (Local Storage) ---
+        const demoId = `demo_${Date.now()}`;
+        const demoTournament: DemoTournament = {
+          id: demoId,
+          title: formData.title,
+          description: formData.description,
+          organizerName: finalOrganizer,
+          format: formData.format,
+          totalSlots: Number(formData.totalSlots) || 16,
+          entryType: formData.entryType,
+          prizePool: formData.prizePool,
+          rewardType: formData.rewardType,
+          messengerGroupLink: formData.messengerGroupLink.trim(),
+          publisherId: auth.currentUser.uid,
+          isDemo: true,
+          status: 'open',
+          filledSlots: Number(formData.totalSlots) || 16, // Auto filled with demo players
+          createdAt: Date.now()
+        };
+
+        saveDemoTournament(demoTournament);
+        
+        // Auto generate demo players
+        const players = generateDemoPlayers(demoTournament.totalSlots);
+        const participants = players.map(p => ({
+          ...p,
+          tournamentId: demoId
+        }));
+        saveDemoParticipants(demoId, participants as any);
+
+        alert(`Demo Tournament created successfully in Local Storage!`);
+        onBack();
+        return;
+      }
+
+      // --- Handle Official Creation (Firestore) ---
       const keyString = formData.deploymentKey.trim();
       if (!keyString) throw new Error('Please enter an activation key!');
 
@@ -95,8 +143,6 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
       if (!keyDoc) {
         throw new Error('Invalid or already used Activation Key! Please purchase a valid key from the admin.');
       }
-
-      const finalOrganizer = formData.organizerName.trim() || profile?.inGameName || profile?.leagueName || 'Official Host';
 
       // 2. Mark Key as Used
       await updateDoc(doc(db, 'licenseKeys', keyDoc.id), {
@@ -173,8 +219,8 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
           <ArrowLeft size={24} />
         </button>
         <div className="flex flex-col">
-          <h2 className="text-2xl font-black text-slate-800 uppercase italic leading-none">CREATE TOURNAMENT</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Deploy new challenge</p>
+          <h2 className="text-2xl font-black text-slate-800 uppercase italic leading-none">{isDemo ? 'DEMO TOURNAMENT' : 'CREATE TOURNAMENT'}</h2>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{isDemo ? 'Sandbox Deployment' : 'Deploy new challenge'}</p>
         </div>
       </div>
 
@@ -394,34 +440,38 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
           </div>
         )}
 
-        {/* Buy Key Section */}
-        <div className="mx-2 p-6 rounded-[2rem] nm-inset bg-indigo-50/50 border border-indigo-100/50 space-y-4">
-          <div className="flex flex-col gap-1 text-center">
-            <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Buy Tournament Activation Key</h4>
-            <p className="text-[8px] text-indigo-600 font-bold uppercase">Contact Admin to purchase your deployment license</p>
-          </div>
-          <Button 
-            type="button" 
-            onClick={() => window.open(telegramLink, '_blank')}
-            className="w-full h-12 rounded-xl bg-white text-indigo-600 border border-indigo-200 shadow-sm hover:bg-indigo-50 text-[10px] font-black uppercase tracking-widest"
-          >
-            Contact Admin (Telegram)
-          </Button>
-        </div>
+        {!isDemo && (
+          <>
+            {/* Buy Key Section */}
+            <div className="mx-2 p-6 rounded-[2rem] nm-inset bg-indigo-50/50 border border-indigo-100/50 space-y-4">
+              <div className="flex flex-col gap-1 text-center">
+                <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Buy Tournament Activation Key</h4>
+                <p className="text-[8px] text-indigo-600 font-bold uppercase">Contact Admin to purchase your deployment license</p>
+              </div>
+              <Button 
+                type="button" 
+                onClick={() => window.open(telegramLink, '_blank')}
+                className="w-full h-12 rounded-xl bg-white text-indigo-600 border border-indigo-200 shadow-sm hover:bg-indigo-50 text-[10px] font-black uppercase tracking-widest"
+              >
+                Contact Admin (Telegram)
+              </Button>
+            </div>
 
-        {/* Activation Key Field */}
-        <div className="space-y-3 pt-2">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Deployment Activation Key</label>
-          <Input 
-            placeholder="Enter key to deploy (e.g. FC-XXXX-XXXX)"
-            required
-            value={formData.deploymentKey}
-            onChange={(e) => setFormData({...formData, deploymentKey: e.target.value})}
-          />
-          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
-            This key is consumed upon tournament creation
-          </p>
-        </div>
+            {/* Activation Key Field */}
+            <div className="space-y-3 pt-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Deployment Activation Key</label>
+              <Input 
+                placeholder="Enter key to deploy (e.g. FC-XXXX-XXXX)"
+                required
+                value={formData.deploymentKey}
+                onChange={(e) => setFormData({...formData, deploymentKey: e.target.value})}
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-4">
+                This key is consumed upon tournament creation
+              </p>
+            </div>
+          </>
+        )}
 
 
 
@@ -430,7 +480,7 @@ export const CreateTournamentPage = ({ profile, onBack }: { profile?: UserProfil
           className="w-full h-18 rounded-[2.5rem] mt-8 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 text-red-600 font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/30 active:scale-95 transition-all"
           disabled={loading}
         >
-          {loading ? 'Deploying...' : `Deploy Tournament`}
+          {loading ? 'Deploying...' : isDemo ? 'Create Demo Arena' : `Deploy Tournament`}
         </Button>
       </form>
     </div>

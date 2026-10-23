@@ -10,6 +10,7 @@ import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { MatchesPage } from '@/src/pages/Matches';
 import { GameLoader } from '@/src/components/ui/GameLoader';
+import { getDemoTournaments, deleteDemoTournament } from '@/src/lib/localTournaments';
 
 
 interface Registration {
@@ -32,12 +33,15 @@ interface Tournament {
 
 export const AdminDashboard = ({ 
   onCreateNew, 
+  onCreateDemo,
   onEnterTournament 
 }: { 
   onCreateNew: () => void; 
+  onCreateDemo?: () => void;
   onEnterTournament: (t: any) => void;
 }) => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [demoTournaments, setDemoTournaments] = useState<any[]>([]);
   const [tournaments, setTournaments] = useState<Record<string, Tournament>>({});
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -139,6 +143,11 @@ export const AdminDashboard = ({
     };
   }, [userProfile?.role, auth.currentUser?.uid]);
 
+  // Load Demo Tournaments
+  useEffect(() => {
+    setDemoTournaments(getDemoTournaments());
+  }, [activeSection]);
+
   // Separate effect to fetch the profile itself if not provided by props
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -228,6 +237,13 @@ export const AdminDashboard = ({
     }
   };
 
+  const handleDeleteDemo = (id: string) => {
+    if (confirm('Delete this demo arena and all its data? This cannot be undone.')) {
+      deleteDemoTournament(id);
+      setDemoTournaments(getDemoTournaments());
+    }
+  };
+
   if (loading) return <GameLoader fullScreen={false} text="LOADING DASHBOARD..." />;
 
   return (
@@ -243,12 +259,43 @@ export const AdminDashboard = ({
         <MatchesPage profile={userProfile} />
       ) : (
         <>
-          <div className="flex items-center justify-between px-4">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-black text-slate-800 uppercase italic leading-none">{userProfile?.role === 'admin' ? 'Command Center' : 'Publisher'}</h2>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Operations</p>
+          <div className="flex flex-col gap-6 px-2">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-black text-slate-800 uppercase italic leading-none">{userProfile?.role === 'admin' ? 'Command Center' : 'Publisher'}</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Operations</p>
+              </div>
             </div>
-            <button onClick={onCreateNew} className="w-14 h-14 rounded-2xl nm-flat text-indigo-500 flex items-center justify-center border border-white/50 active:nm-pressed"><Plus size={24} /></button>
+
+            <div className="grid grid-cols-1 gap-4 px-2">
+              <div className="p-5 nm-flat bg-white rounded-[2rem] border border-white/50 flex items-center justify-between group">
+                <div className="flex flex-col gap-1">
+                   <h4 className="text-[12px] font-black text-slate-800 uppercase italic tracking-tight">Create a Tournament</h4>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Official Competition</p>
+                </div>
+                <button 
+                  onClick={onCreateNew} 
+                  className="w-14 h-14 rounded-2xl nm-inset bg-[#f0f1f5] text-indigo-600 flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                  title="Create Tournament"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
+
+              <div className="p-5 nm-flat bg-white/60 rounded-[2rem] border border-white/30 flex items-center justify-between opacity-80">
+                <div className="flex flex-col gap-1">
+                   <h4 className="text-[12px] font-black text-slate-500 uppercase italic tracking-tight">Create a Demo Tournament</h4>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Sandbox / Testing</p>
+                </div>
+                <button 
+                  onClick={onCreateDemo} 
+                  className="w-14 h-14 rounded-2xl nm-inset bg-[#f0f1f5] text-slate-400 flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                  title="Create Demo"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="mx-2 p-1.5 nm-inset rounded-[1.6rem] bg-[#e6e6e9] border-2 border-white/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
@@ -269,23 +316,57 @@ export const AdminDashboard = ({
                     <Button onClick={handleBroadcast} className="w-full h-12 rounded-xl flex items-center gap-2"><Megaphone size={16} /> Broadcast Update</Button>
                   </Card>
                 )}
-                {Object.values(tournaments).length === 0 && (
+
+                {/* Demo Tournaments List */}
+                {demoTournaments.length > 0 && (
+                  <div className="space-y-4 px-2">
+                    <div className="flex items-center gap-3 px-4 py-2">
+                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Local Demo Arenas</span>
+                      <div className="h-px flex-1 bg-amber-100" />
+                    </div>
+                    {demoTournaments.map(t => (
+                      <Card key={t.id} className="p-6 border-none mx-2 group bg-amber-50/30 border-amber-100/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-black text-slate-800 uppercase italic">{t.title}</span>
+                            <span className="text-[9px] font-black text-amber-600 uppercase tracking-wider">Demo · Local Storage</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleDeleteDemo(t.id)} className="w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-rose-400 hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
+                            <Button variant="outline" size="sm" className="rounded-xl border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white" onClick={() => onEnterTournament(t)}>MANAGE DEMO</Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {(Object.values(tournaments).length === 0 && demoTournaments.length === 0) && (
                   <div className="py-20 text-center space-y-4 nm-inset rounded-[2.5rem] bg-slate-50/50 mx-2">
                     <Trophy size={48} className="mx-auto text-slate-200" />
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">No Tournaments Created</p>
                   </div>
                 )}
-                {Object.values(tournaments).map(t => (
-                  <Card key={t.id} className="p-6 border-none mx-2 group">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-black text-slate-800 uppercase italic">{t.title}</span>
-                        <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider">{t.organizerName || 'Host'}</span>
+                
+                {Object.values(tournaments).length > 0 && (
+                   <div className="space-y-4">
+                     <div className="flex items-center gap-3 px-4 py-2">
+                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Official Live Arenas</span>
+                        <div className="h-px flex-1 bg-indigo-100" />
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-xl border-fc-green text-fc-green hover:bg-fc-green hover:text-white" onClick={() => onEnterTournament(t)}>MANAGE</Button>
-                    </div>
-                  </Card>
-                ))}
+                     {Object.values(tournaments).map(t => (
+                        <Card key={t.id} className="p-6 border-none mx-2 group">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm font-black text-slate-800 uppercase italic">{t.title}</span>
+                              <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wider">{t.organizerName || 'Host'}</span>
+                            </div>
+                            <Button variant="outline" size="sm" className="rounded-xl border-fc-green text-fc-green hover:bg-fc-green hover:text-white" onClick={() => onEnterTournament(t)}>MANAGE</Button>
+                          </div>
+                        </Card>
+                      ))}
+                   </div>
+                )}
               </div>
             </section>
           )}

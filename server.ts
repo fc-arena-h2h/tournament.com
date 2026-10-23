@@ -64,78 +64,8 @@ async function createServer() {
     });
   });
 
-  // Specialized Support AI route
-  app.post('/api/ai/support', async (req, res) => {
-    try {
-      if (!apiKey) {
-        console.error('Support AI API Key missing on server');
-        return res.status(500).json({ error: 'AI Assistant is not configured on the server. Please check GEMINI_API_KEY secret.' });
-      }
-      
-      const { contents } = req.body;
-      if (!contents || !Array.isArray(contents)) {
-        return res.status(400).json({ error: 'Invalid contents format' });
-      }
-
-      // Filter and map contents to match the SDK expectation
-      // The SDK expects contents as an array of Content objects
-      const formattedContents = contents.map(m => ({
-        role: m.role === 'model' ? 'model' : 'user',
-        parts: m.parts.map((p: any) => ({ text: p.text }))
-      }));
-
-      // Load AI context files dynamically
-      let aiContext = '';
-      try {
-        const aiDir = path.resolve(__dirname, 'ai');
-        if (fs.existsSync(aiDir)) {
-          const files = fs.readdirSync(aiDir);
-          for (const file of files) {
-            if (file.endsWith('.md')) {
-              const content = fs.readFileSync(path.join(aiDir, file), 'utf-8');
-              aiContext += `\n--- DOCUMENT: ${file} ---\n${content}\n`;
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error reading AI context:', err);
-      }
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: formattedContents,
-        config: {
-          systemInstruction: `You are the Official AI Support Assistant for "FC Arena VS".
-          
-          CORE KNOWLEDGE BASE:
-          ${aiContext}
-          
-          ADDITIONAL ROLE & GUIDELINES:
-          1. You are the ONLY official AI Support for "FC Arena VS". You are extremely helpful, patient, and knowledgeable.
-          2. READ the entire message from the user carefully before responding. Do not give generic answers.
-          3. If the user asks about how to use a feature, EXPLAIN it in detail.
-          4. Only show the [SHOW_CONTACT_BUTTON] tag if:
-             - The user specifically asks "How can I talk to a human?"
-             - The user reports a bug with their wallet, coins, or payments.
-             - The user reports another player for cheating.
-          5. Keep your tone professional and helpful. Always communicate in English only.`
-        }
-      });
-      
-      const text = response.text;
-      if (!text) {
-        throw new Error('Model returned an empty response');
-      }
-
-      res.json({ text });
-    } catch (error: any) {
-      console.error('Support AI Error:', error);
-      res.status(500).json({ 
-        error: error.message || 'Assistant failed to respond. Please try again later.',
-        details: isProd ? undefined : error.stack
-      });
-    }
-  });
+  // Specialized Support AI route has been migrated to client-side (Fuse.js + faqs.json) for offline support.
+  // The server-side Gemini proxy below remains for other potential AI features.
 
   if (!isProd) {
     // Vite integration for development

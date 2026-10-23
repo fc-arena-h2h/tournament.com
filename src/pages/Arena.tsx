@@ -6,6 +6,7 @@ import { cn } from '@/src/lib/utils';
 import { collection, query, orderBy, limit, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { Reveal } from '@/src/components/ui/Reveal';
+import { getDemoTournaments, getDemoMatches } from '@/src/lib/localTournaments';
 
 interface ArenaProps {
   profile: UserProfile | null;
@@ -41,7 +42,23 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
       limit(5)
     );
     const unsubMatches = onSnapshot(qMatches, (snapshot) => {
-      setRecentResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const officialMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Merge Demo matches
+      const localDemos = getDemoTournaments().filter(dt => dt.publisherId === profile.uid);
+      const allDemoMatches: any[] = [];
+      localDemos.forEach(dt => {
+        const dm = getDemoMatches(dt.id);
+        allDemoMatches.push(...dm);
+      });
+
+      const combined = [...allDemoMatches, ...officialMatches].sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0);
+        return timeB - timeA;
+      });
+
+      setRecentResults(combined.slice(0, 5));
     }, (err) => handleErr("Firestore Recent Matches Error", err));
 
     // Fetch user registrations
@@ -65,7 +82,11 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           filtered = all.slice(0, 3);
         }
         
-        setFeaturedTournaments(filtered.slice(0, 3));
+        // Merge Demo Tournaments for the creator
+        const localDemos = getDemoTournaments().filter(dt => dt.publisherId === profile.uid);
+        const mergedTournaments = [...localDemos, ...filtered];
+        
+        setFeaturedTournaments(mergedTournaments.slice(0, 3));
       }).catch(err => handleErr("Firestore Featured Tournaments Error", err));
 
     }, (err) => handleErr("Firestore Regs Error", err));

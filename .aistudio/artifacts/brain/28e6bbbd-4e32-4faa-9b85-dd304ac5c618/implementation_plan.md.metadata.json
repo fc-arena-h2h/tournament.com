@@ -1,0 +1,6 @@
+{
+  "summary":  "Replacement of server-side Gemini AI with a client-side local AI using Fuse.js for fuzzy matching and a static FAQ dataset. The plan includes creating a comprehensive FAQ JSON supporting Bangla, English, and Banglish, refactoring the SupportAI component for offline usage, and ensuring PWA caching for full offline reliability.",
+  "updatedAt":  "2026-10-23T03:21:59.626718294Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

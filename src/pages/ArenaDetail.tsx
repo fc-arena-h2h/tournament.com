@@ -8,6 +8,7 @@ import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, s
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getDemoParticipants, getDemoMatches, updateDemoMatch, addDemoMatch, updateDemoParticipant, updateDemoTournament, saveDemoParticipants, saveDemoMatches, deleteDemoMatch, DemoMatch, DemoParticipant } from '@/src/lib/localTournaments';
 
 
 
@@ -145,7 +146,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   });
 
   const isPublisher = (currentTournament?.publisherId || tournament.publisherId) === auth.currentUser?.uid;
-  const isAdminUser = profile?.role === 'admin' || isPublisher;
+  const isDemo = currentTournament?.isDemo || (tournament as any).isDemo || tournament.id?.startsWith('demo_');
+  const isAdminUser = profile?.role === 'admin' || isPublisher || isDemo;
 
   const approvedPlayersList = participants.filter(p => p.status === 'approved');
   const distinctAssignedGroups = Array.from(new Set(approvedPlayersList.map(p => p.groupId).filter(Boolean)));
@@ -231,18 +233,42 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
         const hasBothPlayers = Boolean(newHomeId && newAwayId);
 
-        await updateDoc(doc(db, 'matches', existingMatch.id), {
-          matchId: matchSlotId,
-          stage: stage,
-          groupId: 'knockout',
-          homePlayerId: newHomeId,
-          homePlayerName: newHomeName,
-          awayPlayerId: newAwayId,
-          awayPlayerName: newAwayName,
-          participants: [newHomeId, newAwayId].filter(Boolean),
-          status: hasBothPlayers ? 'scheduled' : 'draft',
-          updatedAt: Timestamp.now()
-        });
+        if (isDemo) {
+          updateDemoMatch(tournament.id, existingMatch.id, {
+            matchId: matchSlotId,
+            stage: stage,
+            groupId: 'knockout',
+            homePlayerId: newHomeId,
+            homePlayerName: newHomeName,
+            awayPlayerId: newAwayId,
+            awayPlayerName: newAwayName,
+            status: hasBothPlayers ? 'scheduled' : 'draft',
+          });
+          const updatedMatches = matches.map(m => (m.id === existingMatch.id) ? {
+            ...m,
+            matchId: matchSlotId,
+            stage: stage,
+            homePlayerId: newHomeId,
+            homePlayerName: newHomeName,
+            awayPlayerId: newAwayId,
+            awayPlayerName: newAwayName,
+            status: hasBothPlayers ? 'scheduled' : 'draft' as any
+          } : m);
+          setMatches(updatedMatches);
+        } else {
+          await updateDoc(doc(db, 'matches', existingMatch.id), {
+            matchId: matchSlotId,
+            stage: stage,
+            groupId: 'knockout',
+            homePlayerId: newHomeId,
+            homePlayerName: newHomeName,
+            awayPlayerId: newAwayId,
+            awayPlayerName: newAwayName,
+            participants: [newHomeId, newAwayId].filter(Boolean),
+            status: hasBothPlayers ? 'scheduled' : 'draft',
+            updatedAt: Timestamp.now()
+          });
+        }
 
         if (hasBothPlayers) {
           setAutoMatchToast({
@@ -275,21 +301,40 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         const awayId = !isHome ? playerUid : '';
         const awayName = !isHome ? playerName : '';
 
-        const newDocRef = await addDoc(collection(db, 'matches'), {
-          tournamentId: tournament.id,
-          matchId: matchSlotId,
-          stage: stage,
-          groupId: 'knockout',
-          homePlayerId: homeId,
-          homePlayerName: homeName,
-          awayPlayerId: awayId,
-          awayPlayerName: awayName,
-          participants: [homeId, awayId].filter(Boolean),
-          status: 'draft',
-          publisherId: tournament.publisherId,
-          scheduledTime: serverTimestamp(),
-          createdAt: serverTimestamp()
-        });
+        let newMatchId = '';
+        if (isDemo) {
+          const newMatch = addDemoMatch(tournament.id, {
+            tournamentId: tournament.id,
+            matchId: matchSlotId,
+            stage: stage,
+            groupId: 'knockout',
+            homePlayerId: homeId,
+            homePlayerName: homeName,
+            awayPlayerId: awayId,
+            awayPlayerName: awayName,
+            status: 'draft',
+            scheduledTime: { toMillis: () => Date.now() }
+          });
+          newMatchId = newMatch.id;
+          setMatches(prev => [...prev, newMatch as any]);
+        } else {
+          const newDocRef = await addDoc(collection(db, 'matches'), {
+            tournamentId: tournament.id,
+            matchId: matchSlotId,
+            stage: stage,
+            groupId: 'knockout',
+            homePlayerId: homeId,
+            homePlayerName: homeName,
+            awayPlayerId: awayId,
+            awayPlayerName: awayName,
+            participants: [homeId, awayId].filter(Boolean),
+            status: 'draft',
+            publisherId: tournament.publisherId,
+            scheduledTime: serverTimestamp(),
+            createdAt: serverTimestamp()
+          });
+          newMatchId = newDocRef.id;
+        }
 
         // Prompt to select the other player right away
         const nextRole: 'home' | 'away' = role === 'home' ? 'away' : 'home';
@@ -299,7 +344,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           role: nextRole,
           matchNumber,
           existingMatch: {
-            id: newDocRef.id,
+            id: newMatchId,
             tournamentId: tournament.id,
             matchId: matchSlotId,
             stage,
@@ -334,15 +379,30 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     try {
       const remainingId = role === 'home' ? currentMatchDoc.awayPlayerId : currentMatchDoc.homePlayerId;
       if (!remainingId) {
-        await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+        if (isDemo) {
+          deleteDemoMatch(tournament.id, currentMatchDoc.id);
+          setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id));
+        } else {
+          await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+        }
       } else {
-        await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
-          [role === 'home' ? 'homePlayerId' : 'awayPlayerId']: '',
-          [role === 'home' ? 'homePlayerName' : 'awayPlayerName']: '',
-          participants: [remainingId],
-          status: 'draft',
-          updatedAt: Timestamp.now()
-        });
+        if (isDemo) {
+          const updates = {
+            [role === 'home' ? 'homePlayerId' : 'awayPlayerId']: '',
+            [role === 'home' ? 'homePlayerName' : 'awayPlayerName']: '',
+            status: 'draft'
+          };
+          updateDemoMatch(tournament.id, currentMatchDoc.id, updates as any);
+          setMatches(prev => prev.map(m => m.id === currentMatchDoc.id ? { ...m, ...updates as any } : m));
+        } else {
+          await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
+            [role === 'home' ? 'homePlayerId' : 'awayPlayerId']: '',
+            [role === 'home' ? 'homePlayerName' : 'awayPlayerName']: '',
+            participants: [remainingId],
+            status: 'draft',
+            updatedAt: Timestamp.now()
+          });
+        }
       }
       setSlotAssignModal(null);
     } catch (err) {
@@ -361,13 +421,24 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
-        homePlayerId: currentMatchDoc.awayPlayerId || '',
-        homePlayerName: currentMatchDoc.awayPlayerName || '',
-        awayPlayerId: currentMatchDoc.homePlayerId || '',
-        awayPlayerName: currentMatchDoc.homePlayerName || '',
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        const updates = {
+          homePlayerId: currentMatchDoc.awayPlayerId || '',
+          homePlayerName: currentMatchDoc.awayPlayerName || '',
+          awayPlayerId: currentMatchDoc.homePlayerId || '',
+          awayPlayerName: currentMatchDoc.homePlayerName || '',
+        };
+        updateDemoMatch(tournament.id, currentMatchDoc.id, updates);
+        setMatches(prev => prev.map(m => m.id === currentMatchDoc.id ? { ...m, ...updates } : m));
+      } else {
+        await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
+          homePlayerId: currentMatchDoc.awayPlayerId || '',
+          homePlayerName: currentMatchDoc.awayPlayerName || '',
+          awayPlayerId: currentMatchDoc.homePlayerId || '',
+          awayPlayerName: currentMatchDoc.homePlayerName || '',
+          updatedAt: Timestamp.now()
+        });
+      }
       setSlotAssignModal(null);
     } catch (err) {
       console.error('Error swapping players:', err);
@@ -388,7 +459,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setActionLoading(true);
     try {
-      await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+      if (isDemo) {
+        deleteDemoMatch(tournament.id, currentMatchDoc.id);
+        setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id));
+      } else {
+        await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+      }
       setSlotAssignModal(null);
     } catch (err) {
       console.error('Error deleting fixture:', err);
@@ -421,16 +497,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
       const assignedGroupsSet = new Set<string>();
 
-      await Promise.all(shuffled.map((p, idx) => {
-        const groupIdx = Math.min(Math.floor(idx / PLAYERS_PER_GROUP), groupLetters.length - 1);
-        const assignedGroup = groupLetters[groupIdx];
-        assignedGroupsSet.add(assignedGroup);
-        return updateDoc(doc(db, 'registrations', p.id), {
-          groupId: assignedGroup,
-          stage: 'group',
-          updatedAt: Timestamp.now()
+      if (isDemo) {
+        const updatedParticipants = shuffled.map((p, idx) => {
+          const groupIdx = Math.min(Math.floor(idx / PLAYERS_PER_GROUP), groupLetters.length - 1);
+          const assignedGroup = groupLetters[groupIdx];
+          assignedGroupsSet.add(assignedGroup);
+          return { ...p, groupId: assignedGroup, stage: 'group' };
         });
-      }));
+        saveDemoParticipants(tournament.id, updatedParticipants as any);
+        setParticipants(updatedParticipants);
+      } else {
+        await Promise.all(shuffled.map((p, idx) => {
+          const groupIdx = Math.min(Math.floor(idx / PLAYERS_PER_GROUP), groupLetters.length - 1);
+          const assignedGroup = groupLetters[groupIdx];
+          assignedGroupsSet.add(assignedGroup);
+          return updateDoc(doc(db, 'registrations', p.id), {
+            groupId: assignedGroup,
+            stage: 'group',
+            updatedAt: Timestamp.now()
+          });
+        }));
+      }
 
       setLocalGroupSetupDone(true);
       const usedGroups = Array.from(assignedGroupsSet).sort();
@@ -528,19 +615,29 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       }
 
       if (newMatches.length > 0) {
-        await Promise.all(newMatches.map(m => addDoc(collection(db, 'matches'), m)));
-        
-        // Notify
-        newMatches.forEach(m => {
-          notifyMatchParticipants({
-            homePlayerId: m.homePlayerId,
-            awayPlayerId: m.awayPlayerId,
-            title: '⚽ New Match Scheduled!',
-            message: `${m.homePlayerName} vs ${m.awayPlayerName} is live!`,
-            type: 'match_scheduled',
-            tournamentId: tournament.id
-          }).catch(() => {});
-        });
+        if (isDemo) {
+          const demoMatches: DemoMatch[] = newMatches.map(m => ({
+            ...m,
+            id: `demo_m_${Math.random().toString(36).substr(2, 9)}`,
+            scheduledTime: { toMillis: () => Date.now() }
+          }));
+          saveDemoMatches(tournament.id, demoMatches);
+          setMatches(demoMatches as any);
+        } else {
+          await Promise.all(newMatches.map(m => addDoc(collection(db, 'matches'), m)));
+          
+          // Notify
+          newMatches.forEach(m => {
+            notifyMatchParticipants({
+              homePlayerId: m.homePlayerId,
+              awayPlayerId: m.awayPlayerId,
+              title: '⚽ New Match Scheduled!',
+              message: `${m.homePlayerName} vs ${m.awayPlayerName} is live!`,
+              type: 'match_scheduled',
+              tournamentId: tournament.id
+            }).catch(() => {});
+          });
+        }
         
         setLocalMatchDeployDone(true);
         alert(`Match Deploy Complete! ${newMatches.length} fixtures created.`);
@@ -577,32 +674,48 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       const homeName = p1Profile?.inGameName || p1Reg?.gameName || 'Player 1';
       const awayName = p2Profile?.inGameName || p2Reg?.gameName || 'Player 2';
 
-      const matchRef = await addDoc(collection(db, 'matches'), {
-        tournamentId: tournament.id,
-        matchId: generateMatchId(),
-        homePlayerId: manualMatchForm.homeUserId,
-        awayPlayerId: manualMatchForm.awayUserId,
-        homePlayerName: homeName,
-        awayPlayerName: awayName,
-        participants: [manualMatchForm.homeUserId, manualMatchForm.awayUserId],
-        status: 'scheduled',
-        stage: manualMatchForm.stage,
-        groupId: manualMatchForm.groupId,
-        publisherId: tournament.publisherId,
-        scheduledTime: scheduledTimestamp,
-        createdAt: serverTimestamp()
-      });
+      if (isDemo) {
+        const newMatch = addDemoMatch(tournament.id, {
+          tournamentId: tournament.id,
+          matchId: generateMatchId(),
+          homePlayerId: manualMatchForm.homeUserId,
+          awayPlayerId: manualMatchForm.awayUserId,
+          homePlayerName: homeName,
+          awayPlayerName: awayName,
+          status: 'scheduled',
+          stage: manualMatchForm.stage,
+          groupId: manualMatchForm.groupId,
+          scheduledTime: { toMillis: () => scheduledTimestamp.toMillis() }
+        });
+        setMatches(prev => [...prev, newMatch as any]);
+      } else {
+        const matchRef = await addDoc(collection(db, 'matches'), {
+          tournamentId: tournament.id,
+          matchId: generateMatchId(),
+          homePlayerId: manualMatchForm.homeUserId,
+          awayPlayerId: manualMatchForm.awayUserId,
+          homePlayerName: homeName,
+          awayPlayerName: awayName,
+          participants: [manualMatchForm.homeUserId, manualMatchForm.awayUserId],
+          status: 'scheduled',
+          stage: manualMatchForm.stage,
+          groupId: manualMatchForm.groupId,
+          publisherId: tournament.publisherId,
+          scheduledTime: scheduledTimestamp,
+          createdAt: serverTimestamp()
+        });
 
-      // Notify both players
-      notifyMatchParticipants({
-        homePlayerId: manualMatchForm.homeUserId,
-        awayPlayerId: manualMatchForm.awayUserId,
-        title: '⚽ New Match Scheduled!',
-        message: `New match created: ${homeName} vs ${awayName}. Check the arena and get ready!`,
-        type: 'match_scheduled',
-        tournamentId: tournament.id,
-        matchId: matchRef.id
-      }).catch(() => {});
+        // Notify both players
+        notifyMatchParticipants({
+          homePlayerId: manualMatchForm.homeUserId,
+          awayPlayerId: manualMatchForm.awayUserId,
+          title: '⚽ New Match Scheduled!',
+          message: `New match created: ${homeName} vs ${awayName}. Check the arena and get ready!`,
+          type: 'match_scheduled',
+          tournamentId: tournament.id,
+          matchId: matchRef.id
+        }).catch(() => {});
+      }
 
       alert('Manual Match Deploy complete!');
       setShowManualMatchModal(false);
@@ -619,10 +732,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setActionLoading(true);
     try {
       const nextVal = !(currentTournament?.autoKnockout ?? tournament.autoKnockout);
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        autoKnockout: nextVal,
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoTournament(tournament.id, { autoKnockout: nextVal });
+      } else {
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          autoKnockout: nextVal,
+          updatedAt: Timestamp.now()
+        });
+      }
       setCurrentTournament((prev: any) => prev ? { ...prev, autoKnockout: nextVal } : prev);
       if (nextVal) {
         setTimeout(() => {
@@ -631,7 +748,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       }
     } catch (err) {
       console.error('Error toggling auto knockout:', err);
-      handleFirestoreError(err, OperationType.UPDATE, 'tournaments');
+      if (!isDemo) handleFirestoreError(err, OperationType.UPDATE, 'tournaments');
     } finally {
       setActionLoading(false);
     }
@@ -641,10 +758,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setSavingRules(true);
     try {
       const cleanRules = editableRules.map(r => r.trim()).filter(r => r.length > 0);
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        rules: cleanRules,
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoTournament(tournament.id, { rules: cleanRules });
+        setCurrentTournament((prev: any) => ({ ...prev, rules: cleanRules }));
+      } else {
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          rules: cleanRules,
+          updatedAt: Timestamp.now()
+        });
+      }
       setEditingRules(false);
       alert('Tournament rules updated successfully!');
     } catch (err) {
@@ -661,63 +783,67 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return;
     }
 
-    // Combined Tournament & Match & Regs Listener
-    // Idea 3: Real-time listeners only where necessary. 
-    // Here we need tournament status, matches, and my own registration live.
-    
-    // Fetch user's registration for this tournament
-    // Idea 3: Using a direct doc listener instead of query for better performance and deterministic ID
-    const regDocRef = doc(db, 'registrations', `${auth.currentUser.uid}_${tournament.id}`);
-    const unsubReg = onSnapshot(regDocRef, (snap) => {
-      if (snap.exists()) {
-        setRegistration({ id: snap.id, ...snap.data() });
-      } else {
-        setRegistration(null);
-      }
-    });
+    if (isDemo) {
+      // --- Demo Mode Data Loading (Local Storage) ---
+      const demoParticipants = getDemoParticipants(tournament.id);
+      setParticipants(demoParticipants);
+      
+      const demoMatches = getDemoMatches(tournament.id);
+      setMatches(demoMatches as any);
 
-    const matchesQ = query(
-      collection(db, 'matches'),
-      where('tournamentId', '==', tournament.id)
-    );
-    const unsubMatches = onSnapshot(matchesQ, (snap) => {
-      setMatches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match)));
-    });
-
-    const unsubTournamentDoc = onSnapshot(doc(db, 'tournaments', tournament.id), (snap) => {
-      if (snap.exists()) {
-        setCurrentTournament({ id: snap.id, ...snap.data() } as Tournament);
-      }
-    });
-
-    // Participant list: only live if tournament is not finished
-    const playersQ = query(
-      collection(db, 'registrations'),
-      where('tournamentId', '==', tournament.id)
-    );
-
-    let unsubPlayers: () => void;
-    if (tournament.status === 'finished' || tournament.status === 'completed') {
-      // One-time fetch for finished tournaments
-      getDocs(playersQ).then(pSnap => {
-        const regs = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setParticipants(regs);
-      });
-      unsubPlayers = () => {};
+      setLoading(false);
+      return;
     } else {
-      unsubPlayers = onSnapshot(playersQ, (pSnap) => {
-        const regs = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setParticipants(regs);
+      // --- Official Mode Data Loading (Firestore) ---
+      // Fetch user's registration for this tournament
+      const regDocRef = doc(db, 'registrations', `${auth.currentUser.uid}_${tournament.id}`);
+      const unsubReg = onSnapshot(regDocRef, (snap) => {
+        if (snap.exists()) {
+          setRegistration({ id: snap.id, ...snap.data() });
+        } else {
+          setRegistration(null);
+        }
       });
-    }
 
-    return () => {
-      unsubTournamentDoc();
-      unsubReg();
-      unsubMatches();
-      unsubPlayers();
-    };
-  }, [tournament.id, auth.currentUser?.uid, tournament.status]);
+      const matchesQ = query(
+        collection(db, 'matches'),
+        where('tournamentId', '==', tournament.id)
+      );
+      const unsubMatches = onSnapshot(matchesQ, (snap) => {
+        setMatches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match)));
+      });
+
+      const unsubTournamentDoc = onSnapshot(doc(db, 'tournaments', tournament.id), (snap) => {
+        if (snap.exists()) {
+          setCurrentTournament({ id: snap.id, ...snap.data() } as Tournament);
+        }
+      });
+
+      // Participant list: only live if tournament is not finished
+      const playersQ = query( collection(db, 'registrations'), where('tournamentId', '==', tournament.id) );
+
+      let unsubPlayers: () => void;
+      if (tournament.status === 'finished' || tournament.status === 'completed') {
+        getDocs(playersQ).then(pSnap => {
+          const regs = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setParticipants(regs);
+        });
+        unsubPlayers = () => {};
+      } else {
+        unsubPlayers = onSnapshot(playersQ, (pSnap) => {
+          const regs = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setParticipants(regs);
+        });
+      }
+
+      return () => {
+        unsubTournamentDoc();
+        unsubReg();
+        unsubMatches();
+        unsubPlayers();
+      };
+    }
+  }, [tournament.id, auth.currentUser?.uid, tournament.status, isDemo]);
 
   // Separate effect to fetch profiles for participants, publisher, and matches
   useEffect(() => {
@@ -740,11 +866,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         uids.add(tournament.winnerId.trim());
       }
       const pubId = currentTournament?.publisherId || tournament.publisherId;
-      if (pubId && typeof pubId === 'string' && pubId.trim()) {
+      if (pubId && typeof pubId === 'string' && pubId.trim() && !pubId.startsWith('demo_')) {
         uids.add(pubId.trim());
       }
 
-      const missing = Array.from(uids).filter(uid => Boolean(uid) && !profiles[uid]);
+      const missing = Array.from(uids).filter(uid => 
+        Boolean(uid) && !profiles[uid] && !uid.startsWith('demo_')
+      );
       if (missing.length === 0) return;
 
       const newProfiles = { ...profiles };
@@ -788,6 +916,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const performJoin = async () => {
+    if (isDemo) {
+      alert("You cannot join a demo tournament. It's for simulation only.");
+      return;
+    }
     try {
       // Deterministic ID: userId_tournamentId for efficient security rules and lookups
       await setDoc(doc(db, 'registrations', `${auth.currentUser?.uid}_${tournament.id}`), {
@@ -915,6 +1047,29 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setIsSubmittingReport(true);
     try {
+      if (isDemo) {
+        updateDemoMatch(tournament.id, reportingMatch.id, {
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          penaltyWinnerId: reportFormData.penaltyWinnerId || null,
+          status: 'completed'
+        });
+        
+        const updatedMatches = matches.map(m => m.id === reportingMatch.id ? { 
+          ...m, 
+          status: 'completed' as const,
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          penaltyWinnerId: reportFormData.penaltyWinnerId || null
+        } : m);
+        
+        setMatches(updatedMatches);
+        await evaluateAutoProgression(updatedMatches);
+        alert('Demo result recorded!');
+        setReportingMatch(null);
+        return;
+      }
+
       await updateDoc(doc(db, 'matches', reportingMatch.id), {
         homeScore: reportFormData.home,
         awayScore: reportFormData.away,
@@ -1101,6 +1256,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const handleDisputeResult = async (match: Match) => {
     const reason = prompt('Why are you disputing this result? (Optional)');
     try {
+      if (isDemo) {
+        alert("Demo tournament results are updated locally.");
+        return;
+      }
       await updateDoc(doc(db, 'matches', match.id), {
         status: 'disputed',
         disputeReason: reason || 'Incorrect score reported',
@@ -1115,14 +1274,29 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const handleAdminResolve = async (match: Match, action: 'approve' | 'reset') => {
     try {
       if (action === 'reset') {
-        await updateDoc(doc(db, 'matches', match.id), {
-          status: 'scheduled',
-          homeScore: null,
-          awayScore: null,
-
-          reporterId: null,
-          updatedAt: Timestamp.now()
-        });
+        if (isDemo) {
+          updateDemoMatch(tournament.id, match.id, {
+            status: 'scheduled',
+            homeScore: undefined,
+            awayScore: undefined,
+            penaltyWinnerId: null
+          });
+          setMatches(prev => prev.map(m => m.id === match.id ? { 
+            ...m, 
+            status: 'scheduled' as any, 
+            homeScore: undefined, 
+            awayScore: undefined, 
+            penaltyWinnerId: null 
+          } : m));
+        } else {
+          await updateDoc(doc(db, 'matches', match.id), {
+            status: 'scheduled',
+            homeScore: null,
+            awayScore: null,
+            reporterId: null,
+            updatedAt: Timestamp.now()
+          });
+        }
         alert('Match has been reset to scheduled status.');
       } else {
         await handleConfirmResult(match);
@@ -1218,6 +1392,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   ) => {
     const existing = allActiveMatches.find(m => m.matchId === matchId || (m.stage === stage && m.matchId === matchId));
     if (existing) {
+      if (isDemo) {
+        updateDemoMatch(tournament.id, existing.id, {
+          homePlayerId: homePlayer.userId,
+          awayPlayerId: awayPlayer.userId,
+          homePlayerName: homePlayer.name,
+          awayPlayerName: awayPlayer.name,
+          stage: stage,
+          groupId: 'knockout',
+          status: 'scheduled',
+        });
+        return;
+      }
       await updateDoc(doc(db, 'matches', existing.id), {
         homePlayerId: homePlayer.userId,
         awayPlayerId: awayPlayer.userId,
@@ -1230,6 +1416,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         updatedAt: Timestamp.now()
       });
     } else {
+      if (isDemo) {
+        addDemoMatch(tournament.id, {
+          tournamentId: tournament.id,
+          matchId: matchId,
+          homePlayerId: homePlayer.userId,
+          awayPlayerId: awayPlayer.userId,
+          homePlayerName: homePlayer.name,
+          awayPlayerName: awayPlayer.name,
+          status: 'scheduled',
+          stage: stage,
+          groupId: 'knockout',
+          scheduledTime: { toMillis: () => Date.now() }
+        });
+        return;
+      }
       await addDoc(collection(db, 'matches'), {
         tournamentId: tournament.id,
         matchId: matchId,
@@ -1565,12 +1766,28 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       if (champId && (!currentTournament?.winnerId || currentTournament?.status !== 'finished')) {
         const champProfile = profiles[champId];
         const champName = champProfile?.inGameName || (champId === finalMatch.homePlayerId ? finalMatch.homePlayerName : finalMatch.awayPlayerName) || 'Champion';
-        await updateDoc(doc(db, 'tournaments', tournament.id), {
-          status: 'finished',
-          winnerId: champId,
-          winnerText: champName,
-          updatedAt: Timestamp.now()
-        });
+        
+        if (isDemo) {
+          updateDemoTournament(tournament.id, {
+            status: 'finished',
+            winnerId: champId,
+            winnerText: champName
+          });
+          setCurrentTournament((prev: any) => ({
+            ...prev,
+            status: 'finished',
+            winnerId: champId,
+            winnerText: champName
+          }));
+        } else {
+          await updateDoc(doc(db, 'tournaments', tournament.id), {
+            status: 'finished',
+            winnerId: champId,
+            winnerText: champName,
+            updatedAt: Timestamp.now()
+          });
+        }
+        
         setAutoMatchToast({
           title: 'TOURNAMENT CHAMPION CROWNED!',
           subtitle: `${champName} is the Tournament Champion!`
@@ -1590,10 +1807,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
 
     try {
-      await updateDoc(doc(db, 'matches', match.id), {
-        status: 'completed',
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoMatch(tournament.id, match.id, {
+          status: 'completed'
+        });
+      } else {
+        await updateDoc(doc(db, 'matches', match.id), {
+          status: 'completed',
+          updatedAt: Timestamp.now()
+        });
+      }
       
 
 
@@ -1629,17 +1852,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   const handleApproveRegistration = async (regId: string) => {
     try {
-      await updateDoc(doc(db, 'registrations', regId), {
-        status: 'approved',
-        updatedAt: Timestamp.now()
-      });
-      // Also update tournament filledSlots
-      const tRef = doc(db, 'tournaments', tournament.id);
-      const tSnap = await getDoc(tRef);
-      const currentFilled = tSnap.data()?.filledSlots || 0;
-      await updateDoc(tRef, {
-        filledSlots: currentFilled + 1
-      });
+      if (isDemo) {
+        updateDemoParticipant(tournament.id, regId, { status: 'approved' });
+        const updatedParticipants = participants.map(p => p.id === regId ? { ...p, status: 'approved' } : p);
+        setParticipants(updatedParticipants);
+        
+        const newFilled = (currentTournament?.filledSlots || 0) + 1;
+        updateDemoTournament(tournament.id, { filledSlots: newFilled });
+        setCurrentTournament((prev: any) => ({ ...prev, filledSlots: newFilled }));
+      } else {
+        await updateDoc(doc(db, 'registrations', regId), {
+          status: 'approved',
+          updatedAt: Timestamp.now()
+        });
+        // Also update tournament filledSlots
+        const tRef = doc(db, 'tournaments', tournament.id);
+        const tSnap = await getDoc(tRef);
+        const currentFilled = tSnap.data()?.filledSlots || 0;
+        await updateDoc(tRef, {
+          filledSlots: currentFilled + 1
+        });
+      }
       alert('Player approved!');
     } catch (err) {
       console.error(err);
@@ -1654,29 +1887,38 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
        if (!confirm(`Currently have ${approvedPlayers.length} players. Groups usually have 4 players. Continue?`)) return;
     }
 
-    setDeploying(true);
+      setDeploying(true);
     try {
       // 1. Shuffle players
       const shuffled = [...approvedPlayers].sort(() => Math.random() - 0.5);
       
       // 2. Assign to groups (4 per group)
       const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-      const batchUpdates = [];
-
-      for (let i = 0; i < shuffled.length; i++) {
-        const groupIdx = Math.floor(i / 4);
-        const group = groups[groupIdx] || 'H';
-        batchUpdates.push(updateDoc(doc(db, 'registrations', shuffled[i].id), {
-          groupId: group,
-          updatedAt: Timestamp.now()
-        }));
+      
+      if (isDemo) {
+        const updatedParticipants = shuffled.map((p, i) => {
+          const groupIdx = Math.floor(i / 4);
+          const group = groups[groupIdx] || 'H';
+          return { ...p, groupId: group };
+        });
+        saveDemoParticipants(tournament.id, updatedParticipants as any);
+        setParticipants(updatedParticipants);
+      } else {
+        const batchUpdates = [];
+        for (let i = 0; i < shuffled.length; i++) {
+          const groupIdx = Math.floor(i / 4);
+          const group = groups[groupIdx] || 'H';
+          batchUpdates.push(updateDoc(doc(db, 'registrations', shuffled[i].id), {
+            groupId: group,
+            updatedAt: Timestamp.now()
+          }));
+        }
+        await Promise.all(batchUpdates);
       }
-
-      await Promise.all(batchUpdates);
 
       // 3. Generate matches for each group (Home & Away)
       const groupNames = Array.from(new Set(shuffled.map((_, i) => groups[Math.floor(i / 4)] || 'H')));
-      const matchBatch = [];
+      const newMatches: any[] = [];
 
       for (const gName of groupNames) {
         const gPlayers = shuffled.filter((_, i) => (groups[Math.floor(i / 4)] || 'H') === gName);
@@ -1686,7 +1928,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         for (let i = 0; i < gPlayers.length; i++) {
           for (let j = 0; j < gPlayers.length; j++) {
             if (i === j) continue;
-            matchBatch.push(addDoc(collection(db, 'matches'), {
+            newMatches.push({
               tournamentId: tournament.id,
               matchId: generateMatchId(),
               homePlayerId: gPlayers[i].userId,
@@ -1698,20 +1940,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               groupId: gName,
               stage: 'group',
               publisherId: tournament.publisherId,
-              scheduledTime: Timestamp.now(),
-              createdAt: Timestamp.now()
-            }));
+              scheduledTime: isDemo ? { toMillis: () => Date.now() } : Timestamp.now(),
+              createdAt: isDemo ? Date.now() : Timestamp.now()
+            });
           }
         }
       }
 
-      await Promise.all(matchBatch);
-
-      // 4. Update tournament status
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        status: 'ongoing',
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        const demoMatches = newMatches.map(m => ({ ...m, id: `demo_m_${Math.random().toString(36).substr(2, 9)}` }));
+        saveDemoMatches(tournament.id, demoMatches);
+        setMatches(demoMatches as any);
+        
+        updateDemoTournament(tournament.id, { status: 'ongoing' });
+        setCurrentTournament((prev: any) => ({ ...prev, status: 'ongoing' }));
+      } else {
+        await Promise.all(newMatches.map(m => addDoc(collection(db, 'matches'), m)));
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          status: 'ongoing',
+          updatedAt: Timestamp.now()
+        });
+      }
 
       alert('Tournament deployed successfully! Groups and matches created.');
       setActiveTab('group');
@@ -1725,10 +1974,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   const handleManualAssign = async (regId: string, group: string) => {
     try {
-      await updateDoc(doc(db, 'registrations', regId), {
-        groupId: group,
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoParticipant(tournament.id, regId, { groupId: group });
+        setParticipants(prev => prev.map(p => p.id === regId ? { ...p, groupId: group } : p));
+      } else {
+        await updateDoc(doc(db, 'registrations', regId), {
+          groupId: group,
+          updatedAt: Timestamp.now()
+        });
+      }
     } catch (err) {
       console.error(err);
     }
@@ -1764,33 +2018,61 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setIsResettingTournament(true);
     try {
       // 1. Delete all matches of this tournament
-      const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
-      const matchSnap = await getDocs(matchQuery);
-      await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
+      if (isDemo) {
+        saveDemoMatches(tournament.id, []);
+      } else {
+        const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
+        const matchSnap = await getDocs(matchQuery);
+        await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
 
-      // 2. Clear match room chat messages
-      const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
-      const msgSnap = await getDocs(msgQuery);
-      const matchMsgDeletions = msgSnap.docs
-        .filter(d => d.data().chatId !== tournament.id)
-        .map(d => deleteDoc(doc(db, 'messages', d.id)));
-      await Promise.all(matchMsgDeletions);
+        // 2. Clear match room chat messages
+        const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
+        const msgSnap = await getDocs(msgQuery);
+        const matchMsgDeletions = msgSnap.docs
+          .filter(d => d.data().chatId !== tournament.id)
+          .map(d => deleteDoc(doc(db, 'messages', d.id)));
+        await Promise.all(matchMsgDeletions);
+      }
 
-      // 3. Clear group & stage assignments from registrations, keeping players approved
-      const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
-      const regSnap = await getDocs(regQuery);
-      await Promise.all(regSnap.docs.map(d => updateDoc(doc(db, 'registrations', d.id), { 
-        groupId: null,
-        stage: null 
-      })));
+      // 3. Clear group & stage assignments from registrations
+      if (isDemo) {
+        const updatedParticipants = participants.map(p => ({
+          ...p,
+          groupId: '',
+          stage: ''
+        }));
+        saveDemoParticipants(tournament.id, updatedParticipants as any);
+        setParticipants(updatedParticipants);
+      } else {
+        const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
+        const regSnap = await getDocs(regQuery);
+        await Promise.all(regSnap.docs.map(d => updateDoc(doc(db, 'registrations', d.id), { 
+          groupId: null,
+          stage: null 
+        })));
+      }
 
-      // 4. Reset tournament status in Firestore
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        status: 'open',
-        winnerId: null,
-        winnerText: null,
-        updatedAt: Timestamp.now()
-      });
+      // 4. Reset tournament status
+      if (isDemo) {
+        updateDemoTournament(tournament.id, {
+          status: 'open',
+          winnerId: '',
+          winnerText: ''
+        });
+        setCurrentTournament((prev: any) => ({
+          ...prev,
+          status: 'open',
+          winnerId: '',
+          winnerText: ''
+        }));
+      } else {
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          status: 'open',
+          winnerId: null,
+          winnerText: null,
+          updatedAt: Timestamp.now()
+        });
+      }
 
       // 5. Update local state
       setMatches([]);
@@ -1815,10 +2097,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     try {
       const current = (currentTournament?.resultUploadType || tournament.resultUploadType || 'players');
       const nextVal = current === 'players' ? 'publisher' : 'players';
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        resultUploadType: nextVal,
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoTournament(tournament.id, { resultUploadType: nextVal });
+      } else {
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          resultUploadType: nextVal,
+          updatedAt: Timestamp.now()
+        });
+      }
       setCurrentTournament((prev: any) => prev ? { ...prev, resultUploadType: nextVal } : prev);
       alert(`Match Result Upload Type changed to: ${nextVal === 'players' ? 'Players & Publisher' : 'Publisher Only'}`);
     } catch (err) {
@@ -1833,10 +2119,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setActionLoading(true);
     try {
       const nextVal = !(currentTournament?.autoMatchDeploy ?? tournament.autoMatchDeploy);
-      await updateDoc(doc(db, 'tournaments', tournament.id), {
-        autoMatchDeploy: nextVal,
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoTournament(tournament.id, { autoMatchDeploy: nextVal });
+      } else {
+        await updateDoc(doc(db, 'tournaments', tournament.id), {
+          autoMatchDeploy: nextVal,
+          updatedAt: Timestamp.now()
+        });
+      }
       setCurrentTournament((prev: any) => prev ? { ...prev, autoMatchDeploy: nextVal } : prev);
       alert(`Auto Match Deploy is now: ${nextVal ? 'ENABLED' : 'DISABLED'}`);
     } catch (err) {
@@ -1850,23 +2140,30 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const executeDeleteTournament = async () => {
     setIsDeletingTournament(true);
     try {
-      // 1. Delete all matches of this tournament
-      const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
-      const matchSnap = await getDocs(matchQuery);
-      await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
+      if (isDemo) {
+        // Handle Demo Deletion
+        import('@/src/lib/localTournaments').then(({ deleteDemoTournament }) => {
+          deleteDemoTournament(tournament.id);
+        });
+      } else {
+        // 1. Delete all matches of this tournament
+        const matchQuery = query(collection(db, 'matches'), where('tournamentId', '==', tournament.id));
+        const matchSnap = await getDocs(matchQuery);
+        await Promise.all(matchSnap.docs.map(d => deleteDoc(doc(db, 'matches', d.id))));
 
-      // 2. Delete all player registrations
-      const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
-      const regSnap = await getDocs(regQuery);
-      await Promise.all(regSnap.docs.map(d => deleteDoc(doc(db, 'registrations', d.id))));
+        // 2. Delete all player registrations
+        const regQuery = query(collection(db, 'registrations'), where('tournamentId', '==', tournament.id));
+        const regSnap = await getDocs(regQuery);
+        await Promise.all(regSnap.docs.map(d => deleteDoc(doc(db, 'registrations', d.id))));
 
-      // 3. Delete all chat messages
-      const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
-      const msgSnap = await getDocs(msgQuery);
-      await Promise.all(msgSnap.docs.map(d => deleteDoc(doc(db, 'messages', d.id))));
+        // 3. Delete all chat messages
+        const msgQuery = query(collection(db, 'messages'), where('tournamentId', '==', tournament.id));
+        const msgSnap = await getDocs(msgQuery);
+        await Promise.all(msgSnap.docs.map(d => deleteDoc(doc(db, 'messages', d.id))));
 
-      // 4. Delete the tournament document itself
-      await deleteDoc(doc(db, 'tournaments', tournament.id));
+        // 4. Delete the tournament document itself
+        await deleteDoc(doc(db, 'tournaments', tournament.id));
+      }
 
       setConfirmAction(null);
       onBack();
@@ -2146,10 +2443,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const handleRejectRegistration = async (regId: string, regUserId?: string, regGameName?: string) => {
     if (!confirm('Are you sure you want to reject this player?')) return;
     try {
-      await updateDoc(doc(db, 'registrations', regId), {
-        status: 'rejected',
-        updatedAt: Timestamp.now()
-      });
+      if (isDemo) {
+        updateDemoParticipant(tournament.id, regId, { status: 'rejected' });
+        setParticipants(prev => prev.map(p => p.id === regId ? { ...p, status: 'rejected' } : p));
+      } else {
+        await updateDoc(doc(db, 'registrations', regId), {
+          status: 'rejected',
+          updatedAt: Timestamp.now()
+        });
+      }
 
       alert('Player rejected.');
     } catch (err) {
@@ -2162,43 +2464,59 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!confirm(`DANGER: Are you sure you want to PERMANENTLY REMOVE ${reg.gameName || 'this player'} from the tournament? This will delete their registration record and clear them from any assigned matches.`)) return;
     
     try {
-      // 1. Delete the registration
-      await deleteDoc(doc(db, 'registrations', reg.id));
-      
-      // 2. Clear from matches where they are assigned
-      const matchQueries = [
-        query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('homePlayerId', '==', reg.userId)),
-        query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('awayPlayerId', '==', reg.userId))
-      ];
+      if (isDemo) {
+        const updatedParticipants = participants.filter(p => p.id !== reg.id);
+        saveDemoParticipants(tournament.id, updatedParticipants as any);
+        setParticipants(updatedParticipants);
+        
+        // Clear from matches
+        const updatedMatches = matches.filter(m => m.homePlayerId !== reg.userId && m.awayPlayerId !== reg.userId);
+        saveDemoMatches(tournament.id, updatedMatches as any);
+        setMatches(updatedMatches);
 
-      for (const q of matchQueries) {
-        const snap = await getDocs(q);
-        for (const matchDoc of snap.docs) {
-          const mData = matchDoc.data();
-          const update: any = {};
-          if (mData.homePlayerId === reg.userId) {
-            update.homePlayerId = '';
-            update.homePlayerName = '';
-          }
-          if (mData.awayPlayerId === reg.userId) {
-            update.awayPlayerId = '';
-            update.awayPlayerName = '';
-          }
-          if (Object.keys(update).length > 0) {
-            await updateDoc(matchDoc.ref, update);
+        // Decrement filledSlots
+        const newFilled = Math.max(0, (currentTournament?.filledSlots || 0) - 1);
+        updateDemoTournament(tournament.id, { filledSlots: newFilled });
+        setCurrentTournament((prev: any) => ({ ...prev, filledSlots: newFilled }));
+      } else {
+        // 1. Delete the registration
+        await deleteDoc(doc(db, 'registrations', reg.id));
+        
+        // 2. Clear from matches where they are assigned
+        const matchQueries = [
+          query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('homePlayerId', '==', reg.userId)),
+          query(collection(db, 'matches'), where('tournamentId', '==', tournament.id), where('awayPlayerId', '==', reg.userId))
+        ];
+
+        for (const q of matchQueries) {
+          const snap = await getDocs(q);
+          for (const matchDoc of snap.docs) {
+            const mData = matchDoc.data();
+            const update: any = {};
+            if (mData.homePlayerId === reg.userId) {
+              update.homePlayerId = '';
+              update.homePlayerName = '';
+            }
+            if (mData.awayPlayerId === reg.userId) {
+              update.awayPlayerId = '';
+              update.awayPlayerName = '';
+            }
+            if (Object.keys(update).length > 0) {
+              await updateDoc(matchDoc.ref, update);
+            }
           }
         }
-      }
 
-      // 3. If the player was approved, decrement filledSlots
-      if (reg.status === 'approved') {
-        const tRef = doc(db, 'tournaments', tournament.id);
-        const tSnap = await getDoc(tRef);
-        if (tSnap.exists()) {
-          const currentFilled = tSnap.data()?.filledSlots || 0;
-          await updateDoc(tRef, {
-            filledSlots: Math.max(0, currentFilled - 1)
-          });
+        // 3. If the player was approved, decrement filledSlots
+        if (reg.status === 'approved') {
+          const tRef = doc(db, 'tournaments', tournament.id);
+          const tSnap = await getDoc(tRef);
+          if (tSnap.exists()) {
+            const currentFilled = tSnap.data()?.filledSlots || 0;
+            await updateDoc(tRef, {
+              filledSlots: Math.max(0, currentFilled - 1)
+            });
+          }
         }
       }
       
@@ -3339,9 +3657,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   const handleUpdatePlayerGroup = async (registrationId: string, newGroup: string) => {
     try {
-      await updateDoc(doc(db, 'registrations', registrationId), {
-        groupId: newGroup
-      });
+      if (isDemo) {
+        updateDemoParticipant(tournament.id, registrationId, { groupId: newGroup });
+        setParticipants(prev => prev.map(p => p.id === registrationId ? { ...p, groupId: newGroup } : p));
+      } else {
+        await updateDoc(doc(db, 'registrations', registrationId), {
+          groupId: newGroup
+        });
+      }
     } catch (err) {
       console.error('Error updating player group:', err);
       alert('Failed to update group');
@@ -3421,7 +3744,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                        )}
 
                        {isPublisher && reg.status === 'pending' && (
-                         <div className="flex gap-2">
+                          <div className="flex gap-2">
                            <button 
                             onClick={() => handleApproveRegistration(reg.id)}
                             className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg active:scale-90"

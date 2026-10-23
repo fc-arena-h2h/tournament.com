@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Bot, User, MessageCircle, AlertTriangle, ExternalLink, Trash2, Clock } from 'lucide-react';
+import Fuse from 'fuse.js';
 import { cn } from '@/src/lib/utils';
 import { Card } from '@/src/components/ui/Primitives';
 import { API_BASE_URL } from '@/src/lib/constants';
@@ -10,6 +11,17 @@ interface Message {
   parts: [{ text: string }];
   timestamp: number;
   isError?: boolean;
+  recommendations?: string[];
+}
+
+interface FAQ {
+  id: string;
+  keywords: string[];
+  questions: string[];
+  answer_en: string;
+  answer_bn: string;
+  related_en?: string[];
+  related_bn?: string[];
 }
 
 interface SupportAIProps {
@@ -18,41 +30,42 @@ interface SupportAIProps {
   userId: string;
 }
 
-const MAX_DAILY_MESSAGES = 10;
+const detectLanguage = (text: string): 'bn' | 'en' => {
+  const lowerText = text.toLowerCase();
+  // Check for Bangla characters (Unicode range)
+  const containsBangla = /[\u0980-\u09FF]/.test(text);
+  if (containsBangla) return 'bn';
+  
+  // Heuristic for Banglish - common phonetic words and connectors
+  const banglishKeywords = [
+    'kivabe', 'kivaby', 'korbo', 'hoy', 'ase', 'gesi', 'bolbo', 'khulbo', 'toiri', 'kory', 'pabo', 
+    'desi', 'basi', 'bhule', 'amr', 'amar', 'id', 'dhukbo', 'dhukte', 'kothay', 'kothai', 'niyom', 'dekhte',
+    'kore', 'koro', 'kori', 'parbo', 'parchi', 'hocche', 'bhai', 'bro'
+  ];
+  const words = lowerText.split(/\s+/);
+  if (words.some(word => banglishKeywords.includes(word))) return 'bn';
+
+  return 'en';
+};
+
 const TELEGRAM_LINK = 'https://t.me/fcarenavs';
 
 export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [dailyCount, setDailyCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load chat history and daily limit from localStorage
+  // Load chat history from localStorage
   useEffect(() => {
     if (!userId) return;
 
     const chatKey = `fc_arena_chat_history_${userId}`;
-    const limitKey = `fc_arena_chat_limit_${userId}`;
 
     try {
       const savedHistory = localStorage.getItem(chatKey);
       if (savedHistory) {
         setMessages(JSON.parse(savedHistory));
-      }
-  
-      const savedLimit = localStorage.getItem(limitKey);
-      if (savedLimit) {
-        const { count, date } = JSON.parse(savedLimit);
-        const today = new Date().toDateString();
-        
-        if (date === today) {
-          setDailyCount(count);
-        } else {
-          // Reset limit for new day
-          setDailyCount(0);
-          localStorage.setItem(limitKey, JSON.stringify({ count: 0, date: today }));
-        }
       }
     } catch (e) {
       console.warn('LocalStorage load error:', e);
@@ -69,95 +82,99 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     }
   }, [messages, loading]);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading || dailyCount >= MAX_DAILY_MESSAGES) return;
+  const handleSend = () => {
+    if (!input.trim()) return;
+    sendMessage(input);
+  };
 
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return;
+
+    const userInput = text.trim();
+    const lang = detectLanguage(userInput);
+    
     const userMessage: Message = {
       role: 'user',
-      parts: [{ text: input.trim() }],
+      parts: [{ text: userInput }],
       timestamp: Date.now()
     };
 
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages(prev => {
+      const updated = [...prev, userMessage];
+      try {
+        localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+      return updated;
+    });
+    
     setInput('');
     setLoading(true);
 
-    // Update daily limit
-    const newCount = dailyCount + 1;
-    setDailyCount(newCount);
-    localStorage.setItem(`fc_arena_chat_limit_${userId}`, JSON.stringify({
-      count: newCount,
-      date: new Date().toDateString()
-    }));
-
-    // Save history
     try {
-      localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(newMessages));
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
+      // Load local FAQs
+      const faqResponse = await fetch('/faqs.json');
+      if (!faqResponse.ok) throw new Error('Could not load knowledge base');
+      const faqs: FAQ[] = await faqResponse.json();
 
-    try {
-      // Robust API URL detection for mobile/browser
-      const base = API_BASE_URL || window.location.origin;
-      const apiUrl = `${base.replace(/\/$/, '')}/api/ai/support`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          contents: newMessages.map(m => ({ role: m.role, parts: m.parts })) 
-        })
+      // Configure Fuse with weighting
+      const fuse = new Fuse<FAQ>(faqs, {
+        keys: [
+          { name: 'questions', weight: 0.6 },
+          { name: 'keywords', weight: 0.3 },
+          { name: 'id', weight: 0.1 }
+        ],
+        threshold: 0.35, // Stricter threshold for better accuracy
+        includeScore: true,
+        shouldSort: true,
+        minMatchCharLength: 2
       });
 
-      if (!response.ok) {
-        let errorData = { error: 'Unknown server error' };
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          // If response is not JSON, it might be an HTML error page from the proxy/server
-          const text = await response.text().catch(() => '');
-          console.warn('Non-JSON error response:', text);
-        }
-        throw new Error(errorData.error || `Server Error (${response.status})`);
-      }
+      // Simulate AI thinking for a more natural feel
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      const data = await response.json();
-      
-      if (data.text) {
-        let text = data.text;
-        let showButton = false;
-        
-        if (text.includes('[SHOW_CONTACT_BUTTON]')) {
-          text = text.replace('[SHOW_CONTACT_BUTTON]', '').trim();
-          showButton = true;
-        }
+      const results = fuse.search(userInput);
+      let responseText = "";
+      let showContact = false;
+      let recommendations: string[] = [];
 
-        const modelMessage: Message = {
-          role: 'model',
-          parts: [{ text }],
-          timestamp: Date.now(),
-          isError: showButton
-        };
-        const updatedHistory = [...newMessages, modelMessage];
-        setMessages(updatedHistory);
-        localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(updatedHistory));
+      if (results.length > 0) {
+        // High confidence match
+        const bestMatch = results[0].item;
+        responseText = lang === 'bn' ? bestMatch.answer_bn : bestMatch.answer_en;
+        recommendations = (lang === 'bn' ? bestMatch.related_bn : bestMatch.related_en) || [];
       } else {
-        throw new Error('Failed to get a valid response from the AI.');
+        // Fallback for no match
+        responseText = lang === 'bn' 
+          ? "দুঃখিত, আমি আপনার প্রশ্নের সঠিক উত্তর খুঁজে পাইনি। অনুগ্রহ করে প্রশ্নটি অন্যভাবে করুন অথবা সরাসরি আমাদের টেলিগ্রাম সাপোর্টে যোগাযোগ করুন।"
+          : "I'm sorry, I couldn't find a specific answer to your question in our local database. Please try rephrasing your question or contact our human support team directly on Telegram.";
+        showContact = true;
       }
+
+      const modelMessage: Message = {
+        role: 'model',
+        parts: [{ text: responseText }],
+        timestamp: Date.now(),
+        isError: showContact,
+        recommendations: recommendations.slice(0, 3) // Show top 3
+      };
+
+      setMessages(prev => {
+        const updated = [...prev, modelMessage];
+        try {
+          localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(updated));
+        } catch (e) {
+          console.warn('LocalStorage error:', e);
+        }
+        return updated;
+      });
+
     } catch (err: any) {
-      console.error('Chat Error:', err);
-      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TypeError' || err.message.includes('NetworkError');
-      
+      console.error('Local Chat Error:', err);
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: `[SYSTEM NOTICE] ${isNetworkError ? "I'm having trouble reaching the FC Arena servers. This can happen if your internet connection is unstable or if you are using an older version of the app. Please ensure you have an active data connection." : (err.message || "Something went wrong while processing your request.")}
- 
- Possible solutions:
- 1. Check your internet connection (Wi-Fi or Mobile Data).
- 2. Refresh the page or restart the app.
- 3. If the problem persists, contact our technical team on Telegram (${TELEGRAM_LINK}).` }],
+        parts: [{ text: lang === 'bn' ? "সিস্টেম এরর: অনুগ্রহ করে অ্যাপটি আপডেট করুন বা টেলিগ্রামে যোগাযোগ করুন।" : "System Error: Failed to process request locally. Please ensure you have downloaded the latest app update or contact us on Telegram." }],
         timestamp: Date.now(),
         isError: true
       };
@@ -219,14 +236,14 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         {/* Usage Info */}
         <div className="px-8 py-3 bg-indigo-50/50 border-b border-indigo-100/50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">
-              Daily Limit: {dailyCount} / {MAX_DAILY_MESSAGES}
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+              LOCAL AI ACTIVE (NO LIMIT)
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            <Clock size={10} />
-            Resets at midnight
+            <MessageCircle size={10} />
+            Offline Mode
           </div>
         </div>
 
@@ -277,6 +294,20 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                 )}>
                   {m.parts[0].text}
                   
+                  {m.role === 'model' && m.recommendations && m.recommendations.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {m.recommendations.map((rec, rIdx) => (
+                        <button
+                          key={rIdx}
+                          onClick={() => sendMessage(rec)}
+                          className="px-4 py-2 rounded-xl nm-flat bg-white text-indigo-600 text-[10px] font-bold border border-indigo-50 hover:bg-indigo-100 transition-all active:scale-95"
+                        >
+                          {rec}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
                   {m.isError && (
                     <div className="mt-4">
                       <a 
@@ -309,31 +340,6 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               </div>
             </div>
           )}
-
-          {dailyCount >= MAX_DAILY_MESSAGES && (
-            <div className="p-6 rounded-[2rem] nm-flat bg-rose-50 border border-rose-100 space-y-4 animate-in zoom-in-95">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-lg">
-                  <AlertTriangle size={20} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">LIMIT EXCEEDED</span>
-                  <p className="text-xs font-black text-slate-800 uppercase italic">Daily capacity reached</p>
-                </div>
-              </div>
-              <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">
-                You have reached your limit of {MAX_DAILY_MESSAGES} messages for today. Please return tomorrow or contact our official support on Telegram for immediate assistance.
-              </p>
-              <a 
-                href={TELEGRAM_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-500/20 active:scale-95 transition-transform"
-              >
-                <ExternalLink size={14} /> Contact via Telegram
-              </a>
-            </div>
-          )}
         </div>
 
         {/* Input Area */}
@@ -344,21 +350,29 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={dailyCount >= MAX_DAILY_MESSAGES ? "Limit reached..." : "Type your message..."}
-              disabled={loading || dailyCount >= MAX_DAILY_MESSAGES}
+              placeholder="Type your message..."
+              disabled={loading}
               className="flex-1 h-16 px-6 nm-inset bg-white rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
             />
             <button 
               onClick={handleSend}
-              disabled={!input.trim() || loading || dailyCount >= MAX_DAILY_MESSAGES}
+              disabled={!input.trim() || loading}
               className={cn(
-                "w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl shrink-0",
-                !input.trim() || loading || dailyCount >= MAX_DAILY_MESSAGES
-                  ? "nm-flat bg-slate-100 text-slate-300 cursor-not-allowed"
-                  : "nm-flat bg-indigo-600 text-white active:nm-pressed"
+                "w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl shrink-0 active:scale-95",
+                !input.trim() || loading
+                  ? "nm-flat bg-indigo-50/80 text-indigo-600 border border-indigo-100/80 cursor-not-allowed"
+                  : "nm-flat bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/30 active:nm-pressed"
               )}
+              title="Send Message"
             >
-              <Send size={24} className={loading ? 'animate-pulse' : ''} />
+              <Send 
+                size={24} 
+                className={cn(
+                  "transition-colors",
+                  !input.trim() || loading ? "text-indigo-600" : "text-white",
+                  loading ? "animate-pulse" : ""
+                )} 
+              />
             </button>
           </div>
           {/* Safe area padding for mobile browsers */}

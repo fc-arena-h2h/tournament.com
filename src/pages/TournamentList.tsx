@@ -8,6 +8,7 @@ import { UserProfile } from '@/src/hooks/useAuth';
 import { Reveal } from '@/src/components/ui/Reveal';
 
 import { GameLoader } from '@/src/components/ui/GameLoader';
+import { getDemoTournaments } from '@/src/lib/localTournaments';
 
 interface Tournament {
   id: string;
@@ -57,9 +58,14 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(40));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-      setTournaments(tData);
+      
+      // Merge local demo tournaments
+      const demoTournaments = getDemoTournaments();
+      const merged = [...demoTournaments, ...tData];
+      
+      setTournaments(merged as any);
       try {
-        localStorage.setItem('fc_arena_tournaments', JSON.stringify(tData));
+        localStorage.setItem('fc_arena_tournaments', JSON.stringify(merged));
       } catch {}
 
       // Fetch publisher profiles for tournaments that have a publisherId
@@ -137,7 +143,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
   if (loading) return <GameLoader fullScreen={false} text="LOADING TOURNAMENTS..." />;
 
   const filteredTournaments = viewMode === 'joined' 
-    ? tournaments.filter(t => userRegistrations[t.id])
+    ? tournaments.filter(t => userRegistrations[t.id] || (t as any).isDemo)
     : tournaments;
 
   return (

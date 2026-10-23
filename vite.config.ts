@@ -12,7 +12,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['assets/aistudio/20261021_140921_56efc859.png', 'sw-push-handler.js'],
+        includeAssets: ['assets/aistudio/20261021_140921_56efc859.png', 'sw-push-handler.js', 'faqs.json'],
         manifest: {
           id: '/',
           name: 'FC Arena VS – Pro Tournament Platform',
@@ -47,7 +47,7 @@ export default defineConfig(() => {
         },
         workbox: {
           importScripts: ['/sw-push-handler.js'],
-          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2,json}'],
         },
         devOptions: {
           enabled: true,

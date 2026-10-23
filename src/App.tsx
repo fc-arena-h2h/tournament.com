@@ -42,6 +42,7 @@ export default function App() {
   const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
+  const [isDemoCreating, setIsDemoCreating] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
   const [hasStartedApp, setHasStartedApp] = useState(false);
 
@@ -235,9 +236,11 @@ export default function App() {
       case 'matches':
         if (profile?.role === 'publisher' || profile?.role === 'admin') {
           if (isAdminCreating) return <CreateTournamentPage profile={profile} onBack={() => setIsAdminCreating(false)} />;
+          if (isDemoCreating) return <CreateTournamentPage profile={profile} onBack={() => setIsDemoCreating(false)} isDemo />;
           return (
             <AdminDashboard 
               onCreateNew={() => setIsAdminCreating(true)} 
+              onCreateDemo={() => setIsDemoCreating(true)}
               onEnterTournament={setSelectedTournament} 
             />
           );
