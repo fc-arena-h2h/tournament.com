@@ -40,6 +40,8 @@ jobs:
 
       - name: Build Web Application
         run: npm run build
+        env:
+          VITE_BUILD_SOURCE: github
 
       - name: Setup & Sync Capacitor Android
         run: |

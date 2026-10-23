@@ -45,6 +45,18 @@ export default function App() {
   const [isDemoCreating, setIsDemoCreating] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
   const [hasStartedApp, setHasStartedApp] = useState(false);
+  const [integrityValid, setIntegrityValid] = useState(true);
+
+  // Integrity Check
+  useEffect(() => {
+    import('./lib/integrity').then(({ checkAppIntegrity }) => {
+      checkAppIntegrity().then((result) => {
+        if (!result.valid) {
+          setIntegrityValid(false);
+        }
+      });
+    });
+  }, []);
 
   // Notification States
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -214,6 +226,27 @@ export default function App() {
           >
             {t('sign_out_button')}
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!integrityValid) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex items-center justify-center p-6 text-center">
+        <div className="space-y-6 max-w-xs">
+          <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border-2 border-rose-500/20">
+            <X size={40} strokeWidth={3} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-white uppercase italic">INTEGRITY FAILURE</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+              This application has been modified by an unauthorized 3rd party tool. Please download the official APK from GitHub.
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10">
+             <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest italic">Security Guard Active</span>
+          </div>
         </div>
       </div>
     );
