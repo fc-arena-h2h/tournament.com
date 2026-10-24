@@ -120,7 +120,7 @@ export default function App() {
         showSystemNotification(newest.title, { 
           body: newest.message, 
           tag: newest.id,
-          url: '/'
+          url: import.meta.env.BASE_URL
         });
       }
     }, (err) => {

@@ -26,13 +26,13 @@ let notificationListener = null;
 const displayNotification = (data) => {
   const options = {
     body: data.message || data.body || 'New notification arrived!',
-    icon: '/pwa-192x192.png',
-    badge: '/fc_arena_icon.jpg',
+    icon: 'pwa-192x192.png',
+    badge: 'fc_arena_icon.jpg',
     vibrate: [200, 100, 200, 100, 200],
     tag: data.id || 'fc-arena-' + Date.now(),
     renotify: true,
     data: {
-      url: data.url || '/'
+      url: data.url || './'
     },
     actions: [
       { action: 'open', title: 'View Match / Open' }
@@ -80,7 +80,7 @@ function startBackgroundFirestoreListener() {
                   id: change.doc.id,
                   title: data.title,
                   message: data.message,
-                  url: '/'
+                  url: './'
                 });
               }
             });
@@ -114,7 +114,7 @@ self.addEventListener('push', (event) => {
 // Notification Click Handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

@@ -116,14 +116,14 @@ export function showSystemNotification(title: string, options?: { body?: string;
 
   const notificationOptions: NotificationOptions = {
     body: options?.body || '',
-    icon: options?.icon || '/pwa-192x192.png',
-    badge: '/fc_arena_icon.jpg',
+    icon: options?.icon || 'pwa-192x192.png',
+    badge: 'fc_arena_icon.jpg',
     tag: options?.tag || 'fc-arena-' + Date.now(),
     renotify: true,
     requireInteraction: false,
     ...({
       vibrate: [200, 100, 200, 100, 200],
-      data: { url: options?.url || '/' }
+      data: { url: options?.url || './' }
     } as any)
   };
 

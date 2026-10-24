@@ -6,7 +6,7 @@ import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    base: './',
+    base: '/tournament.com/',
     plugins: [
       react(),
       tailwindcss(),
@@ -14,7 +14,7 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['assets/aistudio/20261021_140921_56efc859.png', 'sw-push-handler.js', 'faqs.json'],
         manifest: {
-          id: '/',
+          id: '/tournament.com/',
           name: 'FC Arena VS – Pro Tournament Platform',
           short_name: 'FC Arena VS',
           description: 'The ultimate professional tournament and 1v1 battle platform for FC Mobile gamers.',
@@ -22,23 +22,23 @@ export default defineConfig(() => {
           background_color: '#fdfbf7',
           display: 'standalone',
           orientation: 'portrait',
-          start_url: '/',
-          scope: '/',
+          start_url: '/tournament.com/',
+          scope: '/tournament.com/',
           icons: [
             {
-              src: '/assets/aistudio/20261021_140921_56efc859.png',
+              src: 'assets/aistudio/20261021_140921_56efc859.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/assets/aistudio/20261021_140921_56efc859.png',
+              src: 'assets/aistudio/20261021_140921_56efc859.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/assets/aistudio/20261021_140921_56efc859.png',
+              src: 'assets/aistudio/20261021_140921_56efc859.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
@@ -46,7 +46,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          importScripts: ['/sw-push-handler.js'],
+          importScripts: ['sw-push-handler.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2,json}'],
         },
         devOptions: {

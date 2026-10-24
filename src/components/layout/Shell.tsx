@@ -320,7 +320,7 @@ export const Header = ({
                    <div className="w-36 h-36 rounded-[2.5rem] p-1.5 nm-flat bg-white border-4 border-white shadow-2xl relative">
                       <div className="w-full h-full rounded-[2rem] overflow-hidden bg-slate-100 flex items-center justify-center">
                         <img 
-                          src="/assets/aistudio/1778263780155-01_c4dd739c.jpeg" 
+                          src="assets/aistudio/1778263780155-01_c4dd739c.jpeg" 
                           alt="Developer" 
                           className="w-full h-full object-cover"
                         />
@@ -605,7 +605,7 @@ export const Header = ({
                       console.log("Sign out successful, reloading...");
                       window.localStorage.clear(); // Clear any local state
                       window.sessionStorage.clear();
-                      window.location.href = '/'; // Force redirect to home
+                      window.location.href = import.meta.env.BASE_URL; // Force redirect to home with base path
                     } catch (error) {
                       console.error("Sign out failed", error);
                       alert("Sign out failed. Please try again.");

@@ -11,7 +11,7 @@ export const Logo: React.FC<LogoProps> = ({ className, size = 64 }) => {
   return (
     <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
       <img 
-        src="/assets/aistudio/20261021_140921_56efc859.png" 
+        src="assets/aistudio/20261021_140921_56efc859.png" 
         alt="FC Arena VS" 
         className="w-full h-full object-contain drop-shadow-xl animate-in fade-in zoom-in duration-500"
       />
