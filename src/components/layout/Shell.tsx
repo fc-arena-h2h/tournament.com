@@ -1,4 +1,4 @@
-import { Trophy, Home, Calendar, Users, User, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut, Languages, Send } from 'lucide-react';
+import { Trophy, Home, Calendar, Users, User as UserIcon, Download, Shield, Bell, X, Megaphone, Clock, MoreVertical, LifeBuoy, Info, Wallet, Settings, Activity, ShieldAlert, HeartHandshake, Zap, LogOut, Languages, Send, Code } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { usePWAInstall } from '@/src/hooks/usePWAInstall';
 import { useState, useEffect } from 'react';
@@ -26,7 +26,7 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
     { id: 'arena' as NavTab, label: t('nav_dashboard'), icon: Home },
     { id: 'tournament' as NavTab, label: t('nav_arena'), icon: Trophy },
     { id: 'matches' as NavTab, label: t('nav_field'), icon: Calendar },
-    { id: 'profile' as NavTab, label: t('nav_me'), icon: User },
+    { id: 'profile' as NavTab, label: t('nav_me'), icon: UserIcon },
   ];
 
   return (
@@ -82,6 +82,7 @@ export const Header = ({
   const [showMenu, setShowMenu] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showSupportAI, setShowSupportAI] = useState(false);
+  const [showDevInfo, setShowDevInfo] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [hasNew, setHasNew] = useState(false);
 
@@ -102,7 +103,7 @@ export const Header = ({
   return (
     <header className={cn(
       "fixed top-0 left-0 right-0 px-3 sm:px-6 py-4 sm:py-6 transition-all duration-300",
-      showMenu || showAbout || showSupportAI ? "z-[20000]" : "z-50"
+      showMenu || showAbout || showSupportAI || showDevInfo ? "z-[20000]" : "z-50"
     )}>
       <div className="nm-flat rounded-full h-18 sm:h-20 px-4 sm:px-8 flex items-center justify-between border-2 border-white/50 relative">
         <div className="flex items-center gap-4">
@@ -191,7 +192,7 @@ export const Header = ({
       {/* About Arena Modal */}
       <AnimatePresence>
         {showAbout && (
-          <div className="fixed inset-0 z-[4000] bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[20002] bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -281,6 +282,97 @@ export const Header = ({
                   className="w-full h-14 nm-flat bg-indigo-600 rounded-2xl text-white font-black uppercase tracking-widest italic active:nm-pressed shadow-xl"
                 >
                   Return to Menu
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Developer Info Modal */}
+      <AnimatePresence>
+        {showDevInfo && (
+          <div className="fixed inset-0 z-[20002] bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-lg bg-[#f0f1f5] rounded-[3rem] border-2 border-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-white/20 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl nm-inset bg-[#e6e6e9] flex items-center justify-center text-indigo-600">
+                    <UserIcon size={24} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Developer Profile</span>
+                    <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Developer <span className="text-indigo-600">Info</span></h2>
+                  </div>
+                </div>
+                <button onClick={() => setShowDevInfo(false)} className="w-11 h-11 rounded-2xl nm-flat bg-white flex items-center justify-center text-slate-400 active:nm-pressed">
+                  <X size={22} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-10 overflow-y-auto no-scrollbar pb-12">
+                {/* Developer Image */}
+                <div className="flex flex-col items-center gap-4">
+                   <div className="w-36 h-36 rounded-[2.5rem] p-1.5 nm-flat bg-white border-4 border-white shadow-2xl relative">
+                      <div className="w-full h-full rounded-[2rem] overflow-hidden bg-slate-100 flex items-center justify-center">
+                        <img 
+                          src="/assets/aistudio/1778263780155-01_c4dd739c.jpeg" 
+                          alt="Developer" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg border-4 border-[#f0f1f5]">
+                         <Zap size={18} className="fill-current" />
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="p-6 rounded-[2rem] nm-inset bg-white/40 border border-white/50 space-y-4">
+                     <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.3em]">Application Name</span>
+                        <span className="text-lg font-black text-slate-800 uppercase italic">FC ARENA VS</span>
+                     </div>
+                     <div className="h-px bg-slate-100" />
+                     <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.3em]">Developer Name</span>
+                        <span className="text-lg font-black text-slate-800 uppercase italic">MD HABIBUL BASHAR</span>
+                     </div>
+                     <div className="h-px bg-slate-100" />
+                     <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.3em]">Address</span>
+                        <span className="text-lg font-black text-slate-800 uppercase italic">DHAKA, BANGLADESH</span>
+                     </div>
+                  </div>
+
+                  <div className="space-y-3">
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 block">Social Media Presence</span>
+                     <button 
+                        onClick={() => window.open('https://www.facebook.com/share/1JY4MX8yQ6/', '_blank')}
+                        className="w-full h-18 rounded-3xl nm-flat bg-white border border-white/50 flex items-center justify-between px-8 hover:bg-slate-50 active:nm-pressed transition-all group"
+                     >
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                              <UserIcon size={20} />
+                           </div>
+                           <span className="text-sm font-black text-slate-800 uppercase italic">Facebook Profile</span>
+                        </div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shadow-sm shadow-blue-500/50" />
+                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-indigo-50/50 border-t border-white/20 text-center shrink-0">
+                <button 
+                  onClick={() => setShowDevInfo(false)}
+                  className="w-full h-14 nm-flat bg-indigo-600 rounded-2xl text-white font-black uppercase tracking-widest italic active:nm-pressed shadow-xl"
+                >
+                  Close Profile
                 </button>
               </div>
             </motion.div>
@@ -435,6 +527,29 @@ export const Header = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Developer Info Section */}
+              <div className="space-y-4">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">DEVELOPER INFO</span>
+                <button 
+                   onClick={() => {
+                     setShowMenu(false);
+                     setShowDevInfo(true);
+                   }}
+                   className="w-full h-20 nm-flat bg-white rounded-3xl px-6 flex items-center justify-between border border-rose-100/50 active:nm-pressed group transition-all"
+                >
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl nm-inset bg-rose-50 text-rose-500 flex items-center justify-center transition-transform group-active:scale-95 shrink-0">
+                         <Code size={24} />
+                      </div>
+                      <div className="flex flex-col text-left">
+                         <span className="text-sm font-black text-slate-800 uppercase italic leading-tight">Developer Profile</span>
+                         <span className="text-[10px] font-bold text-slate-400">MD HABIBUL BASHAR Info</span>
+                      </div>
+                   </div>
+                   <div className="w-2.5 h-2.5 rounded-full bg-rose-200 group-hover:bg-rose-400 transition-colors" />
+                </button>
               </div>
 
               {/* Admin/Host Controls - Only for privileged users */}
