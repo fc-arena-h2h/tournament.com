@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle, Phone } from 'lucide-react';
+import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle, Phone, CircleHelp } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
@@ -88,7 +88,7 @@ const CountdownTimer = ({ targetTime }: { targetTime: Timestamp }) => {
   return <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">{timeLeft}</span>;
 };
 
-type ArenaTab = 'group' | 'knockout' | 'players' | 'rules' | 'manage';
+type ArenaTab = 'group' | 'knockout' | 'players' | 'rules' | 'support' | 'manage';
 
 interface ArenaDetailProps {
   tournament: Tournament;
@@ -244,7 +244,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             awayPlayerName: newAwayName,
             status: hasBothPlayers ? 'scheduled' : 'draft',
           });
-          const updatedMatches = matches.map(m => (m.id === existingMatch.id) ? {
+          setMatches(prev => prev.map(m => (m.id === existingMatch.id) ? {
             ...m,
             matchId: matchSlotId,
             stage: stage,
@@ -253,8 +253,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             awayPlayerId: newAwayId,
             awayPlayerName: newAwayName,
             status: hasBothPlayers ? 'scheduled' : 'draft' as any
-          } : m);
-          setMatches(updatedMatches);
+          } : m));
         } else {
           await updateDoc(doc(db, 'matches', existingMatch.id), {
             matchId: matchSlotId,
@@ -1049,24 +1048,29 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setIsSubmittingReport(true);
     try {
       if (isDemo) {
-        updateDemoMatch(tournament.id, reportingMatch.id, {
-          homeScore: reportFormData.home,
-          awayScore: reportFormData.away,
-          penaltyWinnerId: reportFormData.penaltyWinnerId || null,
-          status: 'completed'
+        // Use functional update to avoid race conditions with evaluateAutoProgression
+        setMatches(prev => {
+          const updated = prev.map(m => m.id === reportingMatch.id ? { 
+            ...m, 
+            status: 'completed' as const,
+            homeScore: reportFormData.home,
+            awayScore: reportFormData.away,
+            penaltyWinnerId: reportFormData.penaltyWinnerId || null
+          } : m);
+
+          updateDemoMatch(tournament.id, reportingMatch.id, {
+            homeScore: reportFormData.home,
+            awayScore: reportFormData.away,
+            penaltyWinnerId: reportFormData.penaltyWinnerId || null,
+            status: 'completed'
+          });
+
+          // Trigger automated progression with the updated list
+          evaluateAutoProgression(updated);
+          return updated;
         });
         
-        const updatedMatches = matches.map(m => m.id === reportingMatch.id ? { 
-          ...m, 
-          status: 'completed' as const,
-          homeScore: reportFormData.home,
-          awayScore: reportFormData.away,
-          penaltyWinnerId: reportFormData.penaltyWinnerId || null
-        } : m);
-        
-        setMatches(updatedMatches);
-        await evaluateAutoProgression(updatedMatches);
-        alert('Demo result recorded!');
+        alert('ম্যাচ রেজাল্ট সফলভাবে রেকর্ড করা হয়েছে! (Demo Mode)');
         setReportingMatch(null);
         return;
       }
@@ -1082,22 +1086,39 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       
       if (isAdminUser) {
         // Trigger automated progression immediately for admin reports
-        const updatedMatches = matches.map(m => m.id === reportingMatch.id ? { 
+        if (isDemo) {
+          setMatches(prev => {
+            const updated = prev.map(m => m.id === reportingMatch.id ? { 
+              ...m, 
+              status: 'completed' as const,
+              homeScore: reportFormData.home,
+              awayScore: reportFormData.away,
+              penaltyWinnerId: reportFormData.penaltyWinnerId || null
+            } : m);
+            // progression logic will be called below
+            return updated;
+          });
+        }
+        
+        // For Live mode, state will be updated by onSnapshot. 
+        // We pass the expected updated list to evaluateAutoProgression.
+        const nextMatchList = matches.map(m => m.id === reportingMatch.id ? { 
           ...m, 
           status: 'completed' as const,
           homeScore: reportFormData.home,
           awayScore: reportFormData.away,
           penaltyWinnerId: reportFormData.penaltyWinnerId || null
         } : m);
-        await evaluateAutoProgression(updatedMatches);
-        alert('Match result recorded and finalized by Admin.');
+        
+        await evaluateAutoProgression(nextMatchList);
+        alert('ম্যাচ রেজাল্ট সফলভাবে রেকর্ড এবং ফাইনাল করা হয়েছে!');
       } else {
-        alert('Result reported! Waiting for opponent to confirm.');
+        alert('রেজাল্ট রিপোর্ট করা হয়েছে! প্রতিপক্ষের কনফার্মেশনের জন্য অপেক্ষা করুন।');
       }
       setReportingMatch(null);
     } catch (err) {
       console.error(err);
-      alert('Error uploading result');
+      handleFirestoreError(err, OperationType.UPDATE, `matches/${reportingMatch.id}`);
     } finally {
       setIsSubmittingReport(false);
     }
@@ -1457,8 +1478,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       await updateDoc(doc(db, 'matches', existing.id), {
         ...updates,
         participants: [homePlayer.userId, awayPlayer.userId],
-        homeScore: null,
-        awayScore: null,
+        homeScore: 0,
+        awayScore: 0,
         updatedAt: Timestamp.now()
       });
     } else {
@@ -1661,7 +1682,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   // Automated Progression Evaluator
   const evaluateAutoProgression = async (providedMatches?: Match[]) => {
     const isAuto = currentTournament?.autoKnockout ?? tournament.autoKnockout;
-    if (!isAuto) return;
+    if (!isAuto || !isAdminUser) return;
 
     const currentList = providedMatches || matches;
     if (!currentList || currentList.length === 0) return;
@@ -1757,7 +1778,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       // Updated match list with this match set to completed
       const updatedMatches = matches.map(m => m.id === match.id ? { ...m, status: 'completed' as const } : m);
 
-      // Trigger automated progression
+      if (isDemo) {
+        setMatches(updatedMatches);
+      }
+      
+      // Progression logic
       await evaluateAutoProgression(updatedMatches);
 
       // Notify both players about confirmed match result
@@ -2403,10 +2428,17 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         saveDemoParticipants(tournament.id, updatedParticipants as any);
         setParticipants(updatedParticipants);
         
-        // Clear from matches
-        const updatedMatches = matches.filter(m => m.homePlayerId !== reg.userId && m.awayPlayerId !== reg.userId);
-        saveDemoMatches(tournament.id, updatedMatches as any);
-        setMatches(updatedMatches);
+        setMatches(prev => {
+          const updated = prev.map(m => {
+            const up: any = {};
+            if (m.homePlayerId === reg.userId) { up.homePlayerId = ''; up.homePlayerName = ''; }
+            if (m.awayPlayerId === reg.userId) { up.awayPlayerId = ''; up.awayPlayerName = ''; }
+            if (Object.keys(up).length > 0) return { ...m, ...up };
+            return m;
+          });
+          saveDemoMatches(tournament.id, updated as any);
+          return updated;
+        });
 
         // Decrement filledSlots
         const newFilled = Math.max(0, (currentTournament?.filledSlots || 0) - 1);
@@ -2533,9 +2565,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const tabs = [
     ...(!isKnockoutOnly ? [{ id: 'group' as ArenaTab, icon: LayoutGrid, label: 'Groups' }] : []),
     { id: 'knockout' as ArenaTab, icon: GitPullRequest, label: 'Brackets' },
-
     { id: 'players' as ArenaTab, icon: List, label: 'Players' },
     { id: 'rules' as ArenaTab, icon: FileText, label: 'Rules' },
+    { id: 'support' as ArenaTab, icon: CircleHelp, label: 'Support' },
     ...(isAdminUser ? [{ id: 'manage' as ArenaTab, icon: Settings, label: 'Manage' }] : []),
   ];
 
@@ -2630,7 +2662,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   "text-xs sm:text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[85px] sm:max-w-[130px]",
                   homeWin && isCompleted ? "text-amber-600 font-black" : homeWin ? "text-fc-dark" : "text-slate-500"
                 )}>
-                  {homeProfile?.inGameName || 'Loading...'}
+                  {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
                 </h5>
               </div>
             </div>
@@ -2697,7 +2729,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   "text-xs sm:text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[85px] sm:max-w-[130px]",
                   awayWin && isCompleted ? "text-amber-600 font-black" : awayWin ? "text-fc-dark" : "text-slate-500"
                 )}>
-                  {awayProfile?.inGameName || 'Loading...'}
+                  {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
                 </h5>
               </div>
             </div>
@@ -4111,6 +4143,84 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 ))}
               </div>
             )}
+          </div>
+        );
+      case 'support':
+        const faqs = [
+          {
+            q: "How to deploy matches in a tournament?",
+            a: "As a host, go to the 'Manage' tab. First, ensure you have enough approved players. Use 'Auto Group Setup' to distribute players into groups, and then click 'Auto Match Deploy' to generate the fixtures. You can also manually create matches if needed."
+          },
+          {
+            q: "How do players advance to the next round?",
+            a: "In 'Auto-Progression' mode, winners of group stages and subsequent knockout matches are automatically promoted to the next stage once all matches in the current stage are completed. Ensure 'Auto-Progression' is active in the Manage tab."
+          },
+          {
+            q: "Who can report match results?",
+            a: "By default, both players in a match can report the score. The opponent must then confirm the result. Alternatively, the host can change the setting in the Manage tab to 'Only Publisher' so only the tournament organizer can record scores."
+          },
+          {
+            q: "What happens in case of a draw in knockout rounds?",
+            a: "Knockout matches cannot end in a draw. If the score is tied, the app will prompt you to select a penalty shootout winner. The selected player will advance to the next round."
+          },
+          {
+            q: "How to join a tournament?",
+            a: "Find the tournament in the Arena list. If it's a public tournament, click 'Join Arena'. If it's private, you will need an Invitation Key provided by the host. Once your registration is approved by the host, you can participate in matches."
+          },
+          {
+            q: "How to contact my opponent?",
+            a: "Each match card has a Messenger icon. Clicking it will open the opponent's linked social profile for quick coordination. We also recommend joining the tournament's Messenger group link provided on the main banner."
+          }
+        ];
+
+        return (
+          <div className="space-y-6 pb-20">
+            <div className="flex flex-col items-center text-center space-y-3">
+               <div className="w-16 h-16 rounded-[2rem] nm-flat flex items-center justify-center text-emerald-500 border border-white/50 mb-2">
+                 <CircleHelp size={32} />
+               </div>
+               <h3 className="text-xl font-black text-fc-dark uppercase italic leading-none">Support System</h3>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-loose text-center max-w-xs">
+                 Everything you need to know about <br /> competing in the Arena
+               </p>
+            </div>
+
+            <div className="space-y-4">
+              {faqs.map((faq, idx) => (
+                <div key={idx} className="nm-flat rounded-3xl p-6 bg-white border border-slate-100 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-black italic">Q</span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight italic">{faq.q}</h4>
+                  </div>
+                  <div className="flex gap-3 pl-1">
+                    <div className="w-8 h-px bg-slate-100 mt-2.5 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-500 leading-relaxed uppercase">
+                      {faq.a}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-8 rounded-[2.5rem] bg-indigo-50 border-2 border-indigo-100 text-center space-y-4">
+               <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-indigo-500 mx-auto shadow-sm">
+                 <MessageSquare size={24} />
+               </div>
+               <div>
+                 <h4 className="text-xs font-black text-indigo-900 uppercase italic">Still Need Help?</h4>
+                 <p className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest mt-1">
+                   Contact the Arena Administrators
+                 </p>
+               </div>
+               <button 
+                 onClick={() => window.open('https://t.me/your_admin_telegram', '_blank')}
+                 className="w-full py-4 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+               >
+                 Contact Support Team
+               </button>
+            </div>
           </div>
         );
       case 'manage':

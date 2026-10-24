@@ -178,7 +178,8 @@ service cloud.firestore {
       ));
       allow list: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        isPublisherOf(resource.data.tournamentId)
+        isPublisherOf(resource.data.tournamentId) ||
+        isParticipantOf(resource.data.tournamentId)
       );
       allow create: if isSignedIn() && isValidRegistration(incoming());
       allow update: if isAdmin() || isPublisherOf(existing().tournamentId);

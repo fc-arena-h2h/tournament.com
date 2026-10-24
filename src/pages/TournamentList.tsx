@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc, orderBy, limit, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { Trophy, Users, Shield, ArrowRight, Clock, Target, CheckCircle, Hash } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -121,7 +121,7 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     }
 
     try {
-      await addDoc(collection(db, 'registrations'), {
+      await setDoc(doc(db, 'registrations', `${auth.currentUser?.uid}_${tournament.id}`), {
         tournamentId: tournament.id,
         userId: auth.currentUser?.uid,
         status: 'pending',
