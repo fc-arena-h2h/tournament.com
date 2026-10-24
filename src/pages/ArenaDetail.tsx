@@ -187,7 +187,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   }, [autoMatchToast]);
 
-  const handleSlotClick = (matchSlotId: string, role: 'home' | 'away', matchNumber: number, existingMatch?: Match) => {
+  const handleSlotClick = (matchSlotId: string, role: 'home' | 'away', matchNumber: number, existingMatch?: Match, stageOverride?: string) => {
     if (!isAdminUser) {
       const playerId = role === 'home' ? existingMatch?.homePlayerId : existingMatch?.awayPlayerId;
       if (playerId && profiles[playerId]) {
@@ -197,7 +197,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
 
     setSlotAssignModal({
-      stage: activeKnockoutStage,
+      stage: stageOverride || activeKnockoutStage,
       matchSlotId,
       role,
       matchNumber,
@@ -1410,12 +1410,30 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     if (targetStage === '3RD_PLACE') {
       const semiMatches = matches.filter(m => m.stage === 'SEMI');
-      const losers: string[] = [];
-      semiMatches.forEach(m => {
-        const lId = getLoserId(m);
-        if (lId) losers.push(lId);
-      });
-      return losers;
+      const finalists = matches.filter(m => m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))
+        .flatMap(m => [m.homePlayerId, m.awayPlayerId])
+        .filter(Boolean);
+      
+      const semiParticipants = semiMatches.flatMap(m => [m.homePlayerId, m.awayPlayerId]).filter(Boolean);
+      
+      // If semi matches are completed, we know exactly who the losers are
+      const completedSemis = semiMatches.filter(m => m.status === 'completed');
+      if (completedSemis.length > 0) {
+        const losers = completedSemis.map(m => getLoserId(m)).filter(Boolean) as string[];
+        // Filter out anyone who somehow made it to the final (safety check)
+        const actualLosers = losers.filter(id => !finalists.includes(id));
+        
+        // Also include semi participants who are NOT finalists (for flexibility if result is pending)
+        const potentialLosers = semiParticipants.filter(id => !finalists.includes(id));
+        
+        // Combine and unique
+        const combined = Array.from(new Set([...actualLosers, ...potentialLosers]));
+        return combined.length > 0 ? combined : null;
+      }
+      
+      // If semis are not completed, show all semi participants who are NOT in the grand final
+      const potentialLosers = semiParticipants.filter(id => !finalists.includes(id));
+      return potentialLosers.length > 0 ? potentialLosers : null;
     }
 
     const stageIdx = knockoutStages.indexOf(targetStage);
@@ -1687,68 +1705,46 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const currentList = providedMatches || matches;
     if (!currentList || currentList.length === 0) return;
 
-    // 1. Group Stage -> Knockout
+    // 1. Group Stage -> Knockout ONLY
     const groupMatches = currentList.filter(m => m.stage === 'group');
-    const knockoutMatches = currentList.filter(m => m.stage !== 'group' && m.groupId === 'knockout');
 
-    if (groupMatches.length > 0 && groupMatches.every(m => m.status === 'completed')) {
-      // Re-evaluate knockout matches even if they exist, to handle score corrections
-      await generateKnockoutMatches(currentList);
-      // After generating/updating knockout matches, we should check if we can advance further
-      // But we'll wait for the next report/confirm to keep it simple and avoid infinite loops
-      return;
-    }
+    // If no group matches exist, this might be a knockout-only tournament
+    if (groupMatches.length === 0) return;
 
-    // 2. Progression through Knockout Stages
-    const stages = ['R32', 'R16', 'QTR', 'SEMI', 'FINAL'];
-    for (let i = 0; i < stages.length - 1; i++) {
-      const currentStage = stages[i];
-      const nextStage = stages[i + 1];
-      const stageMatches = currentList.filter(m => m.stage === currentStage);
-      
-      if (stageMatches.length > 0 && stageMatches.every(m => m.status === 'completed')) {
-        await advanceStage(currentStage, nextStage, currentList);
-        // If we advanced to the next stage, we stop here for this cycle
-        const nextStageMatches = currentList.filter(m => m.stage === nextStage);
-        if (nextStageMatches.length > 0) break; 
+    if (groupMatches.every(m => m.status === 'completed')) {
+      // Check if knockout matches already exist (to avoid overwriting manual progress)
+      const knockoutMatches = currentList.filter(m => m.stage !== 'group');
+      if (knockoutMatches.length > 0) {
+        // If they exist and some have results, STOP EVERYTHING to prevent data loss
+        const hasKnockoutResults = knockoutMatches.some(m => m.status !== 'scheduled' && m.status !== 'draft');
+        if (hasKnockoutResults) {
+          console.log('Auto-progression: Knockout results already exist. Stopping auto-transition.');
+          return;
+        }
       }
-    }
 
-    // 3. FINAL -> CHAMPION
-    const finalMatch = currentList.find(m => m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId));
-    if (finalMatch && finalMatch.status === 'completed') {
-      const champId = getWinnerId(finalMatch);
-      if (champId && (!currentTournament?.winnerId || currentTournament?.status !== 'finished')) {
-        const champProfile = profiles[champId];
-        const champName = (champId === finalMatch.homePlayerId ? finalMatch.homePlayerName : finalMatch.awayPlayerName) || champProfile?.inGameName || 'Champion';
-        
+      await generateKnockoutMatches(currentList);
+      
+      // Disable auto-progression after Group -> Knockout transition
+      // as requested by the user ("এটি বন্ধ হয়ে যাবে এবং এরা আর কোন কাজ থাকবে না")
+      try {
         if (isDemo) {
-          updateDemoTournament(tournament.id, {
-            status: 'finished',
-            winnerId: champId,
-            winnerText: champName
-          });
-          setCurrentTournament((prev: any) => ({
-            ...prev,
-            status: 'finished',
-            winnerId: champId,
-            winnerText: champName
-          }));
+          updateDemoTournament(tournament.id, { autoKnockout: false });
         } else {
           await updateDoc(doc(db, 'tournaments', tournament.id), {
-            status: 'finished',
-            winnerId: champId,
-            winnerText: champName,
+            autoKnockout: false,
             updatedAt: Timestamp.now()
           });
         }
-        
-        setAutoMatchToast({
-          title: 'TOURNAMENT CHAMPION CROWNED!',
-          subtitle: `${champName} is the Tournament Champion!`
-        });
+        setCurrentTournament((prev: any) => prev ? { ...prev, autoKnockout: false } : prev);
+      } catch (e) {
+        console.warn('Failed to auto-disable progression:', e);
       }
+      return;
     }
+    
+    // Auto-progression for subsequent rounds (SEMI, FINAL) is DISABLED 
+    // as per user request to keep it manual for knockouts.
   };
 
   const handleConfirmResult = async (match: Match) => {
@@ -2193,7 +2189,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </button>
               </div>
               <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed italic">
-                Group winners automatically advance to knockout stages and progress to the next rounds.
+                Group winners automatically advance to knockout stage. Subsequent rounds require manual assignment.
               </p>
             </div>
 
@@ -3508,13 +3504,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const renderThirdPlaceMatch = () => {
-    const match = matches.find(m => m.stage === '3RD_PLACE') || 
+    const match = matches.find(m => m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1') || 
                   matches.find(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
     
     // Fallback match object for UI purposes if not found in DB
     const displayMatch = match || {
-      stage: 'FINAL',
-      matchId: 'FINAL_M2',
+      stage: '3RD_PLACE',
+      matchId: '3RD_PLACE_M1',
       status: 'draft',
       homePlayerId: '',
       awayPlayerId: '',
@@ -3553,7 +3549,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           <div className="space-y-3 relative z-10">
             {/* Home Player */}
             <div 
-              onClick={() => handleSlotClick('FINAL_M2', 'home', 2, match)}
+              onClick={() => handleSlotClick('3RD_PLACE_M1', 'home', 1, match, '3RD_PLACE')}
               className={cn(
                 "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
                 isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
@@ -3596,7 +3592,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
             {/* Away Player */}
             <div 
-              onClick={() => handleSlotClick('FINAL_M2', 'away', 2, match)}
+              onClick={() => handleSlotClick('3RD_PLACE_M1', 'away', 1, match, '3RD_PLACE')}
               className={cn(
                 "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
                 isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
@@ -4013,16 +4009,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  {activeKnockoutStage} FIXTURES & RESULTS
                </h4>
                <div className="space-y-6">
-                   {matches.filter(m => {
-                    if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
-                    if (activeKnockoutStage === 'FINAL') {
-                      if (!(m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))) return false;
-                    } else if (m.stage !== activeKnockoutStage) {
-                      return false;
-                    }
-                    if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
-                    return true;
-                  }).length === 0 ? (
+                    {matches.filter(m => {
+                      if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
+                      if (activeKnockoutStage === 'FINAL') {
+                        const isGrandFinal = m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
+                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1' || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+                        if (!isGrandFinal && !isThirdPlace) return false;
+                      } else if (m.stage !== activeKnockoutStage) {
+                        return false;
+                      }
+                      if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
+                      return true;
+                    }).length === 0 ? (
                     <div className="nm-flat rounded-[2.5rem] p-12 text-center border-2 border-white/20">
                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">No matches scheduled for this stage</p>
                     </div>
@@ -4030,7 +4028,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     matches.filter(m => {
                       if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                       if (activeKnockoutStage === 'FINAL') {
-                        if (!(m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))) return false;
+                        const isGrandFinal = m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
+                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1' || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+                        if (!isGrandFinal && !isThirdPlace) return false;
                       } else if (m.stage !== activeKnockoutStage) {
                         return false;
                       }

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Bot, User, MessageCircle, AlertTriangle, ExternalLink, Trash2, Clock } from 'lucide-react';
 import Fuse from 'fuse.js';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/src/lib/utils';
 import { Card } from '@/src/components/ui/Primitives';
-import { API_BASE_URL } from '@/src/lib/constants';
 
 interface Message {
   role: 'user' | 'model';
@@ -113,19 +114,24 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     setLoading(true);
 
     try {
-      // Load local FAQs
-      const faqResponse = await fetch('/faqs.json');
+      // Load local FAQs with cache busting
+      const faqResponse = await fetch(`/faqs.json?v=${Date.now()}`);
       if (!faqResponse.ok) throw new Error('Could not load knowledge base');
       const faqs: FAQ[] = await faqResponse.json();
 
-      // Configure Fuse with weighting
+      // Simple normalization for better matching
+      const normalizedInput = userInput.replace(/[?।!()]/g, ' ').toLowerCase().trim();
+
+      // Configure Fuse with weighting - more lenient threshold for Indic script variations
       const fuse = new Fuse<FAQ>(faqs, {
         keys: [
-          { name: 'questions', weight: 0.6 },
-          { name: 'keywords', weight: 0.3 },
+          { name: 'keywords', weight: 0.6 },
+          { name: 'questions', weight: 0.3 },
           { name: 'id', weight: 0.1 }
         ],
-        threshold: 0.35, // Stricter threshold for better accuracy
+        threshold: 0.4, // Slightly stricter to avoid irrelevant matches
+        distance: 100,  // Lower distance to prioritize local word matches
+        ignoreLocation: true,
         includeScore: true,
         shouldSort: true,
         minMatchCharLength: 2
@@ -134,22 +140,43 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       // Simulate AI thinking for a more natural feel
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      const results = fuse.search(userInput);
+      let results = fuse.search(normalizedInput);
+      
+      // EXPLICIT KEYWORD BOOST: If query contains "admin" or "অ্যাডমিন", prioritize telegram_support
+      if (normalizedInput.includes('admin') || normalizedInput.includes('অ্যাডমিন')) {
+        const adminFaq = faqs.find(f => f.id === 'telegram_support');
+        if (adminFaq) {
+          // If already in results, move to top. If not, add to top.
+          const adminResult = results.find(r => r.item.id === 'telegram_support');
+          if (adminResult) {
+            results = [adminResult, ...results.filter(r => r.item.id !== 'telegram_support')];
+          } else {
+            // @ts-ignore - Construct a fake result for the boost
+            results = [{ item: adminFaq, score: 0 }, ...results];
+          }
+        }
+      }
+
       let responseText = "";
       let showContact = false;
       let recommendations: string[] = [];
 
       if (results.length > 0) {
-        // High confidence match
+        // Find best match from local FAQ
         const bestMatch = results[0].item;
         responseText = lang === 'bn' ? bestMatch.answer_bn : bestMatch.answer_en;
         recommendations = (lang === 'bn' ? bestMatch.related_bn : bestMatch.related_en) || [];
       } else {
-        // Fallback for no match
+        // Fallback for no match - No Gemini AI as requested
         responseText = lang === 'bn' 
-          ? "দুঃখিত, আমি আপনার প্রশ্নের সঠিক উত্তর খুঁজে পাইনি। অনুগ্রহ করে প্রশ্নটি অন্যভাবে করুন অথবা সরাসরি আমাদের টেলিগ্রাম সাপোর্টে যোগাযোগ করুন।"
-          : "I'm sorry, I couldn't find a specific answer to your question in our local database. Please try rephrasing your question or contact our human support team directly on Telegram.";
+          ? "🤖 **আমি আপনার প্রশ্নটি ঠিক বুঝতে পারিনি**\n\nদুঃখিত, আমাদের নলেজ বেসে এই মুহূর্তে এই প্রশ্নের কোনো সরাসরি উত্তর নেই।\n\n**আপনি নিচের বিষয়গুলো চেষ্টা করতে পারেন:**\n*   প্রশ্নটি ছোট করে লিখুন (যেমন: 'কয়েন' বা 'লগইন')।\n*   সঠিক বানান ব্যবহার করুন।\n*   নিচের সাজেশনগুলো চেক করুন।\n\nযদি আপনার জরুরি সাহায্যের প্রয়োজন হয়, তবে সরাসরি আমাদের সাপোর্টে কথা বলতে পারেন।"
+          : "🤖 **I couldn't find a match for your query**\n\nI'm sorry, I don't have a specific answer for that in my knowledge base.\n\n**You might want to:**\n*   Try shorter keywords (e.g., 'coins' or 'login').\n*   Check your spelling.\n*   Look at the suggestions below.\n\nFor urgent help, please contact our human support team.";
         showContact = true;
+        
+        // Suggest general popular topics if no match
+        recommendations = lang === 'bn' 
+          ? ["টুর্নামেন্টে জয়েন করব কীভাবে?", "অ্যাকাউন্ট খুলব কীভাবে?", "অ্যাডমিনের সাথে কথা বলব কীভাবে?"]
+          : ["How to join?", "Account issues", "Contact Admin"];
       }
 
       const modelMessage: Message = {
@@ -157,7 +184,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         parts: [{ text: responseText }],
         timestamp: Date.now(),
         isError: showContact,
-        recommendations: recommendations.slice(0, 3) // Show top 3
+        recommendations: recommendations.slice(0, 3)
       };
 
       setMessages(prev => {
@@ -174,7 +201,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
       console.error('Local Chat Error:', err);
       const errorMessage: Message = {
         role: 'model',
-        parts: [{ text: lang === 'bn' ? "সিস্টেম এরর: অনুগ্রহ করে অ্যাপটি আপডেট করুন বা টেলিগ্রামে যোগাযোগ করুন।" : "System Error: Failed to process request locally. Please ensure you have downloaded the latest app update or contact us on Telegram." }],
+        parts: [{ text: lang === 'bn' ? "🚨 **সিস্টেম এরর**\n\nসাপোর্ট সিস্টেম লোড করতে সমস্যা হচ্ছে। অনুগ্রহ করে আপনার ইন্টারনেট কানেকশন চেক করুন অথবা অ্যাপটি রিলোড দিন। সমস্যা সমাধান না হলে টেলিগ্রামে যোগাযোগ করুন।" : "🚨 **System Error**\n\nFailed to load the support knowledge base. Please check your internet connection or reload the app. If the problem persists, contact us on Telegram." }],
         timestamp: Date.now(),
         isError: true
       };
@@ -277,9 +304,13 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                   "px-5 py-4 rounded-[1.8rem] text-xs font-bold leading-relaxed shadow-sm border",
                   m.role === 'user' 
                     ? "nm-flat bg-white border-white text-slate-700" 
-                    : "nm-inset bg-indigo-50/30 border-white/50 text-slate-800 italic"
+                    : "nm-inset bg-white border-white text-slate-800"
                 )}>
-                  {m.parts[0].text}
+                  <div className="prose prose-slate prose-xs max-w-none prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-indigo-600 prose-strong:text-slate-900 prose-ul:my-1 prose-li:my-0.5">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {m.parts[0].text}
+                    </ReactMarkdown>
+                  </div>
                   
                   {m.role === 'model' && m.recommendations && m.recommendations.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2">

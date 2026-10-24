@@ -39,10 +39,33 @@ async function createServer() {
   app.post('/api/generate', async (req, res) => {
     try {
       if (!apiKey) throw new Error('AI API Key missing on server');
-      const {prompt, model = 'gemini-3.8-flash'} = req.body;
+      const {prompt, history = [], model = 'gemini-3.8-flash'} = req.body;
+      
+      const systemInstruction = `You are the "Arena AI", the official support assistant for the FC Arena VS app. 
+      Your goal is to help users with tournament participation, account issues, and app features.
+      
+      CRITICAL RULES:
+      1. ALWAYS respond in Bengali (বাংলা) unless specifically asked for another language.
+      2. Use a structured, visually appealing format as follows:
+         - Start with a relevant emoji and a bold title (e.g., 🏆 **টুর্নামেন্টে জয়েন করার নিয়ম**).
+         - Provide a brief introductory sentence.
+         - Use bold headings for sections like **ধাপসমূহ:** or **নিয়মাবলী:**.
+         - Use numbered lists for steps (1. 2. 3.).
+         - Use a 💡 **দ্রষ্টব্য:** or ⚠️ **সতর্কতা:** section at the end for important notes or tips.
+      3. Keep the tone professional, helpful, and encouraging.
+      4. If you don't know something specifically about this app, advise the user to contact the official Telegram support at https://t.me/fcarenavs.
+      5. Do not mention that you are an AI model or mention Google/Gemini. You are "Arena AI".
+      
+      Context: FC Arena VS is an app for organizing and playing FC Mobile tournaments. Features include profile creation, tournament joining, match result reporting, and global leaderboards.`;
+
       const response = await ai.models.generateContent({
         model,
-        contents: prompt
+        contents: [
+          { role: 'user', parts: [{ text: systemInstruction }] },
+          { role: 'model', parts: [{ text: "বুঝেছি। আমি এখন থেকে এরিনা এআই হিসেবে সব উত্তর সুন্দরভাবে সাজিয়ে এবং বাংলা ভাষায় দেব।" }] },
+          ...history,
+          { role: 'user', parts: [{ text: prompt }] }
+        ]
       });
       res.json({text: response.text});
     } catch (error: any) {

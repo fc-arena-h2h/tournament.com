@@ -16,14 +16,14 @@
 - **Users:** Users can only write to their own profile. Admins can view/manage all users.
 - **Tournaments:** Only Publishers or Admins can create/edit tournaments.
 - **Matches:**
-    - **Read:** Participants, Publishers, and Admins can read match data.
+    - **Read:** All authenticated users can view match fixtures and scores to ensure tournament transparency and public leaderboards.
     - **Write:** 
         - Only Publishers/Admins can create matches.
         - Only assigned Participants can report scores (Step 1).
         - Reporting scores is restricted to specific fields: `homeScore`, `awayScore`, `status`, `reporterId`, `updatedAt`, `penaltyWinnerId`.
         - Result verification (Step 2) requires the OTHER participant to confirm, preventing self-confirmation fraud.
         - Admins/Publishers have override authority for dispute resolution.
-- **Registrations:** Users can only register themselves. Publishers manage approvals.
+- **Registrations:** All authenticated users can view the participant list for transparency. Personal contact links are only used for coordination.
 
 ## 3. API Key Protection
 - **Vulnerability Check:** Frontend API keys (Firebase) are inherently public in SPAs. However, they are restricted via:

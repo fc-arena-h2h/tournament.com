@@ -170,17 +170,7 @@ service cloud.firestore {
 
     // Registrations Collection
     match /registrations/{registrationId} {
-      allow list: if isAdmin();
-      allow get: if isAdmin() || (isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        isPublisherOf(resource.data.tournamentId) ||
-        isParticipantOf(resource.data.tournamentId)
-      ));
-      allow list: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        isPublisherOf(resource.data.tournamentId) ||
-        isParticipantOf(resource.data.tournamentId)
-      );
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidRegistration(incoming());
       allow update: if isAdmin() || isPublisherOf(existing().tournamentId);
       allow delete: if isAdmin() || isPublisherOf(existing().tournamentId);
@@ -188,11 +178,7 @@ service cloud.firestore {
 
     // Matches Collection
     match /matches/{matchId} {
-      allow get, list: if isAdmin() || (isSignedIn() && (
-        (request.auth.uid in resource.data.participants) ||
-        isPublisherOf(resource.data.tournamentId) ||
-        isParticipantOf(resource.data.tournamentId)
-      ));
+      allow get, list: if isSignedIn();
       allow create: if isPublisherOf(incoming().tournamentId) && isValidMatch(incoming());
       allow update: if isAdmin() || 
         isPublisherOf(existing().tournamentId) ||
