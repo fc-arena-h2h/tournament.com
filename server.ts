@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 async function createServer() {
   const app = express();
   const port = 3000;
-  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
+  const isProd = process.env.NODE_ENV === 'production';
 
   app.use(cors());
   app.use(express.json());

@@ -4,9 +4,9 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(({ mode }) => {
-  const isProd = mode === 'production';
-  const base = isProd ? '/tournament.com/' : '/';
+export default defineConfig(() => {
+  const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
+  const base = isGitHubPages ? '/tournament.com/' : '/';
 
   return {
     base: base,

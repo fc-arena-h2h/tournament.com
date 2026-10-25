@@ -388,18 +388,41 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       </div>
 
       {reportingMatch && createPortal(
-        <div className="fixed inset-0 z-[8000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-md bg-[#1a1f2e] rounded-[2.5rem] border-2 border-slate-800 p-8 space-y-6">
-            <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Report Result</h3>
-            <div className="flex items-center justify-between gap-4">
-              <input type="number" min="0" value={reportFormData.home} onChange={(e) => setReportFormData({...reportFormData, home: parseInt(e.target.value) || 0})} className="w-full h-20 rounded-3xl bg-slate-900 border-2 border-white/5 text-3xl font-black text-center text-white outline-none" />
-              <span className="text-xl font-black text-slate-700">VS</span>
-              <input type="number" min="0" value={reportFormData.away} onChange={(e) => setReportFormData({...reportFormData, away: parseInt(e.target.value) || 0})} className="w-full h-20 rounded-3xl bg-slate-900 border-2 border-white/5 text-3xl font-black text-center text-white outline-none" />
+        <div className="fixed inset-0 z-[8000] flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative">
+            <div className="p-8 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                  <Upload size={20} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">REPORT RESULT</h3>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Submit final match scoreline</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReportingMatch(null)}
+                className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <button onClick={submitFinalReport} disabled={isSubmittingReport} className="w-full h-16 rounded-[2rem] bg-amber-500 text-slate-900 font-black uppercase tracking-widest">
-              {isSubmittingReport ? 'Reporting...' : 'Submit Result'}
-            </button>
-            <button onClick={() => setReportingMatch(null)} className="w-full h-12 rounded-[1.5rem] bg-white/5 text-slate-400 uppercase text-[10px] font-black">Cancel</button>
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{reportingMatch.homePlayerName}</label>
+                  <input type="number" min="0" value={reportFormData.home} onChange={(e) => setReportFormData({...reportFormData, home: Math.max(0, parseInt(e.target.value) || 0)})} className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all" />
+                </div>
+                <span className="text-xl font-black text-slate-400 italic pt-6">VS</span>
+                <div className="flex-1 space-y-3">
+                  <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{reportingMatch.awayPlayerName}</label>
+                  <input type="number" min="0" value={reportFormData.away} onChange={(e) => setReportFormData({...reportFormData, away: Math.max(0, parseInt(e.target.value) || 0)})} className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all" />
+                </div>
+              </div>
+              <button onClick={submitFinalReport} disabled={isSubmittingReport} className="w-full h-16 rounded-[2rem] bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[12px] font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/25 active:scale-95 transition-all">
+                {isSubmittingReport ? 'DEPLOYING...' : 'DEPLOY FINAL RESULT'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

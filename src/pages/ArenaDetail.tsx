@@ -964,16 +964,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!showJoinKeyModal) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[9000] bg-slate-900/60 flex items-center justify-center p-6">
-        <div className="w-full max-w-md nm-flat rounded-[2.5rem] border-2 border-white overflow-hidden shadow-2xl relative">
+      <div className="fixed inset-0 z-[9000] flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative">
           {/* Header */}
-          <div className="p-8 flex items-center justify-between border-b border-white/5">
+          <div className="p-8 flex items-center justify-between border-b border-slate-100">
              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                   <Lock size={20} className="text-indigo-500" />
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                   <Lock size={20} className="text-indigo-600" />
                 </div>
                 <div>
-                   <h3 className="text-xl font-black text-fc-dark uppercase italic tracking-tighter">INVITED ONLY</h3>
+                   <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">INVITED ONLY</h3>
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                      Enter invitation key to join
                    </p>
@@ -984,27 +984,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  setShowJoinKeyModal(false);
                  setEnteredJoinKey('');
                }}
-               className="w-10 h-10 rounded-full bg-white/5 text-slate-400 flex items-center justify-center active:scale-95"
+               className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-colors"
              >
                <X size={20} />
              </button>
           </div>
 
           <div className="p-8 space-y-6">
-             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200">
+             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900">
                <p className="text-[10px] font-bold leading-relaxed">
                  This tournament is restricted to invited players only. Please enter the unique invitation key provided by the host to proceed with your join request.
                </p>
              </div>
 
              <div className="space-y-3">
-               <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4">Invitation Key</label>
+               <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-4">Invitation Key</label>
                <input 
                  type="text"
                  placeholder="INV-XXXXXX"
                  value={enteredJoinKey}
                  onChange={(e) => setEnteredJoinKey(e.target.value.toUpperCase())}
-                 className="w-full h-16 rounded-3xl bg-slate-900/50 border-2 border-white/5 focus:border-indigo-500 text-xl font-black text-center text-white outline-none transition-all uppercase"
+                 className="w-full h-16 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-xl font-black text-center text-slate-900 placeholder:text-slate-400 outline-none transition-all uppercase"
                />
              </div>
 
@@ -1012,10 +1012,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                onClick={verifyAndJoin}
                disabled={isVerifyingKey || !enteredJoinKey.trim()}
                className={cn(
-                 "w-full h-18 rounded-[2rem] flex items-center justify-center text-[12px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
+                 "w-full h-16 rounded-[2rem] flex items-center justify-center text-[12px] font-black uppercase tracking-[0.2em] transition-all active:scale-95",
                  isVerifyingKey || !enteredJoinKey.trim()
-                   ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5" 
-                   : "bg-gradient-to-r from-indigo-500 to-indigo-700 text-white shadow-indigo-500/20 hover:scale-[1.01]"
+                   ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200" 
+                   : "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/25 hover:scale-[1.01]"
                )}
              >
                 {isVerifyingKey ? 'VERIFYING...' : 'VERIFY & SEND REQUEST'}
@@ -1133,19 +1133,17 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const isDraw = reportFormData.home === reportFormData.away;
     const isDrawBlocked = isKnockout && isDraw;
 
-
-
     return createPortal(
-      <div className="fixed inset-0 z-[8000] bg-slate-900/60 flex items-center justify-center p-6">
-        <div className="w-full max-w-md nm-flat rounded-[2.5rem] border-2 border-white overflow-hidden shadow-2xl relative">
+      <div className="fixed inset-0 z-[8000] flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative">
           {/* Header */}
-          <div className="p-8 flex items-center justify-between border-b border-white/5">
+          <div className="p-8 flex items-center justify-between border-b border-slate-100">
              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                   <Upload size={20} className="text-amber-500" />
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                   <Upload size={20} className="text-amber-600" />
                 </div>
                 <div>
-                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">REPORT RESULT</h3>
+                   <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">REPORT RESULT</h3>
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                      {isKnockout ? 'Knockout Stage · Decisive Winner Required' : 'Submit final match scoreline'}
                    </p>
@@ -1153,7 +1151,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              </div>
              <button 
                onClick={() => setReportingMatch(null)}
-               className="w-10 h-10 rounded-full bg-white/5 text-slate-400 flex items-center justify-center active:scale-95"
+               className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-colors"
              >
                <X size={20} />
              </button>
@@ -1163,18 +1161,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              {/* Knockout Stage Rule Banner */}
              {isKnockout && (
                <div className={cn(
-                 "p-3 rounded-2xl border text-center transition-all ",
+                 "p-3.5 rounded-2xl border text-center transition-all",
                  isDraw 
-                   ? "bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-md" 
-                   : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                   ? "bg-rose-50 border-rose-200 text-rose-800" 
+                   : "bg-amber-50 border-amber-200 text-amber-900"
                )}>
-                 <div className="flex items-center justify-center gap-2 mb-0.5">
-                   {isDraw ? <AlertCircle size={14} className="text-rose-400" /> : <Trophy size={14} className="text-amber-400" />}
+                 <div className="flex items-center justify-center gap-2 mb-1">
+                   {isDraw ? <AlertCircle size={14} className="text-rose-600" /> : <Trophy size={14} className="text-amber-600" />}
                    <span className="text-[9.5px] font-black uppercase tracking-wider">
                      {isDraw ? "Draw result is not permitted!" : "Knockout Stage: Winner Required"}
                    </span>
                  </div>
-                 <p className="text-[8.5px] font-bold opacity-90 leading-relaxed">
+                 <p className="text-[8.5px] font-bold leading-relaxed">
                    {isDraw 
                      ? "Draw results cannot be submitted for knockout matches. Please record extra time or penalty shootout score in favor of the winner." 
                      : "Matches in this knockout stage cannot end in a draw. One player must advance as the winner."}
@@ -1185,42 +1183,40 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              {/* Scores */}
              <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 space-y-3">
-                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{homeName}</label>
+                   <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{homeName}</label>
                    <input 
                      type="number"
                      min="0"
                      value={reportFormData.home}
                      onChange={(e) => setReportFormData({...reportFormData, home: Math.max(0, parseInt(e.target.value) || 0)})}
                      className={cn(
-                       "w-full h-20 rounded-3xl bg-slate-900/50 border-2 text-3xl font-black text-center text-white outline-none transition-all",
-                       isDrawBlocked ? "border-rose-500/40 focus:border-rose-500" : "border-white/5 focus:border-indigo-500"
+                       "w-full h-20 rounded-3xl bg-slate-50 border-2 text-3xl font-black text-center text-slate-900 outline-none transition-all focus:bg-white",
+                       isDrawBlocked ? "border-rose-300 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
                      )}
                    />
                 </div>
-                <span className="text-xl font-black text-slate-700 italic pt-6">VS</span>
+                <span className="text-xl font-black text-slate-400 italic pt-6">VS</span>
                 <div className="flex-1 space-y-3">
-                   <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] text-center block truncate w-full px-2">{awayName}</label>
+                   <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{awayName}</label>
                    <input 
                      type="number"
                      min="0"
                      value={reportFormData.away}
                      onChange={(e) => setReportFormData({...reportFormData, away: Math.max(0, parseInt(e.target.value) || 0)})}
                      className={cn(
-                       "w-full h-20 rounded-3xl bg-slate-900/50 border-2 text-3xl font-black text-center text-white outline-none transition-all",
-                       isDrawBlocked ? "border-rose-500/40 focus:border-rose-500" : "border-white/5 focus:border-indigo-500"
+                       "w-full h-20 rounded-3xl bg-slate-50 border-2 text-3xl font-black text-center text-slate-900 outline-none transition-all focus:bg-white",
+                       isDrawBlocked ? "border-rose-300 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
                      )}
                    />
                 </div>
              </div>
 
-
-
              {/* Penalty Winner Selection for Knockout Draws */}
              {isKnockout && isDraw && (
                <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
                  <div className="flex flex-col items-center gap-2">
-                   <div className="h-px w-full bg-slate-800" />
-                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-4 bg-[#1a1f2e] -mt-3 relative z-10">Penalty Shootout Winner</span>
+                   <div className="h-px w-full bg-slate-200" />
+                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-4 bg-white -mt-3 relative z-10">Penalty Shootout Winner</span>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                    <button 
@@ -1228,8 +1224,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      className={cn(
                        "h-12 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                        reportFormData.penaltyWinnerId === reportingMatch.homePlayerId 
-                         ? "bg-indigo-500/20 border-indigo-500 text-indigo-400 nm-inset" 
-                         : "bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/10"
+                         ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/20" 
+                         : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                      )}
                    >
                      {reportFormData.penaltyWinnerId === reportingMatch.homePlayerId && <CheckCircle size={14} />}
@@ -1240,8 +1236,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      className={cn(
                        "h-12 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
                        reportFormData.penaltyWinnerId === reportingMatch.awayPlayerId 
-                         ? "bg-indigo-500/20 border-indigo-500 text-indigo-400 nm-inset" 
-                         : "bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/10"
+                         ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/20" 
+                         : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                      )}
                    >
                      {reportFormData.penaltyWinnerId === reportingMatch.awayPlayerId && <CheckCircle size={14} />}
@@ -1256,10 +1252,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                onClick={submitFinalReport}
                disabled={isSubmittingReport || (isKnockout && isDraw && !reportFormData.penaltyWinnerId)}
                className={cn(
-                 "w-full h-16 sm:h-20 rounded-[2rem] flex items-center justify-center text-[11px] sm:text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl",
+                 "w-full h-16 sm:h-18 rounded-[2rem] flex items-center justify-center text-[11px] sm:text-[13px] font-black uppercase tracking-[0.2em] transition-all active:scale-95",
                  isSubmittingReport || (isKnockout && isDraw && !reportFormData.penaltyWinnerId)
-                   ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5" 
-                   : "bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 shadow-orange-500/20 hover:scale-[1.01]"
+                   ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200" 
+                   : "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-500/25 hover:scale-[1.01]"
                )}
              >
                 {isSubmittingReport 
