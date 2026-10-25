@@ -17,6 +17,9 @@ export interface UserProfile {
   phone?: string;
   pushEnabled?: boolean;
   fcmTokens?: string[];
+  isFrozen?: boolean;
+  status?: string;
+  fraudReason?: string | null;
   createdAt?: any;
   updatedAt?: any;
 }

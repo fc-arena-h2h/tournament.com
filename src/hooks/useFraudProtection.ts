@@ -1,46 +1,26 @@
-import { useEffect, useState, useRef } from 'react';
-import { checkUserFraudStatus } from '@/src/lib/fraudProtection';
+import { useEffect, useState } from 'react';
 
 export function useFraudProtection(user: any, profile: any) {
   const [isFrozen, setIsFrozen] = useState(false);
   const [fraudReason, setFraudReason] = useState<string | null>(null);
-  const profileRef = useRef(profile);
-  const isCheckingRef = useRef(false);
 
-  // Keep latest profile updated without restarting interval
   useEffect(() => {
-    profileRef.current = profile;
-    if (profile?.isFrozen !== undefined && profile?.isFrozen !== isFrozen) {
-      setIsFrozen(profile.isFrozen);
-      if (profile.fraudReason) setFraudReason(profile.fraudReason);
+    if (!user?.uid || !profile) {
+      setIsFrozen(false);
+      setFraudReason(null);
+      return;
     }
-  }, [profile, isFrozen]);
 
-  useEffect(() => {
-    if (!user?.uid) return;
+    const frozen = Boolean(profile.isFrozen || profile.status === 'banned');
+    setIsFrozen(frozen);
 
-    const performCheck = async () => {
-      if (isCheckingRef.current) return;
-      isCheckingRef.current = true;
-      try {
-        const res = await checkUserFraudStatus(user.uid, profileRef.current);
-        setIsFrozen(res.isFrozen);
-        if (res.fraudReason) setFraudReason(res.fraudReason);
-      } catch (err) {
-        console.warn("Fraud check error:", err);
-      } finally {
-        isCheckingRef.current = false;
-      }
-    };
-
-    // Run initial check
-    performCheck();
-
-    // Run periodic integrity check every 2 seconds
-    const interval = setInterval(performCheck, 2000);
-
-    return () => clearInterval(interval);
-  }, [user?.uid]);
+    if (frozen) {
+      setFraudReason(profile.fraudReason || 'Account suspended by security system or admin');
+    } else {
+      setFraudReason(profile.fraudReason || null);
+    }
+  }, [user?.uid, profile?.isFrozen, profile?.status, profile?.fraudReason, profile]);
 
   return { isFrozen, fraudReason };
 }
+

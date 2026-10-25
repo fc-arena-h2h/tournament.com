@@ -1,43 +1,20 @@
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 
 /**
- * Perform a security integrity check every 2 seconds between local profile and Firestore server data
+ * Evaluate user fraud/ban status directly from the real-time profile synced via onSnapshot
  */
 export async function checkUserFraudStatus(userId: string, currentProfile: any): Promise<{ isFrozen: boolean; fraudReason?: string }> {
-  if (!userId) return { isFrozen: false };
+  if (!userId || !currentProfile) return { isFrozen: false };
 
-  // Skip remote check if client is temporarily offline
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return { isFrozen: !!currentProfile?.isFrozen, fraudReason: currentProfile?.fraudReason };
+  if (currentProfile.isFrozen || currentProfile.status === 'banned') {
+    return {
+      isFrozen: true,
+      fraudReason: currentProfile.fraudReason || 'Account suspended by security system or admin'
+    };
   }
 
-  try {
-    const userRef = doc(db, 'users', userId);
-    let serverSnap;
-    try {
-      serverSnap = await getDoc(userRef);
-    } catch (fetchErr: any) {
-      // Gracefully handle network transitions without error spam
-      if (fetchErr?.code === 'unavailable' || fetchErr?.message?.includes('offline') || fetchErr?.message?.includes('could not be completed')) {
-        return { isFrozen: !!currentProfile?.isFrozen, fraudReason: currentProfile?.fraudReason };
-      }
-      throw fetchErr;
-    }
-
-    if (!serverSnap || !serverSnap.exists()) return { isFrozen: false };
-    const serverData = serverSnap.data();
-
-    // Check if admin already froze the account
-    if (serverData.isFrozen || serverData.status === 'banned') {
-      return { isFrozen: true, fraudReason: serverData.fraudReason || 'Account suspended by security system or admin' };
-    }
-
-    return { isFrozen: serverData.isFrozen || false, fraudReason: serverData.fraudReason };
-  } catch (err) {
-    console.warn("Fraud check error:", err);
-    return { isFrozen: false };
-  }
+  return { isFrozen: false, fraudReason: currentProfile.fraudReason };
 }
 
 /**
