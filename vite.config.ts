@@ -5,8 +5,10 @@ import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
-  const base = isGitHubPages ? '/tournament.com/' : '/';
+  const isGitHubPages =
+    process.env.VITE_BASE_PATH === '/tournament.com/' ||
+    (process.env.GITHUB_WORKFLOW === 'Deploy to GitHub Pages' && process.env.VITE_BUILD_SOURCE !== 'github');
+  const base = process.env.VITE_BASE_PATH || (isGitHubPages ? '/tournament.com/' : '/');
 
   return {
     base: base,

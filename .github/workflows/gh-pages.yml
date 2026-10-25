@@ -36,6 +36,8 @@ jobs:
         run: |
           npm run build
           touch dist/.nojekyll
+        env:
+          VITE_BASE_PATH: /tournament.com/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

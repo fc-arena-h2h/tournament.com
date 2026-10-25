@@ -42,6 +42,7 @@ jobs:
         run: npm run build
         env:
           VITE_BUILD_SOURCE: github
+          VITE_BASE_PATH: /
 
       - name: Setup & Sync Capacitor Android
         run: |
