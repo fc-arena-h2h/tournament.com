@@ -1,600 +1,891 @@
 [
   {
     "id": "greeting",
-    "keywords": ["hi", "hello", "hey", "hola", "সালাম", "assalamu", "hi ai", "hello ai", "kemon", "আসালামু আলাইকুম", "ohey", "oy", "হেই", "হ্যালো", "কেমন আছো", "ki obostha", "ki khobor"],
+    "keywords": [
+      "hi", "hello", "hey", "hola", "assalamu alaikum", "salam", "সালাম", "আসসালামু আলাইকুম", "আসালামু আলাইকুম",
+      "hi ai", "hello ai", "kemon acho", "kemon asen", "হেই", "হ্যালো", "হাই", "কেমন আছো", "কেমন আছেন",
+      "ki obostha", "ki khobor", "কি খবর", "কী খবর", "সুপ্রভাত", "good morning", "good evening"
+    ],
     "questions": [
       "Hi",
       "Hello",
       "Assalamu Alaikum",
       "কি খবর?",
+      "কী খবর?",
       "কেমন আছো?",
+      "কেমন আছেন?",
       "হেই এরিনা",
       "হাই",
       "হ্যালো",
       "আসসালামু আলাইকুম",
+      "সালাম",
       "Kemon acho?",
+      "Ki khobor?",
       "Hi assistant",
       "Hey there"
     ],
-    "answer_en": "Hello! I am your Arena Assistant. How can I help you today?",
-    "answer_bn": "হ্যালো! আমি আপনার এরিনা অ্যাসিস্ট্যান্ট। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?",
-    "related_en": ["How to join a tournament?", "How to create an account?", "How to contact support?"],
-    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "অ্যাকাউন্ট খুলব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
+    "answer_en": "👋 **Hello! I am your Arena Support Assistant.**\n\nI can help you with tournament rules, joining cups, match result uploads, contacting opponents, and account settings.\n\n**How can I help you today?** Choose a topic below or type your question!",
+    "answer_bn": "👋 **আসসালামু আলাইকুম! আমি আপনার এরিনা সাপোর্ট অ্যাসিস্ট্যান্ট।**\n\nটুর্নামেন্টে জয়েন করা, ম্যাচের রেজাল্ট আপলোড, প্রতিপক্ষের সাথে যোগাযোগ, পয়েন্ট টেবিল কিংবা অ্যাকাউন্ট সংক্রান্ত যেকোনো প্রশ্নের উত্তর দিতে আমি প্রস্তুত।\n\n💡 **আজ আপনাকে কীভাবে সাহায্য করতে পারি?** নিচের যেকোনো একটি অপশনে ট্যাপ করুন অথবা আপনার প্রশ্নটি লিখুন!",
+    "related_en": ["How to join a tournament?", "How to talk to opponent?", "How to upload match result?"],
+    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
   },
   {
     "id": "how_to_join",
-    "keywords": ["join", "registration", "অংশগ্রহণ", "ভর্তি", "কিভাবে", "kivabe", "join korbo", "shathe", "cup", "tournament", "enlist", "entry", "কিভাবে ঢুকব", "অংশ নেব", "খেলব", "khulbo", "dhukbo", "participation"],
+    "keywords": [
+      "join tournament", "join cup", "join arena", "tournament registration", "টুর্নামেন্টে জয়েন", "টুর্নামেন্টে জয়েন",
+      "কাপে জয়েন", "অংশগ্রহণ", "টুর্নামেন্টে অংশ", "টুর্নামেন্টে খেলব", "join korbo", "tournament e join",
+      "cup e join", "enlist tournament", "participate tournament", "টুর্নামেন্টে ঢুকব", "রেজিস্ট্রেশন করব টুর্নামেন্টে"
+    ],
     "questions": [
       "How to join a tournament?",
+      "টুর্নামেন্টে জয়েন করব কীভাবে?",
       "টুর্নামেন্টে কিভাবে জয়েন করব?",
+      "কিভাবে টুর্নামেন্টে জয়েন করব?",
       "tournament e kivabe join korbo?",
-      "kivabe join korbo?",
+      "kivabe tournament e join korbo?",
       "Cup e join korar niyom ki?",
-      "আমি কি টুর্নামেন্টে খেলতে পারি?",
+      "আমি কীভাবে টুর্নামেন্টে খেলতে পারি?",
       "টুর্নামেন্টে অংশ নেব কীভাবে?",
       "How to play in a cup?",
-      "Kivabe khelbo?",
-      "Join tournament",
-      "কিভাবে টুর্নামেন্টে জয়েন করব",
+      "Tournament e khelbo kivabe?",
+      "Join tournament process",
       "Tournament e dhukbo kivabe?",
-      "Join korar process ki?",
-      "How do I participate?"
+      "How do I participate in a tournament?"
     ],
-    "answer_en": "To join a tournament follow these steps:\n1. Go to the 'Arena' (Trophy icon) tab.\n2. Select the tournament/Cup you want to play.\n3. Click the 'Join Arena' button.\n4. Ensure your profile is complete with In-Game Name and UID.\n5. Wait for the host to approve your request.",
-    "answer_bn": "🏆 **টুর্নামেন্টে জয়েন করার নিয়ম**\n\nFC Arena VS-এ যেকোনো টুর্নামেন্ট বা কাপে অংশগ্রহণ করা খুবই সহজ। জয়েন করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **অ্যারেনা ট্যাবে যান:** অ্যাপের নিচে থাকা 'Arena' (ট্রফি আইকন) ট্যাবে ক্লিক করুন।\n2. **টুর্নামেন্ট বাছাই করুন:** আপনি যে টুর্নামেন্ট বা কাপে খেলতে চান সেটি তালিকা থেকে বেছে নিন।\n3. **জয়েন রিকোয়েস্ট দিন:** টুর্নামেন্ট ডিটেইলস পেজে গিয়ে 'Join Arena' বাটনে ক্লিক করুন।\n4. **প্রোফাইল নিশ্চিত করুন:** আপনার প্রোফাইলে গেমের নাম (IGN) এবং ইউআইডি (UID) সঠিকভাবে দেওয়া আছে কিনা তা নিশ্চিত করুন।\n5. **অনুমোদনের অপেক্ষা:** হোস্ট আপনার রিকোয়েস্টটি যাচাই করে 'Approve' করার পর আপনি টুর্নামেন্টে যুক্ত হয়ে যাবেন।\n\n💡 **দ্রষ্টব্য:** আপনার প্রোফাইল অসম্পূর্ণ থাকলে হোস্ট রিকোয়েস্ট রিজেক্ট করতে পারে। তাই জয়েন করার আগে প্রোফাইল আপডেট করে নিন।",
-    "related_en": ["Where to find FC Mobile UID?", "How to use invitation key?", "How to talk to opponent?"],
-    "related_bn": ["ইউআইডি (UID) কোথায় পাব?", "ইনভিটেশন কোড কীভাবে দেব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?"]
+    "answer_en": "🏆 **How to Join a Tournament**\n\nFollow these steps to participate in any cup on FC Arena VS:\n1. Go to the **'Arena'** (Trophy icon) tab from the bottom navigation.\n2. Select an **'OPEN'** tournament that you want to play.\n3. Tap the **'Join Arena'** button on the tournament page.\n4. Make sure your profile has your accurate **FC Mobile IGN, UID, and Messenger link**.\n5. Wait for the tournament host to approve your join request.",
+    "answer_bn": "🏆 **টুর্নামেন্টে জয়েন করার নিয়ম**\n\nFC Arena VS-এ যেকোনো টুর্নামেন্ট বা কাপে অংশগ্রহণ করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **অ্যারেনা ট্যাবে যান:** অ্যাপের নিচে থাকা **'Arena'** (ট্রফি আইকন) ট্যাবে ক্লিক করুন।\n2. **টুর্নামেন্ট বাছাই করুন:** তালিকা থেকে যে টুর্নামেন্টটি **'OPEN'** অবস্থায় আছে সেটি বেছে নিন।\n3. **জয়েন রিকোয়েস্ট দিন:** টুর্নামেন্ট ডিটেইলস পেজে গিয়ে **'Join Arena'** বাটনে ক্লিক করুন।\n4. **প্রোফাইল নিশ্চিত করুন:** আপনার প্রোফাইলে গেমের নাম (IGN), ইউআইডি (UID) এবং মেসেঞ্জার লিঙ্ক সঠিকভাবে দেওয়া আছে কিনা তা নিশ্চিত করুন।\n5. **অনুমোদনের অপেক্ষা:** হোস্ট আপনার রিকোয়েস্টটি যাচাই করে **'Approve'** করার পর আপনি টুর্নামেন্টে যুক্ত হয়ে যাবেন।\n\n💡 **দ্রষ্টব্য:** প্রোফাইলে সঠিক তথ্য না থাকলে হোস্ট আপনার রিকোয়েস্ট বাতিল করতে পারেন।",
+    "related_en": ["How to use invitation key?", "How to talk to opponent?", "Where to find FC Mobile UID?"],
+    "related_bn": ["ইনভিটেশন কোড কীভাবে দেব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "ইউআইডি (UID) কোথায় পাব?"]
   },
   {
     "id": "join_key",
-    "keywords": ["key", "invitation", "invite", "code", "password", "পাসওয়ার্ড", "কি", "কোড", "কিবোর্ড", "ইভেন্ট কোড", "inv-", "password required", "key code"],
+    "keywords": [
+      "invitation key", "invite key", "join key", "invited only", "inv-", "key code", "ইনভিটেশন কোড", "ইনভাইটেশন কি",
+      "ইনভাইটেশন কোড", "জয়েন কোড", "জয়েন কি", "টুর্নামেন্ট পাসওয়ার্ড", "ইভেন্ট কোড", "key diye join",
+      "code diye join", "verify and join", "প্রাইভেট টুর্নামেন্ট কোড"
+    ],
     "questions": [
       "How to use invitation key?",
+      "ইনভিটেশন কোড কীভাবে দেব?",
       "ইনভিটেশন কোড কোথায় দেব?",
+      "ইনভাইটেশন কি দিয়ে কীভাবে জয়েন করব?",
       "Key diye join korbo kivabe?",
       "What is invitation key?",
+      "Invited only tournament e kivabe join korbo?",
       "Password chaitese join korar somoy",
       "How to enter join code?",
       "কোড দিয়ে কীভাবে জয়েন করব?",
-      "Invite key pabo kothay?"
+      "Invite key pabo kothay?",
+      "INV কোড কোথায় পাব?"
     ],
-    "answer_en": "If a tournament is 'Invited Only', you need a key:\n1. Open the tournament detail.\n2. Click 'Join Arena'.\n3. An input box will appear. Enter the INV-XXXX key provided by the host.\n4. Click 'Verify & Join'.",
-    "answer_bn": "🔑 **ইনভিটেশন কোড ব্যবহারের নিয়ম**\n\nযদি কোনো টুর্নামেন্ট 'Invited Only' বা ব্যক্তিগত হয়, তবে জয়েন করার জন্য হোস্টের দেওয়া একটি বিশেষ 'Key' বা কোড প্রয়োজন হবে।\n\n**ধাপসমূহ:**\n1. টুর্নামেন্ট ডিটেইলস ওপেন করে 'Join Arena' বাটনে ক্লিক করুন।\n2. স্ক্রিনে একটি ইনপুট বক্স আসবে, সেখানে আপনার 'INV-XXXX' কোডটি লিখুন।\n3. 'Verify & Join' বাটনে ক্লিক করুন।\n\n⚠️ **সতর্কতা:** ভুল কোড দিলে আপনি জয়েন করতে পারবেন না। কোডটি কপি করে পেস্ট করা সবচেয়ে নিরাপদ।",
-    "related_en": ["How to join a tournament?", "How to contact support?", "Where to find FC Mobile UID?"],
-    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "ইউআইডি (UID) কোথায় পাব?"]
+    "answer_en": "🔑 **How to Use an Invitation Key**\n\nIf a tournament is marked as **'Invited Only'**, you need a special key from the host:\n1. Open the tournament details page.\n2. Click on **'Join Arena'**.\n3. In the popup modal, enter the **INV-XXXX** invitation key provided by the host.\n4. Tap **'Verify & Join'** to complete your entry.",
+    "answer_bn": "🔑 **ইনভিটেশন কোড (Invitation Key) ব্যবহারের নিয়ম**\n\nযদি কোনো টুর্নামেন্ট **'Invited Only'** বা প্রাইভেট হয়, তবে জয়েন করার জন্য হোস্টের দেওয়া একটি বিশেষ 'Key' বা কোড প্রয়োজন হবে:\n\n**ধাপসমূহ:**\n1. টুর্নামেন্ট ডিটেইলস পেজে গিয়ে **'Join Arena'** বাটনে ক্লিক করুন।\n2. স্ক্রিনে **'Invited Only'** নামের একটি বক্স ওপেন হবে।\n3. হোস্টের কাছ থেকে পাওয়া **INV-XXXX** কোডটি ইনপুট বক্সে লিখুন বা পেস্ট করুন।\n4. এরপর **'Verify & Join'** বাটনে ক্লিক করুন।\n\n⚠️ **সতর্কতা:** ইনভিটেশন কোড শুধুমাত্র টুর্নামেন্টের হোস্ট বা অর্গানাইজার দিতে পারেন। ভুল কোড দিলে জয়েন রিকোয়েস্ট সম্পন্ন হবে না।",
+    "related_en": ["How to join a tournament?", "How to join tournament Messenger group?", "How to contact support?"],
+    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "টুর্নামেন্টের মেসেঞ্জার গ্রুপে কীভাবে জয়েন করব?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
+  },
+  {
+    "id": "match_chat",
+    "keywords": [
+      "talk to opponent", "contact opponent", "chat with opponent", "message opponent", "opponent messenger",
+      "প্রতিপক্ষের সাথে কথা", "প্রতিপক্ষের সাথে যোগাযোগ", "প্রতিপক্ষকে মেসেজ", "অপোনেন্টের সাথে কথা", "অপোনেন্টের সাথে যোগাযোগ",
+      "প্রতিপক্ষ", "অপোনেন্ট", "protipokkho", "opponent er sathe kotha", "opponent ke message", "match chat",
+      "coordinate match time", "খেলার সময় ঠিক", "লবি আইডি শেয়ার"
+    ],
+    "questions": [
+      "How to talk to opponent?",
+      "প্রতিপক্ষের সাথে কীভাবে কথা বলব?",
+      "প্রতিপক্ষের সাথে কথা বলব কীভাবে?",
+      "প্রতিপক্ষের সাথে কিভাবে কথা বলব?",
+      "প্রতিপক্ষের সাথে যোগাযোগ করব কীভাবে?",
+      "অপোনেন্টের সাথে যোগাযোগ কীভাবে করব?",
+      "অপোনেন্টের সাথে কথা বলব কীভাবে?",
+      "Protipokkher sathe kivabe kotha bolbo?",
+      "Opponent er sathe kivabe kotha bolbo?",
+      "How to contact my opponent?",
+      "How to message opponent for match?",
+      "খেলার জন্য প্রতিপক্ষকে মেসেজ দেব কীভাবে?",
+      "প্রতিপক্ষকে কোথায় খুঁজে পাব?"
+    ],
+    "answer_en": "💬 **How to Contact Your Opponent**\n\nTo coordinate match time and share your in-game lobby request with your opponent:\n1. Go to the **'My Matches'** (Field) tab or open the tournament's **'Matches'** section.\n2. Find your scheduled match card.\n3. Tap the **Messenger icon** directly on the match card.\n4. This will immediately open your opponent's Messenger / Facebook chat so you can message them and fix the match time.\n5. You can also tap on your opponent's name/avatar to view their profile, UID, Facebook, and WhatsApp details.",
+    "answer_bn": "💬 **প্রতিপক্ষের সাথে কথা বলার বা যোগাযোগ করার নিয়ম**\n\nম্যাচের সময় ঠিক করতে বা গেমে ফ্রেন্ড রিকোয়েস্ট পাঠাতে আপনার প্রতিপক্ষের (Opponent) সাথে সরাসরি যোগাযোগ করতে পারেন:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচে থাকা **'My Matches'** (ক্যালেন্ডার আইকন) ট্যাবে যান অথবা টুর্নামেন্টের **'Matches'** সেকশন ওপেন করুন।\n2. আপনার নির্দিষ্ট ম্যাচ কার্ডটি খুঁজে বের করুন।\n3. ম্যাচ কার্ডের উপরে থাকা **'Messenger' (মেসেঞ্জার) আইকনে** ক্লিক করুন।\n4. এটি সাথে সাথে আপনাকে প্রতিপক্ষের মেসেঞ্জার চ্যাটে নিয়ে যাবে, যেখানে আপনি তাকে মেসেজ দিয়ে খেলার সময় ঠিক করতে পারবেন।\n5. এছাড়া প্রতিপক্ষের নামের ওপর ক্লিক করে তার প্রোফাইল থেকে গেমের **UID**, **Facebook** এবং **WhatsApp** নাম্বারও দেখতে পাবেন।\n\n💡 **দ্রষ্টব্য:** প্রতিপক্ষ যদি দীর্ঘক্ষণ মেসেজের রিপ্লাই না দেয়, তবে মেসেজের স্ক্রিনশটসহ টুর্নামেন্ট হোস্টকে জানান।",
+    "related_en": ["What if opponent does not respond?", "How to join tournament Messenger group?", "How to upload match result?"],
+    "related_bn": ["প্রতিপক্ষ রিপ্লাই না দিলে বা খেলায় না আসলে কী করব?", "টুর্নামেন্টের মেসেঞ্জার গ্রুপে কীভাবে জয়েন করব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
+  },
+  {
+    "id": "opponent_not_responding",
+    "keywords": [
+      "opponent not responding", "opponent offline", "opponent no reply", "walkover", "afk opponent",
+      "প্রতিপক্ষ রিপ্লাই দেয় না", "প্রতিপক্ষ অনলাইনে আসে না", "প্রতিপক্ষ খেলায় না আসলে", "অপোনেন্ট রিপ্লাই দিচ্ছে না",
+      "ওয়াকওভার", "walkover niyom", "opponent khelte ashe na", "প্রতিপক্ষ মেসেজ সিন করে না"
+    ],
+    "questions": [
+      "What if opponent does not respond?",
+      "প্রতিপক্ষ রিপ্লাই না দিলে বা খেলায় না আসলে কী করব?",
+      "প্রতিপক্ষ মেসেজের রিপ্লাই না দিলে কী করব?",
+      "অপোনেন্ট খেলায় না আসলে কী হবে?",
+      "Opponent reply na dile ki korbo?",
+      "How to claim walkover?",
+      "ওয়াকওভার পাওয়ার নিয়ম কী?",
+      "প্রতিপক্ষ অফলাইন থাকলে কী করব?",
+      "Opponent offline thakle ki korbo?"
+    ],
+    "answer_en": "⏳ **What to Do If Your Opponent Doesn't Respond**\n\nIf your opponent is inactive or not replying to your messages:\n1. Send them a polite message on **Messenger** with your Match ID and wait until the scheduled deadline.\n2. Take a **screenshot** of your chat showing the time you messaged them.\n3. Share the screenshot in the **Tournament Messenger Group** or directly with the **Tournament Host**.\n4. If the opponent fails to appear within the deadline, the Host will grant you a **Walkover (3-0 Win)**.",
+    "answer_bn": "⏳ **প্রতিপক্ষ রিপ্লাই না দিলে বা খেলায় না আসলে করণীয় (Walkover নিয়ম)**\n\nআপনার প্রতিপক্ষ যদি মেসেজের উত্তর না দেয় বা নির্ধারিত সময়ে খেলতে না আসে, তবে নিচের পদক্ষেপগুলো নিন:\n\n**ধাপসমূহ:**\n1. **মেসেজ পাঠান:** ম্যাচ কার্ডের মেসেঞ্জার আইকনে ক্লিক করে প্রতিপক্ষকে আপনার ম্যাচ আইডিসহ মেসেজ দিয়ে রাখুন।\n2. **স্ক্রিনশট নিন:** আপনি যে সঠিক সময়ে মেসেজ দিয়েছেন এবং সে রিপ্লাই দেয়নি, তার প্রমাণ হিসেবে মেসেঞ্জার চ্যাটের একটি স্ক্রিনশট নিন।\n3. **হোস্টকে জানান:** টুর্নামেন্টের মেসেঞ্জার গ্রুপে অথবা সরাসরি হোস্টকে আপনার ম্যাচ আইডি ও স্ক্রিনশটটি পাঠান।\n4. **ওয়াকওভার (Walkover):** নির্ধারিত ডেডলাইনের মধ্যে প্রতিপক্ষ উপস্থিত না হলে হোস্ট আপনাকে **ওয়াকওভার (সাধারণত ৩-০ গোলে জয়)** প্রদান করবেন।\n\n💡 **দ্রষ্টব্য:** নিজে মেসেজ না দিয়ে বা শেষ মুহূর্তে মেসেজ দিয়ে ওয়াকওভার দাবি করলে তা গ্রহণযোগ্য হবে না।",
+    "related_en": ["How to talk to opponent?", "How to join tournament Messenger group?", "How to upload match result?"],
+    "related_bn": ["প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "টুর্নামেন্টের মেসেঞ্জার গ্রুপে কীভাবে জয়েন করব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
+  },
+  {
+    "id": "tournament_messenger_group",
+    "keywords": [
+      "tournament messenger group", "messenger group link", "tournament chat group", "cup group chat",
+      "টুর্নামেন্টের মেসেঞ্জার গ্রুপ", "মেসেঞ্জার গ্রুপে জয়েন", "টুর্নামেন্ট চ্যাট গ্রুপ", "গ্রুপ চ্যাট লিঙ্ক",
+      "messenger group kothay", "tournament group link"
+    ],
+    "questions": [
+      "How to join tournament Messenger group?",
+      "টুর্নামেন্টের মেসেঞ্জার গ্রুপে কীভাবে জয়েন করব?",
+      "টুর্নামেন্টের গ্রুপ চ্যাট কোথায় পাব?",
+      "মেসেঞ্জার গ্রুপে অ্যাড হব কীভাবে?",
+      "Tournament messenger group link kothay?",
+      "How to find tournament group chat?",
+      "কাপের মেসেঞ্জার গ্রুপ লিঙ্ক কোথায় থাকে?"
+    ],
+    "answer_en": "💬 **How to Join the Tournament Messenger Group**\n\nMany hosts provide an official Messenger group for tournament announcements and player coordination:\n1. Open the **Tournament Detail** page from the Arena tab.\n2. Look at the top-right area of the tournament banner.\n3. If the host has added a group link, you will see a glowing **Messenger Group icon**.\n4. Tap that icon to directly join the official tournament chat room.",
+    "answer_bn": "💬 **টুর্নামেন্টের মেসেঞ্জার গ্রুপে জয়েন করার নিয়ম**\n\nপ্রতিটি টুর্নামেন্টের জরুরি নোটিশ এবং হোস্ট ও প্লেয়ারদের সাথে দ্রুত যোগাযোগের জন্য মেসেঞ্জার গ্রুপ থাকে:\n\n**ধাপসমূহ:**\n1. **টুর্নামেন্ট ওপেন করুন:** 'Arena' ট্যাব থেকে আপনি যে টুর্নামেন্টে জয়েন করেছেন সেটির ভেতরে যান।\n2. **মেসেঞ্জার আইকন খুঁজুন:** টুর্নামেন্ট ব্যানারের উপরে ডান দিকে একটি **'Messenger' আইকন** দেখতে পাবেন (যদি হোস্ট গ্রুপ লিঙ্ক যুক্ত করে থাকেন)।\n3. **গ্রুপে যুক্ত হোন:** ওই আইকনে ট্যাপ করলেই আপনাকে সরাসরি সেই টুর্নামেন্টের অফিসিয়াল মেসেঞ্জার গ্রুপে নিয়ে যাবে।\n\n💡 **দ্রষ্টব্য:** টুর্নামেন্টের সব আপডেট, শিডিউল এবং ম্যাচের সমস্যা জানাতে এই গ্রুপে যুক্ত থাকা অত্যন্ত জরুরি।",
+    "related_en": ["How to talk to opponent?", "How to join a tournament?", "What if opponent does not respond?"],
+    "related_bn": ["প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "টুর্নামেন্টে জয়েন করব কীভাবে?", "প্রতিপক্ষ রিপ্লাই না দিলে বা খেলায় না আসলে কী করব?"]
   },
   {
     "id": "create_tournament",
-    "keywords": ["create", "host", "make", "tournament toiri", "tori", "publish", "টুর্নামেন্ট তৈরি", "হোস্ট", "আয়োজন", "host hobo", "toiri", "banano", "arena toiri", "new tournament"],
+    "keywords": [
+      "create tournament", "host tournament", "make tournament", "publish tournament", "new tournament",
+      "টুর্নামেন্ট তৈরি", "টুর্নামেন্ট বানাবো", "টুর্নামেন্ট হোস্ট", "নতুন টুর্নামেন্ট", "কাপ তৈরি",
+      "tournament toiri", "tournament banabo", "host korbo", "publish arena"
+    ],
     "questions": [
       "How to create a tournament?",
+      "টুর্নামেন্ট তৈরি করব কীভাবে?",
       "টুর্নামেন্ট তৈরি করে কিভাবে?",
+      "টুর্নামেন্ট বানাবো কীভাবে?",
+      "আমি কীভাবে টুর্নামেন্ট হোস্ট করব?",
       "Kivabe tournament toiri korbo?",
       "Host hobo kivabe?",
-      "আমি কীভাবে টুর্নামেন্ট হোস্ট করব?",
       "Make a new cup",
       "Tournament toiri korar niyom ki?",
-      "Kivabe toiri korbo tournament?",
-      "How to publish a tournament?",
-      "টুর্নামেন্ট বানাবো কীভাবে?"
+      "How to publish a tournament?"
     ],
-    "answer_en": "To create a tournament:\n1. You must have the 'Publisher' role.\n2. Go to 'My Matches' (Calendar icon) tab.\n3. Click the 'Create Tournament' button.\n4. Fill in the Cup Title, Description, Total Slots, and Rules.\n5. Click 'Publish Arena'.\nNote: If you are a Player, contact us on Telegram to become a Host.",
-    "answer_bn": "🛡️ **টুর্নামেন্ট তৈরি বা হোস্ট করার নিয়ম**\n\nআপনি যদি একজন অর্গানাইজার বা হোস্ট হতে চান, তবে আপনার আইডিতে 'Publisher' রোল থাকতে হবে।\n\n**ধাপসমূহ:**\n1. **ফিল্ড ট্যাবে যান:** অ্যাপের নিচে থাকা 'My Matches' (ক্যালেন্ডার আইকন) ট্যাবে যান।\n2. **ক্রিয়েট বাটন:** উপরে থাকা 'Create Tournament' বাটনে ক্লিক করুন।\n3. **তথ্য পূরণ:** কাপের নাম, বর্ণনা, মোট প্লেয়ার স্লট, পুরস্কার এবং নিয়মাবলী সঠিকভাবে লিখুন।\n4. **পাবলিশ:** সবশেষে 'Publish Arena' বাটনে ক্লিক করলেই আপনার টুর্নামেন্টটি লাইভ হয়ে যাবে।\n\n💡 **দ্রষ্টব্য:** সাধারণ প্লেয়াররা টুর্নামেন্ট তৈরি করতে পারে না। হোস্ট হওয়ার পারমিশন নিতে আমাদের টেলিগ্রাম সাপোর্টে যোগাযোগ করুন।",
-    "related_en": ["How to add players?", "How to deploy matches?", "How to setup rules?"],
-    "related_bn": ["প্লেয়ার এড করব কীভাবে?", "ম্যাচ ডিপ্লয় করব কীভাবে?", "রুল সেটআপ করব কীভাবে?"]
+    "answer_en": "🛡️ **How to Create & Host a Tournament**\n\nTo organize your own tournament on FC Arena VS:\n1. Your account must have the **'Publisher'** or **'Admin'** role.\n2. Go to the **'My Matches'** (Field) or **'Arena'** tab and tap **'Create Tournament'**.\n3. Enter the **Tournament Title, Banner, Format (Knockout or Group+Knockout), Total Slots, Prize Pool, and Rules**.\n4. Optionally add your **Messenger Group link** and **Invitation Key**.\n5. Tap **'Publish Arena'** to make it live!",
+    "answer_bn": "🛡️ **টুর্নামেন্ট তৈরি বা হোস্ট করার নিয়ম**\n\nআপনি যদি নিজে একটি টুর্নামেন্ট আয়োজন করতে চান, তবে আপনার আইডিতে **'Publisher'** রোল থাকতে হবে:\n\n**ধাপসমূহ:**\n1. **ক্রিয়েট অপশনে যান:** অ্যাপের **'My Matches'** বা **'Arena'** ট্যাব থেকে **'Create Tournament'** বাটনে ক্লিক করুন।\n2. **তথ্য পূরণ করুন:** টুর্নামেন্টের নাম, ফরম্যাট (Knockout অথবা Group + Knockout), মোট প্লেয়ার সংখ্যা (Slots), প্রাইজ পুল এবং নিয়মাবলী লিখুন।\n3. **গ্রুপ ও সিকিউরিটি:** চাইলে আপনার মেসেঞ্জার গ্রুপের লিঙ্ক এবং প্রাইভেট টুর্নামেন্ট হলে 'Invited Only' অপশন চালু করুন।\n4. **পাবলিশ করুন:** সবশেষে **'Publish Arena'** বাটনে ক্লিক করলেই আপনার টুর্নামেন্টটি লাইভ হয়ে যাবে।\n\n💡 **দ্রষ্টব্য:** সাধারণ প্লেয়ারদের প্র্যাকটিসের জন্য **'Demo Tournament'** অপশন রয়েছে। লাইভ টুর্নামেন্ট হোস্ট করার পারমিশন (Publisher রোল) নিতে আমাদের টেলিগ্রাম সাপোর্টে যোগাযোগ করুন।",
+    "related_en": ["How to get Publisher role?", "How to add players?", "How to deploy matches?"],
+    "related_bn": ["পাবলিশার বা হোস্ট রোল কীভাবে পাব?", "প্লেয়ার এড করব কীভাবে?", "ম্যাচ ডিপ্লয় করব কীভাবে?"]
+  },
+  {
+    "id": "become_publisher_host",
+    "keywords": [
+      "publisher role", "become publisher", "host permission", "organizer role", "পাবলিশার রোল",
+      "হোস্ট পারমিশন", "অর্গানাইজার হব", "পাবলিশার হব", "publisher badge", "host access"
+    ],
+    "questions": [
+      "How to get Publisher role?",
+      "পাবলিশার বা হোস্ট রোল কীভাবে পাব?",
+      "পাবলিশার হব কীভাবে?",
+      "টুর্নামেন্ট হোস্ট করার পারমিশন কীভাবে পাব?",
+      "Publisher role kivabe pabo?",
+      "How to become a tournament host?",
+      "Host permission kothay pabo?"
+    ],
+    "answer_en": "👑 **How to Get the Publisher (Host) Role**\n\nTo host official live tournaments on FC Arena VS:\n1. Make sure your Arena profile is 100% complete with genuine social links.\n2. Contact our management team via the official Telegram group: **https://t.me/fcarenavs**.\n3. Share your registered email/UID and details about the tournament you want to organize.\n4. Once verified by an Admin, your account will be upgraded to **'Publisher'**.",
+    "answer_bn": "👑 **পাবলিশার (Publisher) বা হোস্ট রোল পাওয়ার নিয়ম**\n\nFC Arena VS-এ লাইভ টুর্নামেন্ট আয়োজন করার জন্য আপনার অ্যাকাউন্টে **'Publisher'** অ্যাক্সেস থাকতে হবে:\n\n**ধাপসমূহ:**\n1. প্রথমে আপনার প্রোফাইলে সঠিক নাম, গেমের UID এবং ফেসবুক/মেসেঞ্জার লিঙ্ক আপডেট করুন।\n2. আমাদের অফিসিয়াল টেলিগ্রাম সাপোর্ট গ্রুপে ([https://t.me/fcarenavs](https://t.me/fcarenavs)) যোগাযোগ করুন।\n3. আপনার অ্যাকাউন্টের ইমেইল এবং আপনি কী ধরনের টুর্নামেন্ট হোস্ট করতে চান তা অ্যাডমিনকে জানান।\n4. অ্যাডমিন আপনার তথ্য যাচাই করে আপনার আইডিতে **'Publisher'** রোল যুক্ত করে দেবেন।\n\n💡 **দ্রষ্টব্য:** পাবলিশার হওয়ার আগে আপনি অ্যাপের ভেতরে **Demo Mode** ব্যবহার করে টুর্নামেন্ট পরিচালনার প্র্যাকটিস করে নিতে পারেন।",
+    "related_en": ["How to create a tournament?", "Difference between Demo and Live tournaments?", "How to contact support?"],
+    "related_bn": ["টুর্নামেন্ট তৈরি করব কীভাবে?", "ডেমো এবং লাইভ টুর্নামেন্টের মধ্যে পার্থক্য কী?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "create_account",
-    "keywords": ["account", "sign up", "register", "toiri", "account khola", "id khola", "khulbo", "রেজিস্টার", "অ্যাকাউন্ট", "নতুন আইডি", "নাম রেজিস্ট্রেশন", "reg korbo", "id banabo"],
+    "keywords": [
+      "create account", "sign up", "register account", "new account", "open account", "অ্যাকাউন্ট খুলব",
+      "একাউন্ট খুলব", "নতুন অ্যাকাউন্ট", "আইডি খুলব", "রেজিস্ট্রেশন করব", "account khulbo", "id khulbo",
+      "account toiri", "id banabo", "enlist now"
+    ],
     "questions": [
       "How to create an account?",
-      "Account toiri Kory kivaby?",
+      "অ্যাকাউন্ট খুলব কীভাবে?",
       "কিভাবে অ্যাকাউন্ট খুলব?",
+      "নতুন অ্যাকাউন্ট কীভাবে তৈরি করব?",
+      "Account toiri Kory kivaby?",
       "Kivabe id khulbo?",
       "New account registration",
       "রেজিস্ট্রেশন করব কীভাবে?",
       "আইডি খোলার নিয়ম কী?",
       "Kivabe account banabo?",
-      "Create my profile",
       "Sign up kivabe korbo?"
     ],
-    "answer_en": "To create a new account:\n1. Open the App and go to the Login screen.\n2. Click 'No account? Enlist Now' at the bottom.\n3. Enter your Email and choose a strong Password.\n4. Enter your real FC Mobile In-Game Name and UID.\n5. Provide your Messenger/Facebook profile link.\n6. Click 'Create Account'.",
-    "answer_bn": "👤 **নতুন অ্যাকাউন্ট তৈরির নিয়ম**\n\nFC Arena VS অ্যাপে একটি নতুন অ্যাকাউন্ট তৈরি করা খুবই সহজ ও দ্রুত। আপনার অ্যাকাউন্ট খুলতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **অ্যাপ ওপেন করুন:** আপনার ডিভাইসে FC Arena VS অ্যাপটি চালু করুন।\n2. **রেজিস্ট্রেশন শুরু করুন:** লগইন স্ক্রিনের নিচে থাকা 'No account? Enlist Now' অপশনে ক্লিক করুন (অথবা সরাসরি 'Continue with Google' ব্যবহার করতে পারেন)।\n3. **তথ্য প্রদান:** আপনার সক্রিয় ইমেইল অ্যাড্রেস এবং একটি শক্তিশালী পাসওয়ার্ড দিন।\n4. **গেমিং প্রোফাইল সেটআপ:** আপনার FC Mobile গেমের সঠিক In-Game Name (IGN) এবং UID প্রদান করুন।\n5. **সম্পন্ন করুন:** আপনার মেসেঞ্জার বা ফেসবুক প্রোফাইল লিঙ্ক দিয়ে 'Create Account' বাটনে ট্যাপ করুন।\n\n💡 **দ্রষ্টব্য:** টুর্নামেন্টে জয়েন করার জন্য প্রোফাইলে সঠিক IGN এবং UID দেওয়া অত্যন্ত জরুরি, যাতে প্রতিপক্ষ ও হোস্ট আপনাকে সহজেই খুঁজে পায়।",
-    "related_en": ["Why can't I login?", "How to link messenger?", "How to add coins?"],
-    "related_bn": ["লগইন হচ্ছে না কেন?", "মেসেঞ্জার লিঙ্ক কীভাবে দেব?", "কয়েন কীভাবে যোগ করব?"]
+    "answer_en": "👤 **How to Create an Account**\n\nFollow these steps to register on FC Arena VS:\n1. Open the app and go to the **Login** screen.\n2. Tap **'No account? Enlist Now'** at the bottom (or tap **'Continue with Google'**).\n3. Enter your active **Email Address** and set a strong **Password**.\n4. Fill in your **FC Mobile In-Game Name (IGN)** and **UID**.\n5. Add your **Messenger/Facebook link** and tap **'Create Account'**.",
+    "answer_bn": "👤 **নতুন অ্যাকাউন্ট তৈরির নিয়ম**\n\nFC Arena VS অ্যাপে একটি নতুন অ্যাকাউন্ট খুলতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **রেজিস্ট্রেশন পেজে যান:** লগইন স্ক্রিনের নিচে থাকা **'No account? Enlist Now'** অপশনে ক্লিক করুন (অথবা সরাসরি **'Continue with Google'** ব্যবহার করুন)।\n2. **লগইন তথ্য দিন:** আপনার সক্রিয় ইমেইল অ্যাড্রেস এবং একটি শক্তিশালী পাসওয়ার্ড দিন।\n3. **গেমিং প্রোফাইল সেটআপ:** আপনার FC Mobile গেমের সঠিক **In-Game Name (IGN)** এবং **UID** প্রদান করুন।\n4. **সোশ্যাল লিঙ্ক দিন:** প্রতিপক্ষের সাথে যোগাযোগের জন্য আপনার ফেসবুক বা মেসেঞ্জার প্রোফাইল লিঙ্ক দিন এবং **'Create Account'** বাটনে ট্যাপ করুন।\n\n💡 **দ্রষ্টব্য:** একজন প্লেয়ার শুধুমাত্র একটি অ্যাকাউন্ট ব্যবহার করতে পারবেন। একাধিক ফেক আইডি খুললে অ্যাকাউন্ট ব্যান হতে পারে।",
+    "related_en": ["Where to find FC Mobile UID?", "How to link messenger?", "Why can't I login?"],
+    "related_bn": ["ইউআইডি (UID) কোথায় পাব?", "মেসেঞ্জার লিঙ্ক কীভাবে দেব?", "লগইন হচ্ছে না কেন?"]
   },
   {
     "id": "find_uid",
-    "keywords": ["find uid", "uid kothay", "uid pabo", "game id", "fc mobile id", "কোথায় পাব", "আইডি কোথায়", "ইউআইডি", "uid number", "numeric id"],
+    "keywords": [
+      "find uid", "fc mobile uid", "game uid", "uid kothay", "uid pabo", "ইউআইডি কোথায়", "ইউআইডি পাব",
+      "গেম আইডি কোথায়", "uid number", "user id fc mobile", "ইউআইডি কি", "uid ki"
+    ],
     "questions": [
       "Where to find FC Mobile UID?",
+      "ইউআইডি (UID) কোথায় পাব?",
       "ইউআইডি কোথায় পাব?",
       "UID kothay thake?",
       "How to get my game ID?",
       "গেম আইডি কোথায় পাব?",
       "UID number pabo kothay?",
-      "How to see my UID?"
+      "How to see my UID?",
+      "FC Mobile UID কী?"
     ],
-    "answer_en": "To find your FC Mobile UID:\n1. Open FC Mobile game.\n2. Tap on 'Settings' (Gear icon) at top right.\n3. Look for 'User ID' or 'UID' section.\n4. Copy the long numeric ID to use in your profile.",
-    "answer_bn": "🆔 **ইউআইডি (UID) খুঁজে পাওয়ার নিয়ম**\n\nআপনার FC Mobile প্রোফাইলের ইউআইডি খুঁজে পেতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আপনার ফোনে **FC Mobile** গেমটি ওপেন করুন।\n2. গেমের প্রধান স্ক্রিনে উপরে ডানে থাকা **'Settings'** (গিয়ার আইকন) এ ক্লিক করুন।\n3. সেটিংসে **'User ID'** বা **'UID'** সেকশনটি খুঁজুন।\n4. সেখানে একটি লম্বা সংখ্যার আইডি পাবেন, সেটি কপি করুন।\n\n💡 **দ্রষ্টব্য:** এই আইডিটিই আমাদের অ্যাপের প্রোফাইলে ব্যবহার করতে হবে যাতে আপনাকে সিস্টেমে শনাক্ত করা যায়।",
-    "related_en": ["How to create an account?", "How to join a tournament?", "How to link messenger?"],
-    "related_bn": ["অ্যাকাউন্ট খুলব কীভাবে?", "টুর্নামেন্টে জয়েন করব কীভাবে?", "মেসেঞ্জার লিঙ্ক কীভাবে দেব?"]
+    "answer_en": "🆔 **Where to Find Your FC Mobile UID**\n\n1. Open the **EA Sports FC Mobile** game on your phone.\n2. Tap the **Settings (Gear icon)** in the top-right corner.\n3. Look at the top of the settings menu for **'UID'** (a long numeric code).\n4. Tap the copy icon next to it and paste it into your FC Arena VS profile.",
+    "answer_bn": "🆔 **ইউআইডি (UID) খুঁজে পাওয়ার নিয়ম**\n\nআপনার FC Mobile গেমের ইউআইডি (UID) খুঁজে পেতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আপনার ফোনে **FC Mobile** গেমটি ওপেন করুন।\n2. গেমের হোম স্ক্রিনের উপরে ডান কোণায় থাকা **'Settings'** (গিয়ার আইকন) এ ক্লিক করুন।\n3. সেটিংস মেনুর একদম উপরে ডান পাশে **'UID'** লেখা একটি লম্বা সংখ্যার কোড দেখতে পাবেন।\n4. পাশের কপি আইকনে ট্যাপ করে আইডিটি কপি করুন এবং আমাদের অ্যাপের প্রোফাইলে পেস্ট করুন।\n\n💡 **দ্রষ্টব্য:** সঠিক UID দিলে প্রতিপক্ষ খুব সহজেই আপনাকে গেমে খুঁজে ফ্রেন্ড রিকোয়েস্ট পাঠাতে পারবে।",
+    "related_en": ["How to edit profile Name, IGN or UID?", "How to create an account?", "How to join a tournament?"],
+    "related_bn": ["প্রোফাইলের নাম, IGN বা UID কীভাবে পরিবর্তন করব?", "অ্যাকাউন্ট খুলব কীভাবে?", "টুর্নামেন্টে জয়েন করব কীভাবে?"]
+  },
+  {
+    "id": "edit_ign_uid",
+    "keywords": [
+      "edit profile", "change ign", "change uid", "update profile photo", "change name", "প্রোফাইল এডিট",
+      "নাম পরিবর্তন", "ইউআইডি পরিবর্তন", "ছবি পরিবর্তন", "ign change", "uid change", "profile update"
+    ],
+    "questions": [
+      "How to edit profile Name, IGN or UID?",
+      "প্রোফাইলের নাম, IGN বা UID কীভাবে পরিবর্তন করব?",
+      "প্রোফাইল এডিট করব কীভাবে?",
+      "গেমের নাম বা UID ভুল হলে কীভাবে ঠিক করব?",
+      "প্রোফাইল ছবি পরিবর্তন করব কীভাবে?",
+      "How to change my IGN and UID?",
+      "Kivabe profile edit korbo?",
+      "How to change profile picture?"
+    ],
+    "answer_en": "✏️ **How to Edit Your Profile (Name, IGN, UID & Photo)**\n\n1. Go to the **'Profile'** tab from the bottom navigation bar.\n2. Tap the **'Edit Profile'** button.\n3. Update your Display Name, FC Mobile IGN, UID, Avatar photo, or social contact links.\n4. Tap **'Save Changes'** to apply the updates immediately.",
+    "answer_bn": "✏️ **প্রোফাইলের নাম, IGN, UID বা ছবি পরিবর্তন করার নিয়ম**\n\nআপনার প্রোফাইলের যেকোনো তথ্য আপডেট করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচে থাকা **'Profile'** (ইউজার আইকন) ট্যাবে যান।\n2. আপনার নামের নিচে বা পাশে থাকা **'Edit Profile'** বাটনে ক্লিক করুন।\n3. সেখান থেকে আপনার প্রোফাইল ছবি, নাম, গেমের **In-Game Name (IGN)** এবং **UID** পরিবর্তন করুন।\n4. সব তথ্য ঠিক থাকলে **'Save Changes'** বাটনে ট্যাপ করে সেভ করুন।\n\n💡 **দ্রষ্টব্য:** কোনো টুর্নামেন্ট চলাকালীন হুট করে গেমের নাম (IGN) বা UID পরিবর্তন করলে হোস্টকে অবশ্যই জানিয়ে রাখবেন।",
+    "related_en": ["How to link messenger?", "Where to find FC Mobile UID?", "How to join a tournament?"],
+    "related_bn": ["মেসেঞ্জার লিঙ্ক কীভাবে দেব?", "ইউআইডি (UID) কোথায় পাব?", "টুর্নামেন্টে জয়েন করব কীভাবে?"]
   },
   {
     "id": "match_id_search",
-    "keywords": ["match id", "search", "খুঁজে পাওয়া", "khuje paoa", "search match", "id diye", "kothay", "khuje", "ম্যাচ আইডি", "id search", "find match"],
+    "keywords": [
+      "match id", "search match", "find match by id", "m-", "ম্যাচ আইডি", "আইডি দিয়ে ম্যাচ", "ম্যাচ সার্চ",
+      "ম্যাচ খুঁজব", "match id diye khujbo", "search fixture", "ম্যাচ খুঁজে পাওয়া"
+    ],
     "questions": [
       "How to find a match by ID?",
+      "ম্যাচ আইডি দিয়ে কীভাবে খুঁজব?",
       "ম্যাচ আইডি দিয়ে কিভাবে খুঁজব?",
       "match id diye kivabe khujbo?",
       "Kothay match id likhbo?",
       "ID দিয়ে ম্যাচ সার্চ করব কীভাবে?",
-      "How to search match?",
-      "ম্যাচ খুঁজে পাচ্ছি না",
-      "Khuje pabo kivabe match?"
+      "How to search match by ID?",
+      "ম্যাচ আইডি কোথায় সার্চ করব?"
     ],
-    "answer_en": "To search for a specific match:\n1. Open the tournament where you are playing.\n2. Locate the 'Search Bar' at the top of the fixtures.\n3. Type your 6-digit Match ID (e.g., M-XXXXXX).\n4. The specific match will be displayed instantly.",
-    "answer_bn": "🔍 **আইডি দিয়ে ম্যাচ খুঁজে পাওয়ার নিয়ম**\n\nআপনি যদি নির্দিষ্ট কোনো ম্যাচ খুঁজে পেতে চান, তবে সার্চ বার ব্যবহার করুন:\n\n**ধাপসমূহ:**\n1. আপনি যে টুর্নামেন্টে অংশ নিয়েছেন সেটি ওপেন করুন।\n2. ফিক্সচার বা ম্যাচের তালিকার ঠিক উপরে থাকা **'Search Bar'** টি লক্ষ্য করুন।\n3. আপনার ৬ সংখ্যার ম্যাচ আইডি (যেমন: **M-XXXXXX**) সেখানে লিখুন।\n4. সাথে সাথেই আপনার নির্দিষ্ট ম্যাচটি সামনে চলে আসবে।\n\n💡 **দ্রষ্টব্য:** ম্যাচ আইডিটি আপনার প্রতিপক্ষের সাথে শেয়ার করে সহজেই একে অপরকে খুঁজে নিতে পারেন।",
-    "related_en": ["How to upload match result?", "How to talk to opponent?", "Where are my matches?"],
-    "related_bn": ["ম্যাচ রিজাল্ট কীভাবে দেব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "আমার ম্যাচগুলো কোথায় পাব?"]
+    "answer_en": "🔍 **How to Find a Match by Match ID**\n\n1. Open the tournament or go to the **'Matches'** tab.\n2. Locate the **Search Bar** at the top of the match list.\n3. Enter the Match ID (for example: **M-XXXXXX**) or player name.\n4. The exact match card will appear immediately.",
+    "answer_bn": "🔍 **ম্যাচ আইডি (Match ID) দিয়ে ম্যাচ খুঁজে পাওয়ার নিয়ম**\n\nআপনি যদি নির্দিষ্ট কোনো ম্যাচ দ্রুত খুঁজে পেতে চান, তবে সার্চ বার ব্যবহার করুন:\n\n**ধাপসমূহ:**\n1. আপনি যে টুর্নামেন্টে খেলছেন সেটি ওপেন করে **'Matches'** সেকশনে যান।\n2. ম্যাচের তালিকার ঠিক উপরে থাকা **'Search Bar'** টি লক্ষ্য করুন।\n3. সেখানে আপনার ম্যাচ আইডি (যেমন: **M-XXXXXX**) বা প্লেয়ারের নাম লিখুন।\n4. সাথে সাথেই আপনার নির্দিষ্ট ম্যাচ কার্ডটি সামনে চলে আসবে।\n\n💡 **দ্রষ্টব্য:** যেকোনো ডিসপিউট বা রেজাল্ট ভেরিফিকেশনের সময় হোস্টকে এই ম্যাচ আইডিটি জানালে দ্রুত সমাধান পাওয়া যায়।",
+    "related_en": ["Where are my matches?", "How to upload match result?", "How to talk to opponent?"],
+    "related_bn": ["আমার ম্যাচগুলো কোথায় পাব?", "ম্যাচ রিজাল্ট কীভাবে দেব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "result_upload",
-    "keywords": ["result upload", "score report", "রিজাল্ট আপলোড", "স্কোর জমা", "কিভাবে রেজাল্ট দেব", "screenshot upload", "match result", "রিজাল্ট দেওয়া", "score submit", "রিপোর্ট দেওয়া", "ফাইনাল স্কোর", "ম্যাচ রেজাল্ট", "win report", "হারা জেতা", "পয়েন্ট আপডেট", "score update"],
+    "keywords": [
+      "result upload", "upload match result", "report result", "score submit", "score report",
+      "ম্যাচ রিজাল্ট", "ম্যাচ রেজাল্ট", "রিজাল্ট আপলোড", "রেজাল্ট আপলোড", "স্কোর জমা", "স্কোর আপলোড",
+      "রিজাল্ট দেব", "রেজাল্ট দেব", "রিপোর্ট রেজাল্ট", "match result upload", "submit score", "ফলাফল জমা"
+    ],
     "questions": [
       "How to upload match result?",
-      "ম্যাচ রিজাল্ট কিভাবে আপলোড করব?",
-      "match result kivabe upload korbo?",
-      "Kivabe screenshot dibo?",
-      "স্কোর কীভাবে জমা দেব?",
-      "Match shesh, ekhon ki korbo?",
-      "Upload my win",
-      "Kivabe report korbo?",
-      "রিজাল্ট সাবমিট করব কীভাবে?",
+      "ম্যাচ রিজাল্ট কীভাবে দেব?",
       "ম্যাচ রেজাল্ট কীভাবে দেব?",
-      "ম্যাচ শেষ রেজাল্ট দেব কীভাবে?",
-      "স্কোরবোর্ড আপলোড করব কীভাবে?"
+      "ম্যাচ রিজাল্ট কিভাবে আপলোড করব?",
+      "ম্যাচ রেজাল্ট কিভাবে আপলোড করব?",
+      "match result kivabe upload korbo?",
+      "স্কোর কীভাবে জমা দেব?",
+      "ম্যাচ শেষ, এখন রেজাল্ট দেব কীভাবে?",
+      "রিজাল্ট সাবমিট করব কীভাবে?",
+      "How to report match score?",
+      "Kivabe match result dibo?"
     ],
-    "answer_en": "To report your match score:\n1. Take a clear screenshot of the end-game score screen.\n2. Go to 'My Matches' tab.\n3. Click the 'Report Result' button on the specific match card.\n4. Enter your score and opponent's score correctly.\n5. Click 'Submit Report'.\n6. Wait for the host or opponent to confirm.",
-    "answer_bn": "📊 **ম্যাচ রেজাল্ট আপলোড করার নিয়ম**\n\nখেলা শেষ হওয়ার পর আপনার জয় বা স্কোর সাবমিট করতে নিচের ধাপগুলো মেনে চলুন:\n\n**ধাপসমূহ:**\n1. **স্ক্রিনশট নিন:** গেম শেষ হওয়ার পর ফাইনাল স্কোরসহ রেজাল্ট স্ক্রিনের একটি পরিষ্কার স্ক্রিনশট নিন।\n2. **ফিল্ড ট্যাবে যান:** অ্যাপের নিচে থাকা 'My Matches' (ক্যালেন্ডার আইকন) ট্যাবে যান।\n3. **রিপোর্ট বাটন:** নির্দিষ্ট ম্যাচ কার্ডের উপরে থাকা **'Report Result'** বাটনে ক্লিক করুন।\n4. **স্কোর দিন:** আপনার এবং প্রতিপক্ষের স্কোর সঠিকভাবে ইনপুট বক্সে লিখুন।\n5. **সাবমিট:** সবশেষে 'Submit Report' বাটনে ক্লিক করুন।\n\n⚠️ **সতর্কতা:** ভুল স্কোর দিলে বা ফেক রিপোর্ট করলে আপনার আইডি চিরস্থায়ীভাবে ব্যান করা হতে পারে।",
-    "related_en": ["How to get prize money?", "How to report a cheater?", "How leaderboard works?"],
-    "related_bn": ["পুরস্কারের টাকা কীভাবে পাব?", "চিটার রিপোর্ট করব কীভাবে?", "লিডারবোর্ড কীভাবে কাজ করে?"]
+    "answer_en": "📊 **How to Upload / Report Match Results**\n\nAfter completing your match in FC Mobile:\n1. Take a clear **screenshot** of the full-time final score screen as proof.\n2. Open the app and go to **'My Matches'** or the tournament's **'Matches'** tab.\n3. Tap the **'Report Result'** button on your match card.\n4. Enter your score and your opponent's score accurately in the score boxes.\n5. Tap **'Submit Report'** (or if your opponent already reported the correct score, tap **'Confirm Result'**).\n\n⚠️ **Note:** For Knockout matches, draws are not allowed—if the match ends in a draw, play a Penalty Shootout or extra match to decide the winner!",
+    "answer_bn": "📊 **ম্যাচ রেজাল্ট বা স্কোর সাবমিট করার নিয়ম**\n\nখেলা শেষ হওয়ার পর আপনার ম্যাচের ফলাফল সাবমিট করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **প্রমাণ রাখুন:** গেম শেষ হওয়ার পর ফাইনাল স্কোরবোর্ডের একটি পরিষ্কার স্ক্রিনশট নিয়ে রাখুন।\n2. **ম্যাচ কার্ডে যান:** অ্যাপের **'My Matches'** ট্যাবে অথবা টুর্নামেন্টের ভেতরে আপনার ম্যাচ কার্ডটি ওপেন করুন।\n3. **রিপোর্ট বাটন:** ম্যাচ কার্ডে থাকা **'Report Result'** বাটনে ক্লিক করুন।\n4. **স্কোর লিখুন:** আপনার নামের ঘরে আপনার গোল সংখ্যা এবং প্রতিপক্ষের ঘরে প্রতিপক্ষের গোল সংখ্যা সঠিকভাবে লিখুন।\n5. **সাবমিট / কনফার্ম:** সবশেষে **'Submit Report'** বাটনে ক্লিক করুন। (যদি প্রতিপক্ষ আগেই সঠিক স্কোর দিয়ে থাকে, তবে আপনি **'Confirm Result'** বাটনে ক্লিক করলেই রেজাল্ট সাথে সাথে ভেরিফাই হয়ে যাবে)।\n\n⚠️ **সতর্কতা:** ভুল বা ভুয়া স্কোর সাবমিট করলে আপনার আইডি ব্যান করা হতে পারে।",
+    "related_en": ["What if opponent submits wrong score?", "What are the rules for Knockout Draw or Penalty?", "How do players move to the next round?"],
+    "related_bn": ["প্রতিপক্ষ ভুল স্কোর বা রেজাল্ট দিলে কী করব?", "নকআউট ম্যাচে ড্র বা পেনাল্টির নিয়ম কী?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?"]
+  },
+  {
+    "id": "wrong_score_dispute",
+    "keywords": [
+      "wrong score", "fake score", "fake result", "dispute result", "incorrect score",
+      "ভুল স্কোর", "ভুল রেজাল্ট", "ফেক স্কোর", "ফেক রেজাল্ট", "মিথ্যা স্কোর", "রেজাল্ট ভুল দিলে",
+      "স্কোর ভুল দিয়েছে", "match dispute", "opponent wrong score"
+    ],
+    "questions": [
+      "What if opponent submits wrong score?",
+      "প্রতিপক্ষ ভুল স্কোর বা রেজাল্ট দিলে কী করব?",
+      "ভুল স্কোর দিলে কীভাবে ঠিক করব?",
+      "প্রতিপক্ষ ফেক রেজাল্ট দিলে কী করব?",
+      "Opponent bhul score dile ki korbo?",
+      "I submitted wrong score by mistake, what to do?",
+      "ভুল করে ভুল রেজাল্ট দিয়ে ফেললে কী করব?",
+      "How to dispute a match result?"
+    ],
+    "answer_en": "⚖️ **How to Resolve Wrong or Disputed Match Scores**\n\n1. **Do NOT click 'Confirm Result'** if your opponent submitted an incorrect score.\n2. Instead, tap **'Report Result'** and submit the actual score, which will mark the match for Host Review.\n3. Send your **full-time match screenshot** along with the **Match ID (M-XXXXXX)** to the Tournament Host via the Tournament Messenger Group.\n4. The Host has full authority to verify the screenshot and update/override the official match score.",
+    "answer_bn": "⚖️ **ভুল স্কোর বা ফেক রেজাল্ট সমাধানের নিয়ম**\n\nআপনার প্রতিপক্ষ যদি ভুল বা মিথ্যা স্কোর সাবমিট করে, কিংবা আপনি নিজে যদি ভুলবশত ভুল স্কোর দিয়ে ফেলেন, তবে আতঙ্কিত হওয়ার কিছু নেই:\n\n**করণীয়:**\n1. **কনফার্ম করবেন না:** প্রতিপক্ষ ভুল স্কোর দিলে ভুলেও **'Confirm Result'** বাটনে ক্লিক করবেন না।\n2. **সঠিক স্কোর রিপোর্ট করুন:** আপনি **'Report Result'**-এ গিয়ে সঠিক স্কোরটি সাবমিট করুন। দুইজনের স্কোর ভিন্ন হলে সিস্টেম স্বয়ংক্রিয়ভাবে ম্যাচটি হোস্টের রিভিউয়ের জন্য পাঠাবে।\n3. **হোস্টকে প্রমাণ দিন:** টুর্নামেন্টের মেসেঞ্জার গ্রুপে বা সরাসরি হোস্টের ইনবক্সে আপনার **ম্যাচ আইডি (M-XXXXXX)** এবং খেলার ফাইনাল স্ক্রিনশটটি পাঠান।\n4. **হোস্ট ভেরিফিকেশন:** হোস্ট প্রমাণ যাচাই করে নিজেই সঠিক স্কোর আপডেট করে দেবেন।\n\n⚠️ **সতর্কতা:** ইচ্ছাকৃতভাবে ফেক স্কোর দেওয়ার প্রমাণ পাওয়া গেলে দোষী প্লেয়ারকে টুর্নামেন্ট থেকে ডিসকোয়ালিফাই ও ব্যান করা হবে।",
+    "related_en": ["How to upload match result?", "How to report a cheater?", "How to join tournament Messenger group?"],
+    "related_bn": ["ম্যাচ রিজাল্ট কীভাবে দেব?", "চিটার রিপোর্ট করব কীভাবে?", "টুর্নামেন্টের মেসেঞ্জার গ্রুপে কীভাবে জয়েন করব?"]
+  },
+  {
+    "id": "penalty_draw_rules",
+    "keywords": [
+      "penalty", "draw in knockout", "match draw", "tie match", "extra time", "penalty shootout",
+      "পেনাল্টি", "ড্র হলে", "নকআউট ড্র", "সমান গোল", "ম্যাচ ড্র হলে", "টাই হলে", "knockout draw rule"
+    ],
+    "questions": [
+      "What are the rules for Knockout Draw or Penalty?",
+      "নকআউট ম্যাচে ড্র বা পেনাল্টির নিয়ম কী?",
+      "ম্যাচ ড্র হলে কী করব?",
+      "নকআউট পর্বে সমান গোল হলে কী হবে?",
+      "পেনাল্টি শুটআউটের স্কোর কীভাবে দেব?",
+      "Knockout match draw hole ki korbo?",
+      "Penalty shootout rule ki?",
+      "Can knockout matches end in a draw?"
+    ],
+    "answer_en": "⚽ **Knockout Draw & Penalty Shootout Rules**\n\n* **Group Stage Matches:** Draws are allowed (both players get **1 Point**).\n* **Knockout Matches (Round of 16, Quarter-Final, Semi-Final, Final):** Draws are **NOT allowed** because one winner must advance to the next round!\n* **If a Knockout Match is Tied:** Follow the tournament rules—either play Extra Time + Penalty Shootout in-game, or play a rematch (Golden Goal / full match) until a winner is decided.\n* **Reporting the Score:** Enter the final aggregate/penalty-decided score so the winning player has a higher score than the loser.",
+    "answer_bn": "⚽ **নকআউট ম্যাচে ড্র (Draw) বা পেনাল্টির নিয়ম**\n\nটুর্নামেন্টের ধাপ অনুযায়ী ড্র-এর নিয়ম নিচে দেওয়া হলো:\n\n1. **গ্রুপ স্টেজ (Group Stage):** গ্রুপ পর্বের ম্যাচে ড্র গ্রহণযোগ্য। ড্র হলে উভয় প্লেয়ার **১ পয়েন্ট** করে পাবে।\n2. **নকআউট পর্ব (Knockout Stage):** রাউন্ড অব ১৬, কোয়ার্টার ফাইনাল, সেমিফাইনাল বা ফাইনাল ম্যাচে **ড্র গ্রহণযোগ্য নয়**, কারণ একজন বিজয়ীকে পরের রাউন্ডে যেতে হবে (অ্যাপে নকআউট ম্যাচে সমান স্কোর সাবমিট করা যায় না)।\n3. **নকআউটে সমান গোল হলে করণীয়:** গেমে লবি তৈরি করার সময় Extra Time ও Penalties চালু রাখবেন। যদি সাধারণ ম্যাচে ড্র হয়, তবে টুর্নামেন্টের নিয়ম অনুযায়ী পেনাল্টি শুটআউট অথবা আরেকটি রিম্যাচ খেলে জয়ী নির্ধারণ করতে হবে।\n4. **স্কোর সাবমিট:** পেনাল্টি বা রিম্যাচসহ চূড়ান্ত ফলাফলে যে জিতেছে তার গোল সংখ্যা বেশি দিয়ে রেজাল্ট সাবমিট করবেন।",
+    "related_en": ["How to upload match result?", "How do players move to the next round?", "What is GD and Pts?"],
+    "related_bn": ["ম্যাচ রিজাল্ট কীভাবে দেব?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?", "পয়েন্ট টেবিল কীভাবে কাজ করে?"]
   },
   {
     "id": "telegram_support",
-    "keywords": ["contact admin", "talk to support", "সরাসরি কথা", "এডমিন হেল্প", "admin support", "telegram link", "help desk", "সাহায্য চাই", "যোগাযোগ করা", "অ্যাডমিনের সাথে কথা", "অ্যাডমিন যোগাযোগ", "help me admin", "admin kothay", "সাপোর্ট টিম", "অ্যাডমিন হেল্প", "admin help"],
+    "keywords": [
+      "contact admin", "talk to support", "admin support", "telegram support", "telegram link",
+      "help desk", "human support", "অ্যাডমিনের সাথে কথা", "এডমিনের সাথে কথা", "অ্যাডমিন সাপোর্ট",
+      "টেলিগ্রাম সাপোর্ট", "টেলিগ্রাম লিঙ্ক", "সাপোর্ট টিম", "অ্যাডমিন হেল্প", "admin help",
+      "admin er sathe kotha", "contact us", "সরাসরি সাপোর্টে"
+    ],
     "questions": [
       "How to contact support?",
+      "অ্যাডমিনের সাথে কীভাবে কথা বলব?",
       "অ্যাডমিনের সাথে কিভাবে কথা বলব?",
       "admin er sathe kivabe kotha bolbo?",
-      "Sorasori kotha bola jay?",
+      "Sorasori admin er sathe kotha bola jay?",
       "Need help from admin",
       "অ্যাডমিন কই?",
-      "Kivabe contact korbo?",
-      "Support pabo kothay?",
+      "Support team er sathe kivabe contact korbo?",
       "Human assistant chai",
-      "অ্যাডমিনের সাথে কীভাবে কথা বলব?",
-      "Admin help help",
       "সরাসরি অ্যাডমিনের সাথে যোগাযোগ করব কীভাবে?",
-      "টেলিগ্রাম সাপোর্ট লিঙ্ক দেন"
+      "টেলিগ্রাম সাপোর্ট লিঙ্ক দেন",
+      "How to contact Admin on Telegram?"
     ],
-    "answer_en": "You can contact our official team directly on Telegram:\n1. Click the 'Menu' (Three dots) icon at top right.\n2. Select 'Contact Us'.\n3. This will open our Telegram group: https://t.me/fcarenavs\n4. Post your issue there for human help.",
-    "answer_bn": "💬 **সরাসরি সাপোর্টে কথা বলার নিয়ম**\n\nআপনার যদি মানবিক সাহায্যের প্রয়োজন হয় বা কোনো জরুরি সমস্যা থাকে, তবে আমাদের টেলিগ্রাম টিমে যোগাযোগ করুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের উপরে ডানে থাকা **'Menu'** (তিনটি ডট) আইকনে ক্লিক করুন।\n2. সেখান থেকে **'Contact Us'** অপশনটি সিলেক্ট করুন।\n3. এটি আপনাকে সরাসরি আমাদের অফিসিয়াল টেলিগ্রাম গ্রুপে নিয়ে যাবে।\n4. সেখানে আপনার সমস্যাটি লিখে মেসেজ দিন।\n\n🔗 **লিঙ্ক:** [https://t.me/fcarenavs](https://t.me/fcarenavs)\n\n💡 **দ্রষ্টব্য:** আমাদের অ্যাডমিনরা আপনাকে সাহায্য করার জন্য সর্বদা প্রস্তুত আছেন।",
-    "related_en": ["How to add coins?", "How to become a moderator?", "Why is my account frozen?"],
-    "related_bn": ["কয়েন কীভাবে যোগ করব?", "মডারেটর হব কীভাবে?", "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?"]
+    "answer_en": "💬 **How to Contact Official Admin Support**\n\nIf you need direct human assistance from our Admin Team:\n1. Tap the **Menu (Three dots)** icon in the top-right header.\n2. Select **'Contact Us'** or **'Telegram Support'**.\n3. Join our official Telegram support channel: **https://t.me/fcarenavs**\n4. Describe your issue along with your registered Email or UID for fast resolution.",
+    "answer_bn": "💬 **সরাসরি অ্যাডমিন বা সাপোর্টে কথা বলার নিয়ম**\n\nআপনার যদি কোনো জরুরি সমস্যা থাকে বা সরাসরি অ্যাডমিনের সাহায্যের প্রয়োজন হয়, তবে আমাদের অফিসিয়াল টেলিগ্রাম সাপোর্টে যোগাযোগ করুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের উপরে ডানে থাকা **'Menu'** আইকনে ক্লিক করুন।\n2. সেখান থেকে **'Contact Us'** অপশনটি সিলেক্ট করুন।\n3. অথবা সরাসরি নিচের লিঙ্কে ক্লিক করে আমাদের অফিসিয়াল টেলিগ্রাম গ্রুপে যুক্ত হোন:\n\n🔗 **টেলিগ্রাম সাপোর্ট লিঙ্ক:** [https://t.me/fcarenavs](https://t.me/fcarenavs)\n\n💡 **দ্রষ্টব্য:** মেসেজ দেওয়ার সময় আপনার অ্যাকাউন্টের ইমেইল বা ম্যাচ আইডি উল্লেখ করলে দ্রুত সমাধান পাবেন।",
+    "related_en": ["Why is my account frozen?", "How to get Publisher role?", "How to add coins?"],
+    "related_bn": ["অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "পাবলিশার বা হোস্ট রোল কীভাবে পাব?", "কয়েন কীভাবে যোগ করব?"]
   },
   {
     "id": "login_issue",
-    "keywords": ["login", "password", "reset", "লগইন", "পাসওয়ার্ড", "ভুল", "ভুলে গেছি", "dhukte", "somossya", "ঢুকতে পারছি না", "login problem", "forgot password", "লগইন হচ্ছে না", "পাসওয়ার্ড রিসেট"],
+    "keywords": [
+      "login issue", "login problem", "cannot login", "forgot password", "reset password", "wrong password",
+      "লগইন সমস্যা", "লগইন হচ্ছে না", "পাসওয়ার্ড ভুলে গেছি", "পাসওয়ার্ড রিসেট", "আইডিতে ঢুকতে পারছি না",
+      "login hocche na", "password bhule gesi", "password reset"
+    ],
     "questions": [
       "Why can't I login?",
       "লগইন হচ্ছে না কেন?",
       "login hocche na keno?",
       "Passward bhule gesi",
       "Password reset korbo kivabe?",
+      "পাসওয়ার্ড ভুলে গেলে কী করব?",
       "Can't enter my account",
-      "লগইন সমস্যা",
+      "লগইন সমস্যা কীভাবে ঠিক করব?",
       "Incorrect password dekhasse",
-      "আইডিতে ঢুকতে পারছি না",
-      "অ্যাকাউন্ট লগইন প্রবলেম"
+      "আইডিতে ঢুকতে পারছি না কেন?"
     ],
-    "answer_en": "If you cannot login:\n1. Check your internet connection.\n2. Ensure email and password are correct.\n3. If you forgot password, click 'Forgot?' link.\n4. Enter your email to receive a reset link.\n5. Note: 10 wrong attempts will lock your account for safety.",
-    "answer_bn": "🔐 **লগইন সমস্যার সমাধান**\n\nযদি আপনি আপনার অ্যাকাউন্টে ঢুকতে না পারেন, তবে নিচের বিষয়গুলো চেক করুন:\n\n**ধাপসমূহ:**\n1. **ইন্টারনেট চেক:** আপনার ইন্টারনেট কানেকশন সক্রিয় আছে কিনা নিশ্চিত করুন।\n2. **সঠিক তথ্য:** ইমেইল এবং পাসওয়ার্ড বড় হাতের বা ছোট হাতের অক্ষর খেয়াল করে লিখুন।\n3. **পাসওয়ার্ড রিসেট:** পাসওয়ার্ড ভুলে গেলে লগইন স্ক্রিনে থাকা **'Forgot?'** লিঙ্কে ক্লিক করুন। আপনার ইমেইলে একটি রিসেট লিঙ্ক পাঠানো হবে।\n\n⚠️ **সতর্কতা:** নিরাপত্তার জন্য ১০ বারের বেশি ভুল পাসওয়ার্ড দিলে আপনার আইডি সাময়িকভাবে লক হয়ে যেতে পারে।",
-    "related_en": ["How to create an account?", "How to contact support?", "How to update the app?"],
-    "related_bn": ["অ্যাকাউন্ট খুলব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "অ্যাপ আপডেট করব কীভাবে?"]
+    "answer_en": "🔐 **How to Fix Login & Password Issues**\n\nIf you are unable to log in to your account:\n1. Check your internet connection and make sure your email has no typos.\n2. If you signed up using **'Continue with Google'**, use that same button to log in.\n3. If you forgot your password, tap **'Forgot?'** on the login screen and enter your email to receive a password reset link (check your Spam folder too).\n4. Note: Too many failed password attempts may temporarily lock login for security.",
+    "answer_bn": "🔐 **লগইন ও পাসওয়ার্ড সমস্যার সমাধান**\n\nযদি আপনি আপনার অ্যাকাউন্টে লগইন করতে না পারেন, তবে নিচের বিষয়গুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **গুগল লগইন:** আপনি যদি প্রথমে **'Continue with Google'** দিয়ে আইডি খুলে থাকেন, তবে সবসময় সেই বাটনে ট্যাপ করেই লগইন করবেন।\n2. **সঠিক ইমেইল ও পাসওয়ার্ড:** ইমেইল এবং পাসওয়ার্ড লেখার সময় বানান ও ছোট-বড় হাতের অক্ষর (Case-sensitive) খেয়াল করুন।\n3. **পাসওয়ার্ড রিসেট:** পাসওয়ার্ড ভুলে গেলে লগইন স্ক্রিনে থাকা **'Forgot?'** বাটনে ক্লিক করে আপনার ইমেইল দিন। আপনার ইমেইলের ইনবক্স বা **Spam** ফোল্ডারে পাসওয়ার্ড রিসেট লিঙ্ক চলে যাবে।\n\n⚠️ **সতর্কতা:** নিরাপত্তার কারণে বারবার ভুল পাসওয়ার্ড দিলে আপনার লগইন সাময়িকভাবে ব্লক হয়ে যেতে পারে।",
+    "related_en": ["How to create an account?", "Why is my account frozen?", "How to contact support?"],
+    "related_bn": ["অ্যাকাউন্ট খুলব কীভাবে?", "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "coin_wallet",
-    "keywords": ["coin", "wallet", "money", "টাকা", "কয়েন", "ব্যালেন্স", "taka", "add", "deposit", "টাকা ভরব", "রিচার্জ", "buy coins", "top up", "টাকা এড", "কয়েন এড"],
+    "keywords": [
+      "add coins", "buy coins", "coin wallet", "top up", "deposit money", "recharge balance",
+      "কয়েন যোগ", "কয়েন এড", "ব্যালেন্স বাড়াব", "টপ আপ", "টাকা রিচার্জ", "কয়েন কিনব",
+      "coin add korbo", "balance top up"
+    ],
     "questions": [
       "How to add coins?",
+      "কয়েন কীভাবে যোগ করব?",
       "কয়েন কিভাবে যোগ করব?",
       "coin kivabe add korbo?",
-      "Taka kivabe dibo?",
       "Top up korbo kivabe?",
       "How to buy coins?",
       "ব্যালেন্স কীভাবে বাড়াব?",
-      "Taka recharge korar niyom",
-      "Money deposit kivabe?",
-      "টাকা ইনভেস্ট করব কীভাবে?"
+      "Taka recharge korar niyom ki?",
+      "ওয়ালেটে কয়েন নেব কীভাবে?"
     ],
-    "answer_en": "Currently, coin system works manually:\n1. Contact our admin on Telegram.\n2. Provide your Register Email and the amount.\n3. Pay via bKash, Nagad or Rocket.\n4. Admin will update your balance within 10-30 minutes.",
-    "answer_bn": "💰 **কয়েন বা ব্যালেন্স যোগ করার নিয়ম**\n\nবর্তমানে কয়েন সিস্টেমটি ম্যানুয়ালি কাজ করে। ব্যালেন্স টপ-আপ করতে নিচের নিয়ম মেনে চলুন:\n\n**ধাপসমূহ:**\n1. আমাদের অফিসিয়াল টেলিগ্রাম অ্যাডমিনের সাথে যোগাযোগ করুন।\n2. আপনার রেজিস্টার্ড ইমেইল এবং আপনি কত কয়েন নিতে চান তা জানান।\n3. অ্যাডমিনের দেওয়া নাম্বারে বিকাশ, নগদ বা রকেটের মাধ্যমে পেমেন্ট সম্পন্ন করুন।\n4. পেমেন্ট ভেরিফাই হওয়ার ১০-৩০ মিনিটের মধ্যে আপনার ওয়ালেটে কয়েন যোগ করে দেওয়া হবে।\n\n💡 **দ্রষ্টব্য:** ভবিষ্যতে আমরা অটোমেটিক পেমেন্ট গেটওয়ে যুক্ত করার চেষ্টা করছি।",
+    "answer_en": "💰 **How to Add Coins to Your Wallet**\n\nCurrently, wallet top-ups are processed securely by our Admin Team:\n1. Contact our official support on Telegram: **https://t.me/fcarenavs**\n2. Provide your registered **Email / UID** and the amount of coins you want.\n3. Complete the payment via **bKash, Nagad, or Rocket**.\n4. Your coin balance will be updated within 10–30 minutes.",
+    "answer_bn": "💰 **কয়েন বা ব্যালেন্স যোগ করার নিয়ম**\n\nনিরাপত্তার স্বার্থে বর্তমানে কয়েন টপ-আপ সিস্টেমটি আমাদের অ্যাডমিন প্যানেল থেকে সরাসরি পরিচালিত হয়:\n\n**ধাপসমূহ:**\n1. আমাদের অফিসিয়াল টেলিগ্রাম সাপোর্টে ([https://t.me/fcarenavs](https://t.me/fcarenavs)) যোগাযোগ করুন।\n2. আপনার অ্যাকাউন্টের রেজিস্টার্ড ইমেইল এবং কত কয়েন নিতে চান তা জানান।\n3. অ্যাডমিনের দেওয়া নাম্বারে বিকাশ, নগদ বা রকেটের মাধ্যমে পেমেন্ট সম্পন্ন করুন।\n4. পেমেন্ট ভেরিফাই হওয়ার ১০-৩০ মিনিটের মধ্যে আপনার প্রোফাইল ওয়ালেটে কয়েন যুক্ত হয়ে যাবে।",
     "related_en": ["How to get prize money?", "How to join a tournament?", "How to contact support?"],
     "related_bn": ["পুরস্কারের টাকা কীভাবে পাব?", "টুর্নামেন্টে জয়েন করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "account_banned",
-    "keywords": ["banned", "security", "frozen", "ব্যান", "অ্যাকাউন্ট", "বন্ধ", "id bondho", "নিষিদ্ধ", "blocked", "appeal", "unban", "ব্যান হয়েছে", "আইডি বন্ধ"],
+    "keywords": [
+      "account frozen", "account banned", "id banned", "id blocked", "unban account",
+      "অ্যাকাউন্ট বন্ধ", "আইডি ব্যান", "অ্যাকাউন্ট ফ্রোজেন", "আইডি ব্লক", "ব্যান খুলব",
+      "id bondho", "account ban", "frozen account"
+    ],
     "questions": [
       "Why is my account frozen?",
       "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?",
       "account keno bondho hoye gelo?",
       "Amar id keno ban korlo?",
       "How to unban my id?",
-      "Id block hoye gese",
+      "Id block hoye gese keno?",
       "আইডি কেন ব্যান হলো?",
-      "Appeal unban request",
       "ব্যান কীভাবে খুলব?"
     ],
-    "answer_en": "If your account is frozen/banned:\n1. Our system detected multiple devices or fake scores.\n2. Or you violated community rules.\n3. To appeal, go to Telegram and talk to the Head Admin.\n4. Provide proof of innocence to unlock.",
-    "answer_bn": "🚫 **অ্যাকাউন্ট ব্যান বা ব্লক হওয়ার কারণ**\n\nযদি আপনার অ্যাকাউন্টে 'Blocked' বা 'Frozen' দেখায়, তবে এর কারণ হতে পারে:\n\n**সম্ভাব্য কারণসমূহ:**\n1. **মাল্টিপল ডিভাইস:** একই আইডি একাধিক ফোনে ব্যবহারের চেষ্টা করা।\n2. **ফেক রিপোর্ট:** ভুল বা ভুয়া ম্যাচ রেজাল্ট সাবমিট করা।\n3. **অশালীন আচরণ:** প্রতিপক্ষের সাথে খারাপ ব্যবহার বা গালিগালাজ করা।\n\n💡 **আপিল করার নিয়ম:** আপনি যদি মনে করেন ভুলবশত ব্যান করা হয়েছে, তবে টেলিগ্রামে হেড অ্যাডমিনের সাথে যোগাযোগ করে আপনার নির্দোষ হওয়ার প্রমাণ দিন।",
-    "related_en": ["How to report a cheater?", "How to contact support?", "How to update my profile links?"],
-    "related_bn": ["চিটার রিপোর্ট করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "লিঙ্ক আপডেট করব কীভাবে?"]
+    "answer_en": "🚫 **Why Your Account Was Frozen or Banned**\n\nAccounts are automatically or manually restricted for the following reasons:\n1. **Multiple Accounts:** Creating or logging into multiple accounts from the same device.\n2. **Fake Score Reports:** Submitting falsified match scores or edited screenshots.\n3. **Toxic Behavior / Cheating:** Using game hacks or abusing opponents.\n\n💡 **How to Appeal:** If you believe this was a mistake, contact the Head Admin on Telegram (**https://t.me/fcarenavs**) with your registered email.",
+    "answer_bn": "🚫 **অ্যাকাউন্ট ব্যান বা ফ্রোজেন (Frozen) হওয়ার কারণ**\n\nআমাদের অ্যান্টি-ফ্রড সিকিউরিটি সিস্টেম নিচের কারণগুলোতে অ্যাকাউন্ট সাময়িক বা স্থায়ীভাবে লক করে দেয়:\n\n**প্রধান কারণসমূহ:**\n1. **একাধিক অ্যাকাউন্ট (Multi-Accounting):** একই ফোনে বা ডিভাইসে একাধিক আইডি খোলা বা ব্যবহারের চেষ্টা করা।\n2. **ফেক স্কোর রিপোর্ট:** ম্যাচে হেরে গিয়েও জয়ের ভুয়া স্কোর সাবমিট করা।\n3. **অশালীন আচরণ বা হ্যাকিং:** প্রতিপক্ষের সাথে খারাপ আচরণ করা বা গেমে কোনো অসদুপায় অবলম্বন করা।\n\n💡 **আপিল করার নিয়ম:** আপনি যদি মনে করেন ভুলবশত আপনার আইডি লক হয়েছে, তবে প্রমাণসহ আমাদের টেলিগ্রাম সাপোর্টে হেড অ্যাডমিনের সাথে যোগাযোগ করুন।",
+    "related_en": ["Security and Fair-Play Policy?", "How to contact support?", "Why can't I login?"],
+    "related_bn": ["নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা কী?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "লগইন হচ্ছে না কেন?"]
   },
   {
     "id": "match_list",
-    "keywords": ["my matches", "kothay", "match center", "amar match", "dekhte", "pabo", "খেলা", "আমার খেলা", "upcoming matches", "match schedule", "ম্যাচ কই", "আমার ম্যাচ"],
+    "keywords": [
+      "where are my matches", "my matches", "match schedule", "upcoming matches", "match list",
+      "আমার ম্যাচগুলো কোথায়", "আমার খেলা কোথায়", "ম্যাচ শিডিউল", "খেলা কখন", "ম্যাচ লিস্ট",
+      "amar match kothay", "khela kokhon"
+    ],
     "questions": [
       "Where are my matches?",
+      "আমার ম্যাচগুলো কোথায় পাব?",
       "আমার ম্যাচগুলো কোথায় দেখব?",
       "Amar match gulo kothay pabo?",
       "When is my next match?",
       "ম্যাচ শিডিউল কোথায় পাব?",
-      "My match center",
-      "আমার খেলা কখন?",
-      "Upcoming matches check",
-      "ম্যাচ কার্ড পাচ্ছি না"
+      "আমার খেলা কখন কীভাবে দেখব?",
+      "ম্যাচ কার্ড পাচ্ছি না কেন?"
     ],
-    "answer_en": "To see your upcoming or past matches:\n1. Click the 'Field' (Calendar icon) at bottom.\n2. Or go to 'My Matches' from the dashboard.\n3. You will see 'Ongoing', 'Scheduled' and 'History' sections.",
-    "answer_bn": "🏟️ **আমার ম্যাচগুলো খুঁজে পাওয়ার নিয়ম**\n\nআপনার বর্তমান বা আসন্ন ম্যাচগুলো দেখতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচে থাকা **'Field'** (ক্যালেন্ডার আইকন) এ ক্লিক করুন।\n2. অথবা আপনার প্রোফাইল ড্যাশবোর্ড থেকে **'My Matches'** বাটনে ট্যাপ করুন।\n3. সেখানে আপনি **'Ongoing'**, **'Scheduled'** এবং **'History'** নামে আলাদা সেকশন পাবেন।\n\n💡 **দ্রষ্টব্য:** আপনার খেলা শুরু হওয়ার আগে এখান থেকেই প্রতিপক্ষের সাথে চ্যাট করে সময় ঠিক করে নিতে পারেন।",
+    "answer_en": "🏟️ **Where to Find Your Matches**\n\n1. Tap the **'Field' / 'My Matches'** (Calendar icon) tab on the bottom navigation bar.\n2. Here you will see all your active fixtures divided into **Ongoing**, **Scheduled**, and **Completed**.\n3. You can also open your specific tournament from the **'Arena'** tab and go to the **'Matches'** section to view the full bracket and group fixtures.",
+    "answer_bn": "🏟️ **আমার ম্যাচগুলো খুঁজে পাওয়ার নিয়ম**\n\nআপনার চলমান বা আসন্ন ম্যাচগুলো দেখতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচের নেভিগেশন বারে থাকা **'Field' / 'My Matches'** (ক্যালেন্ডার আইকন) ট্যাবে ক্লিক করুন।\n2. সেখানে আপনি আপনার সব **Ongoing (চলমান)** এবং **Completed (সমাপ্ত)** ম্যাচের কার্ড দেখতে পাবেন।\n3. এছাড়া আপনি যে টুর্নামেন্টে জয়েন করেছেন সেটির ভেতরে গিয়ে **'Matches'** বা **'Bracket'** ট্যাবেও সব খেলার তালিকা দেখতে পাবেন।\n\n💡 **দ্রষ্টব্য:** হোস্ট যতক্ষণ না ম্যাচ ডিপ্লয় (Deploy) করছেন, ততক্ষণ ম্যাচ লিস্ট ফাঁকা দেখাবে।",
     "related_en": ["How to talk to opponent?", "How to upload match result?", "How to find a match by ID?"],
     "related_bn": ["প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "ম্যাচ রিজাল্ট কীভাবে দেব?", "ম্যাচ আইডি দিয়ে কীভাবে খুঁজব?"]
   },
   {
     "id": "moderator",
-    "keywords": ["become moderator", "join admin team", "mod recruitment", "মডারেটর হওয়া", "টিমে জয়েন", "এডমিন হওয়া", "কাজ করতে চাই", "helper application", "টিমে কাজ", "মডারেটর রিক্রুটমেন্ট", "মডারেটর নিয়োগ"],
+    "keywords": [
+      "become moderator", "moderator recruitment", "join admin team", "মডারেটর হব",
+      "মডারেটর নিয়োগ", "অ্যাডমিন টিমে কাজ", "mod recruitment", "moderator hobo kivabe"
+    ],
     "questions": [
       "How to become a moderator?",
       "মডারেটর হব কীভাবে?",
       "Kivabe admin team e join korbo?",
       "Mod recruitment form pabo kothay?",
-      "I want to help Arena",
-      "টিমে কীভাবে ঢুকব?",
-      "Admin hobo kivabe?",
-      "Be a moderator",
-      "মডারেটর হতে চাই"
+      "অ্যাডমিন বা মডারেটর হতে চাই",
+      "Be a moderator"
     ],
-    "answer_en": "To join the admin team:\n1. Stay active in our community group.\n2. Help other players with their queries.\n3. Apply when we post recruitment forms on Telegram.\n4. Trusted members are selected based on behavior.",
-    "answer_bn": "🎖️ **অ্যাডমিন বা মডারেটর হওয়ার নিয়ম**\n\nআপনি যদি FC Arena টিমের অংশ হতে চান এবং আমাদের সাহায্য করতে চান, তবে নিচের নিয়মগুলো মেনে চলুন:\n\n**ধাপসমূহ:**\n1. আমাদের কমিউনিটি গ্রুপে নিয়মিত সক্রিয় থাকুন।\n2. নতুন প্লেয়ারদের তাদের ছোটখাটো সমস্যায় সাহায্য করুন।\n3. টেলিগ্রামে যখন **'Mod Recruitment'** ফর্ম দেওয়া হবে, তখন সেটি পূরণ করুন।\n\n💡 **দ্রষ্টব্য:** আমরা সাধারণত প্লেয়ারদের আচরণ এবং কমিউনিটিতে তাদের অবদানের ভিত্তিতে মডারেটর নির্বাচন করি।",
-    "related_en": ["How to contact support?", "How to report a cheater?", "How to link messenger?"],
-    "related_bn": ["অ্যাডমিনের সাথে কীভাবে কথা বলব?", "চিটার রিপোর্ট করব কীভাবে?", "মেসেঞ্জার লিঙ্ক কীভাবে দেব?"]
+    "answer_en": "🎖️ **How to Become an Arena Moderator**\n\n1. Stay active in our official community and maintain a clean fair-play record.\n2. Help new players in the Telegram group.\n3. Apply when **Moderator Recruitment** announcements are posted in our Telegram channel (**https://t.me/fcarenavs**).",
+    "answer_bn": "🎖️ **অ্যাডমিন বা মডারেটর হওয়ার নিয়ম**\n\nআপনি যদি FC Arena টিমের মডারেটর হিসেবে কাজ করতে চান, তবে নিচের বিষয়গুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আমাদের কমিউনিটি ও টুর্নামেন্টগুলোতে নিয়মিত সক্রিয় ও সৎ থাকুন।\n2. টেলিগ্রাম গ্রুপে নতুন প্লেয়ারদের বিভিন্ন প্রশ্নের উত্তর দিয়ে সাহায্য করুন।\n3. আমাদের টেলিগ্রাম চ্যানেলে যখন **'Moderator Recruitment'** ঘোষণা করা হবে, তখন আবেদন ফর্ম পূরণ করুন।\n\n💡 **দ্রষ্টব্য:** প্লেয়ারদের আচার-আচরণ, অভিজ্ঞতা এবং দায়িত্বশীলতার ভিত্তিতে মডারেটর নির্বাচন করা হয়।",
+    "related_en": ["How to get Publisher role?", "How to contact support?", "Security and Fair-Play Policy?"],
+    "related_bn": ["পাবলিশার বা হোস্ট রোল কীভাবে পাব?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা কী?"]
   },
   {
     "id": "prize_money",
-    "keywords": ["prize money", "withdraw money", "টাকা পাব কীভাবে", "জিতলে টাকা", "winnings payout", "পেমেন্ট", "বিকাশ পেমেন্ট", "পুরস্কার নেওয়া", "টাকা তোলা", "টাকা উইথড্র"],
+    "keywords": [
+      "prize money", "winnings", "withdraw prize", "tournament prize", "পুরস্কারের টাকা",
+      "প্রাইজ মানি", "জিতলে টাকা", "টাকা উইথড্র", "পুরস্কার কীভাবে পাব", "bkash payment",
+      "taka kivabe pabo", "prize kivabe pabo"
+    ],
     "questions": [
       "How to get prize money?",
       "পুরস্কারের টাকা কীভাবে পাব?",
+      " প্রাইজ মানি কীভাবে পাব?",
       "Match jitle taka kivabe pabo?",
-      "Winnings payout process",
-      "Match jitle ki taka pabo?",
+      "Tournament jitle prize kivabe pabo?",
       "টাকা কীভাবে দেবে?",
-      "Kivabe taka pabo?",
       "When will I get my prize?",
       "টাকা উইথড্র করব কীভাবে?"
     ],
-    "answer_en": "To receive your winnings:\n1. Ensure the match result is 'Completed'.\n2. If it's an official FC Arena Cup, prize is auto-sent within 24h.\n3. If it's a Host-run Cup, contact the host via Messenger.\n4. Provide your bKash/Nagad number to the host.",
-    "answer_bn": "🏆 **পুরস্কারের টাকা পাওয়ার নিয়ম**\n\nটুর্নামেন্ট জেতার পর আপনার প্রাইজ মানি বা পুরস্কার বুঝে নিতে নিচের নিয়মগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **কনফার্মেশন:** নিশ্চিত করুন আপনার ফাইনাল ম্যাচের রেজাল্ট অ্যাপে 'Completed' দেখাচ্ছে।\n2. **অফিসিয়াল কাপ:** এটি যদি আমাদের অফিসিয়াল টুর্নামেন্ট হয়, তবে ২৪ ঘণ্টার মধ্যে আপনার ব্যালেন্স বা বিকাশ নাম্বারে টাকা চলে যাবে।\n3. **ব্যক্তিগত কাপ:** এটি যদি অন্য কারো হোস্ট করা কাপ হয়, তবে আপনি সরাসরি হোস্টকে মেসেঞ্জারে আপনার বিকাশ বা নগদ নাম্বারটি দিন।\n\n💡 **দ্রষ্টব্য:** যেকোনো পেমেন্ট সংক্রান্ত সমস্যায় সরাসরি অ্যাডমিনকে জানাতে ভুলবেন না।",
-    "related_en": ["How leaderboard works?", "How to upload match result?", "How to add coins?"],
-    "related_bn": ["লিডারবোর্ড কীভাবে কাজ করে?", "ম্যাচ রিজাল্ট কীভাবে দেব?", "কয়েন কীভাবে যোগ করব?"]
+    "answer_en": "🏆 **How to Claim Your Tournament Prize Money**\n\n1. Make sure the Grand Final result is verified and the tournament status is **'FINISHED'**.\n2. **Official Arena Cups:** Prizes are sent within 24 hours via bKash/Nagad or added to your wallet.\n3. **Community Host Cups:** Contact the Tournament Host directly via Messenger or the Tournament Group with your bKash/Nagad number.",
+    "answer_bn": "🏆 **পুরস্কারের টাকা (Prize Money) পাওয়ার নিয়ম**\n\nটুর্নামেন্টে চ্যাম্পিয়ন বা রানার-আপ হওয়ার পর আপনার পুরস্কার বুঝে নিতে নিচের নিয়ম অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **ফাইনাল কনফার্মেশন:** নিশ্চিত করুন যে গ্র্যান্ড ফাইনাল ম্যাচের রেজাল্ট অ্যাপে কনফার্ম হয়ে টুর্নামেন্ট **'FINISHED'** দেখাচ্ছে।\n2. **অফিসিয়াল টুর্নামেন্ট:** আমাদের অফিসিয়াল কাপ হলে ২৪ ঘণ্টার মধ্যে আপনার বিকাশ/নগদ নাম্বারে প্রাইজ মানি পাঠিয়ে দেওয়া হবে।\n3. **হোস্টদের টুর্নামেন্ট:** অন্য কোনো পাবলিশার বা হোস্টের টুর্নামেন্ট হলে সরাসরি সেই হোস্টের সাথে মেসেঞ্জারে যোগাযোগ করে আপনার বিকাশ/নগদ নাম্বার দিন।\n\n💡 **দ্রষ্টব্য:** পেমেন্ট সংক্রান্ত যেকোনো জটিলতায় প্রমাণসহ আমাদের টেলিগ্রাম সাপোর্টে জানাতে পারেন।",
+    "related_en": ["How leaderboard works?", "How to upload match result?", "How to contact support?"],
+    "related_bn": ["লিডারবোর্ড কীভাবে কাজ করে?", "ম্যাচ রিজাল্ট কীভাবে দেব?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "app_update",
-    "keywords": ["update app", "download latest", "নতুন ভার্সন", "আপডেট করা", "installing update", "অ্যাপ নামানো", "play store", "apk download", "আপডেট প্রবলেম"],
+    "keywords": [
+      "update app", "app update", "download apk", "install app", "latest version",
+      "অ্যাপ আপডেট", "নতুন ভার্সন", "অ্যাপ ডাউনলোড", "এপিকে ডাউনলোড", "অ্যাপ ইন্সটল",
+      "apk download", "pwa install"
+    ],
     "questions": [
       "How to update the app?",
       "অ্যাপ আপডেট করব কীভাবে?",
-      "New version kothay pabo?",
-      "Update Arena VS",
       "নতুন ভার্সন কীভাবে নামাব?",
-      "App update niyom",
+      "এপিকে (APK) ডাউনলোড করব কীভাবে?",
+      "New version kothay pabo?",
       "How to download latest version?",
-      "অ্যাপ ডাউনলোড হচ্ছে না"
+      "অ্যাপ ইন্সটল করব কীভাবে?"
     ],
-    "answer_en": "To update FC Arena VS:\n1. If an update is mandatory, a screen will appear.\n2. Click the 'Download Update' button.\n3. If using Chrome, tap 3-dots and click 'Install App' again.\n4. Refresh the page to load new features.",
-    "answer_bn": "🔄 **অ্যাপ আপডেট করার নিয়ম**\n\nFC Arena VS-এর নতুন সব ফিচার এবং সিকিউরিটি আপডেট পেতে অ্যাপটি সর্বদা লেটেস্ট ভার্সনে রাখুন:\n\n**ধাপসমূহ:**\n1. **নোটিফিকেশন:** যখনই নতুন আপডেট আসবে, অ্যাপ ওপেন করলে একটি আপডেট স্ক্রিন দেখতে পাবেন।\n2. **ডাউনলোড:** সেখানে থাকা **'Download Update'** বাটনে ক্লিক করুন।\n3. **রিফ্রেশ:** আপডেট হওয়ার পর অ্যাপটি একবার রিলোড বা রিফ্রেশ করুন।\n4. **ইনস্টল (PWA):** আপনি যদি ক্রোম ব্রাউজার ব্যবহার করেন, তবে মেনু থেকে **'Install App'** এ ক্লিক করে হোম স্ক্রিনে যুক্ত করে নিতে পারেন।\n\n💡 **দ্রষ্টব্য:** নিয়মিত আপডেট না করলে কিছু ফিচার বা টুর্নামেন্ট ঠিকমতো কাজ নাও করতে পারে।",
-    "related_en": ["Why can't I login?", "App taking too much space?", "High ping in game?"],
-    "related_bn": ["লগইন হচ্ছে না কেন?", "মেমোরি ফুল হয়ে গেছে কেন?", "গেম ল্যাগ করলে কী করব?"]
+    "answer_en": "🔄 **How to Install or Update the App**\n\n1. **Auto Web Update:** Simply reload/refresh the app to get the latest features instantly.\n2. **PWA Install:** On Chrome/Safari, open browser menu and tap **'Add to Home Screen'** or **'Install App'**.\n3. **Android APK:** If a new APK version is released, tap the **'Download Update'** prompt or get the latest APK from our official website/Telegram channel.",
+    "answer_bn": "🔄 **অ্যাপ আপডেট ও ইন্সটল করার নিয়ম**\n\nFC Arena VS-এর সর্বশেষ ফিচারগুলো পেতে নিচের নিয়ম অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. **ওয়েব / প্রিভিউ আপডেট:** ব্রাউজারে অ্যাপটি একবার রিফ্রেশ বা রিলোড দিলেই নতুন আপডেট স্বয়ংক্রিয়ভাবে লোড হয়ে যাবে।\n2. **হোম স্ক্রিনে ইন্সটল (PWA):** ক্রোম ব্রাউজারের মেনু (তিন ডট) থেকে **'Install App'** বা **'Add to Home Screen'** এ ক্লিক করে অ্যাপ হিসেবে ব্যবহার করতে পারেন।\n3. **অ্যান্ড্রয়েড APK:** নতুন ভার্সনের APK রিলিজ হলে আমাদের অফিসিয়াল গিটহাব রিলিজ বা টেলিগ্রাম গ্রুপ থেকে লেটেস্ট APK ডাউনলোড করে ইন্সটল করে নিন।",
+    "related_en": ["App taking too much space?", "Why can't I login?", "Not getting notifications?"],
+    "related_bn": ["মেমোরি ফুল হয়ে গেছে কেন?", "লগইন হচ্ছে না কেন?", "নোটিফিকেশন পাচ্ছি না কেন?"]
   },
   {
     "id": "rules_violation",
-    "keywords": ["report cheater", "hacking report", "চিটার রিপোর্ট", "হ্যাক করা", "toxic behavior", "গালি দিচ্ছে", "বিহেভিয়র রিপোর্ট", "illegal play", "অভিযোগ করা", "রিপোর্ট করা", "চিটার"],
+    "keywords": [
+      "report cheater", "report hacker", "toxic player", "abusive player", "report player",
+      "চিটার রিপোর্ট", "হ্যাকার রিপোর্ট", "গালি দিলে", "খারাপ ব্যবহার", "অভিযোগ করব",
+      "cheater report korbo", "hack report"
+    ],
     "questions": [
       "How to report a cheater?",
       "চিটার রিপোর্ট করব কীভাবে?",
-      "Kew toxic hole ki korbo?",
-      "Report a player for abuse",
       "হ্যাক রিপোর্ট কীভাবে করব?",
-      "গালি দিচ্ছে প্লেয়ার",
-      "Abusive behavior report",
-      "He is cheating",
+      "Kew toxic hole ba gali dile ki korbo?",
+      "Report a player for abuse",
+      "প্রতিপক্ষ গালি দিলে বা চিটিং করলে কী করব?",
       "প্লেয়ারকে রিপোর্ট করব কীভাবে?"
     ],
-    "answer_en": "To report illegal activity:\n1. Record the game or take a screenshot of the incident.\n2. Go to the tournament and find the 'Rules' section.\n3. Contact the Host immediately with proof.\n4. Or report to Telegram Global Admin with Match ID.",
-    "answer_bn": "🛡️ **চিটার বা নিয়ম ভঙ্গকারী রিপোর্ট করার নিয়ম**\n\nআমরা একটি সুন্দর এবং ফেয়ার গেমিং পরিবেশ বজায় রাখতে কঠোর নিয়ম পালন করি। কেউ নিয়ম ভাঙলে এভাবে রিপোর্ট করুন:\n\n**ধাপসমূহ:**\n1. **প্রমাণ সংগ্রহ:** ঘটনার একটি পরিষ্কার ভিডিও রেকর্ড বা স্ক্রিনশট নিন।\n2. **ম্যাচ আইডি:** আপনার ম্যাচের আইডিটি কপি করে রাখুন।\n3. **অ্যাডমিনকে জানানো:** সরাসরি আমাদের টেলিগ্রাম গ্রুপে প্রমাণসহ ম্যাচ আইডি দিন।\n4. **হোস্টকে জানানো:** টুর্নামেন্ট চলাকালীন হলে সাথে সাথে হোস্টকে মেসেজ দিন।\n\n⚠️ **সতর্কতা:** ফেক রিপোর্ট বা মিথ্যা অভিযোগ করলে উল্টো আপনার আইডি ব্যান হতে পারে।",
-    "related_en": ["How to contact support?", "Why is my account frozen?", "How leaderboard works?"],
-    "related_bn": ["অ্যাডমিনের সাথে কীভাবে কথা বলব?", "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "লিডারবোর্ড কীভাবে কাজ করে?"]
+    "answer_en": "🛡️ **How to Report a Cheater or Rule Breaker**\n\n1. Take clear **video proof or screenshots** of the cheating, hack, or abusive chat.\n2. Copy the **Match ID (M-XXXXXX)** and the player's UID.\n3. Report it immediately to the **Tournament Host** or post it in our official Telegram support group (**https://t.me/fcarenavs**).\n4. Verified cheaters are permanently banned from the platform.",
+    "answer_bn": "🛡️ **চিটার বা নিয়ম ভঙ্গকারীকে রিপোর্ট করার নিয়ম**\n\nকেউ যদি গেমে হ্যাক ব্যবহার করে, নেট গ্লিচ দেয় অথবা চ্যাটে অশালীন আচরণ করে, তবে এভাবে রিপোর্ট করুন:\n\n**ধাপসমূহ:**\n1. **প্রমাণ সংগ্রহ:** ঘটনার একটি পরিষ্কার স্ক্রিন রেকর্ড (ভিডিও) বা স্ক্রিনশট নিন।\n2. **ম্যাচ আইডি কপি করুন:** আপনার ম্যাচের আইডি (**M-XXXXXX**) এবং ওই প্লেয়ারের নাম/UID নোট করুন।\n3. **হোস্ট ও অ্যাডমিনকে জানান:** টুর্নামেন্টের হোস্টকে অথবা সরাসরি আমাদের টেলিগ্রাম সাপোর্ট গ্রুপে প্রমাণসহ মেসেজ দিন।\n\n⚠️ **সতর্কতা:** প্রমাণ ছাড়া কাউকে মিথ্যা অপবাদ দিলে অভিযোগ গ্রহণ করা হবে না।",
+    "related_en": ["What if opponent submits wrong score?", "Security and Fair-Play Policy?", "How to contact support?"],
+    "related_bn": ["প্রতিপক্ষ ভুল স্কোর বা রেজাল্ট দিলে কী করব?", "নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা কী?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "link_social",
-    "keywords": ["link", "facebook", "messenger", "whatsapp", "প্রোফাইল", "লিঙ্ক", "মেসেঞ্জার", "বিকাশ", "profile update", "fb link"],
+    "keywords": [
+      "link messenger", "facebook link", "whatsapp number", "social link", "add messenger link",
+      "মেসেঞ্জার লিঙ্ক", "ফেসবুক লিঙ্ক", "হোয়াটসঅ্যাপ নাম্বার", "সোশ্যাল লিঙ্ক",
+      "messenger link kivabe dibo", "fb link add"
+    ],
     "questions": [
       "How to link messenger?",
       "মেসেঞ্জার লিঙ্ক কীভাবে দেব?",
-      "Kivabe link add korbo?",
-      "Update my profile links",
       "ফেসবুক লিঙ্ক কীভাবে দেব?",
-      "Profile photo update",
-      "Messenger link pabo kothay?",
+      "হোয়াটসঅ্যাপ নাম্বার কোথায় যোগ করব?",
+      "Kivabe messenger link add korbo?",
+      "Update my profile social links",
       "How to update fb link?"
     ],
-    "answer_en": "To update your contact links:\n1. Go to 'Profile' (User icon) tab.\n2. Click the 'Edit Profile' or Gear icon.\n3. Paste your Facebook profile and Messenger links.\n4. Enter your WhatsApp number.\n5. Click 'Save Changes'.",
-    "answer_bn": "🔗 **সোশ্যাল লিঙ্ক বা প্রোফাইল আপডেট করার নিয়ম**\n\nআপনার প্রতিপক্ষ বা হোস্ট যাতে আপনার সাথে যোগাযোগ করতে পারে, সেজন্য সঠিক লিঙ্ক দেওয়া জরুরি:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচে থাকা **'Profile'** (ইউজার আইকন) ট্যাবে যান।\n2. সেখানে থাকা **'Edit Profile'** বা গিয়ার আইকনে ক্লিক করুন।\n3. আপনার ফেসবুক প্রোফাইল এবং মেসেঞ্জার লিঙ্ক কপি করে পেস্ট করুন।\n4. আপনার হোয়াটসঅ্যাপ নাম্বারটি আপডেট করুন।\n5. সবশেষে **'Save Changes'** বাটনে ক্লিক করুন।\n\n💡 **দ্রষ্টব্য:** মেসেঞ্জার লিঙ্ক না দিলে প্রতিপক্ষ আপনার সাথে ম্যাচের সময় ঠিক করতে পারবে না।",
-    "related_en": ["Where to find FC Mobile UID?", "How to create an account?", "How to get prize money?"],
-    "related_bn": ["ইউআইডি (UID) কোথায় পাব?", "অ্যাকাউন্ট খুলব কীভাবে?", "পুরস্কারের টাকা কীভাবে পাব?"]
+    "answer_en": "🔗 **How to Add Your Messenger, Facebook & WhatsApp Links**\n\n1. Go to the **'Profile'** tab at the bottom right.\n2. Tap **'Edit Profile'**.\n3. Paste your **Facebook Profile URL / Messenger Username** and enter your **WhatsApp Number**.\n4. Tap **'Save Changes'**.\n\n💡 Having a valid Messenger link lets your opponent message you with 1 click from the match card!",
+    "answer_bn": "🔗 **মেসেঞ্জার, ফেসবুক লিঙ্ক ও হোয়াটসঅ্যাপ যুক্ত করার নিয়ম**\n\nপ্রতিপক্ষ এবং হোস্ট যাতে ১ ক্লিকেই আপনার সাথে যোগাযোগ করতে পারে, সেজন্য প্রোফাইলে সঠিক লিঙ্ক দেওয়া জরুরি:\n\n**ধাপসমূহ:**\n1. অ্যাপের নিচে থাকা **'Profile'** ট্যাবে যান।\n2. সেখানে থাকা **'Edit Profile'** বাটনে ক্লিক করুন।\n3. আপনার ফেসবুক প্রোফাইল লিঙ্ক বা মেসেঞ্জার ইউজারনেম কপি করে নির্দিষ্ট ঘরে পেস্ট করুন।\n4. আপনার সচল **WhatsApp** নাম্বারটি লিখুন এবং **'Save Changes'** বাটনে ক্লিক করুন।\n\n💡 **দ্রষ্টব্য:** সঠিক মেসেঞ্জার লিঙ্ক দেওয়া থাকলে ম্যাচ কার্ডের মেসেঞ্জার আইকনে ক্লিক করলেই প্রতিপক্ষ আপনাকে সরাসরি মেসেজ দিতে পারবে।",
+    "related_en": ["How to talk to opponent?", "How to edit profile Name, IGN or UID?", "How to join a tournament?"],
+    "related_bn": ["প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "প্রোফাইলের নাম, IGN বা UID কীভাবে পরিবর্তন করব?", "টুর্নামেন্টে জয়েন করব কীভাবে?"]
   },
   {
     "id": "withdraw_cup",
-    "keywords": ["leave", "withdraw", "exit", "ber", "hobo", "nam", "kata", "বের হব", "টুর্নামেন্ট থেকে", "unjoin", "cancel join"],
+    "keywords": [
+      "leave tournament", "withdraw tournament", "cancel join", "unjoin tournament",
+      "টুর্নামেন্ট থেকে নাম কাটব", "টুর্নামেন্ট থেকে বের হব", "খেলব না টুর্নামেন্ট", "লিভ নেব",
+      "tournament theke ber hobo", "nam katbo"
+    ],
     "questions": [
       "How to leave a tournament?",
       "টুর্নামেন্ট থেকে নাম কাটব কীভাবে?",
-      "Kivabe withdraw korbo?",
+      "টুর্নামেন্ট থেকে বের হব কীভাবে?",
+      "Kivabe tournament theke withdraw korbo?",
       "I want to leave this cup",
-      "নাম সরাতে চাই টুর্নামেন্ট থেকে",
-      "Cancel my join request",
-      "খেলব না এই টুর্নামেন্ট",
-      "Unjoin cup"
+      "Cancel my join request"
     ],
-    "answer_en": "To withdraw from a cup:\n1. You can only leave BEFORE the matches are deployed.\n2. Go to the tournament detail page.\n3. If your status is 'Pending', contact the host to reject.\n4. Once matches start, you cannot withdraw.",
-    "answer_bn": "🚪 **টুর্নামেন্ট থেকে নাম কাটানোর নিয়ম**\n\nআপনি যদি কোনো টুর্নামেন্টে জয়েন করার পর খেলতে না চান, তবে নিচের নিয়ম মেনে চলুন:\n\n**নিয়মাবলী:**\n1. **সময়সীমা:** আপনি শুধুমাত্র ম্যাচ শুরু বা ফিক্সচার তৈরির আগেই নাম কাটাতে পারবেন।\n2. **পেন্ডিং স্ট্যাটাস:** যদি আপনার জয়েন রিকোয়েস্ট এখনো 'Pending' থাকে, তবে হোস্টকে বলুন রিজেক্ট করে দিতে।\n3. **শুরু হয়ে গেলে:** একবার টুর্নামেন্ট শুরু হয়ে গেলে বা আপনি গ্রুপে যুক্ত হয়ে গেলে আর বের হওয়া যাবে না।\n\n💡 **দ্রষ্টব্য:** বিনা কারণে টুর্নামেন্ট মাঝপথে ছেড়ে দিলে আপনার প্রোফাইল রেটিং কমে যেতে পারে।",
-    "related_en": ["How to join a tournament?", "How to contact support?", "How to report a cheater?"],
-    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "চিটার রিপোর্ট করব কীভাবে?"]
+    "answer_en": "🚪 **How to Withdraw / Leave a Tournament**\n\n1. You can only withdraw **before** the host deploys the groups and match fixtures.\n2. Contact the Tournament Host via the Tournament Messenger Group and ask them to remove your entry.\n3. Once the tournament is **ONGOING** and matches are deployed, players cannot withdraw.",
+    "answer_bn": "🚪 **টুর্নামেন্ট থেকে নাম কাটানো বা লিভ নেওয়ার নিয়ম**\n\nআপনি যদি কোনো টুর্নামেন্টে জয়েন করার পর বিশেষ কারণে খেলতে না পারেন:\n\n**নিয়মাবলী:**\n1. **ম্যাচ তৈরির আগে:** আপনি শুধুমাত্র ফিক্সচার বা গ্রুপ ডিপ্লয় হওয়ার আগেই নাম কাটাতে পারবেন।\n2. **হোস্টকে জানান:** আপনার রিকোয়েস্ট যদি 'Pending' বা 'Approved' থাকে, তবে টুর্নামেন্ট শুরুর আগেই হোস্টকে মেসেজ দিয়ে আপনার নাম রিমুভ করতে বলুন।\n3. **খেলা শুরু হয়ে গেলে:** একবার টুর্নামেন্ট **'ONGOING'** হয়ে ম্যাচ তৈরি হয়ে গেলে আর নাম কাটানো সম্ভব নয়।",
+    "related_en": ["How to join a tournament?", "What do different tournament statuses mean?", "How to contact support?"],
+    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "টুর্নামেন্টের স্ট্যাটাসগুলোর মানে কী?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "leaderboard",
-    "keywords": ["rank", "leaderboard", "top player", "শীর্ষ", "র‍্যাঙ্ক", "লিডারবোর্ড", "পয়েন্ট", "rank list", "global rank"],
+    "keywords": [
+      "leaderboard", "global rank", "top players", "ranking system",
+      "লিডারবোর্ড", "গ্লোবাল র‍্যাঙ্ক", "র‍্যাঙ্কিং", "সেরা প্লেয়ার", "র‍্যাঙ্ক বাড়াব",
+      "rank kivabe bare", "leaderboard kivabe kaj kore"
+    ],
     "questions": [
       "How leaderboard works?",
       "লিডারবোর্ড কীভাবে কাজ করে?",
+      "র‍্যাঙ্কিং কীভাবে কাজ করে?",
       "Kivabe rank barabo?",
       "Who is top player?",
-      "র‍্যাঙ্ক কীভাবে হয়?",
-      "Points for leaderboard",
-      "Global rankings check",
-      "কে সেরা প্লেয়ার?"
+      "র‍্যাঙ্ক কীভাবে বাড়ে?",
+      "Global rankings check"
     ],
-    "answer_en": "Arena Leaderboard works like this:\n1. You get points for winning matches in official cups.\n2. More points = Higher Rank.\n3. Top 10 players get special badges and rewards.\n4. Check the 'Home' tab to see current rankings.",
-    "answer_bn": "📈 **লিডারবোর্ড বা র‍্যাঙ্কিং সিস্টেমের নিয়ম**\n\nআমাদের গ্লোবাল লিডারবোর্ড প্লেয়ারদের পারফরম্যান্সের ওপর ভিত্তি করে তৈরি হয়:\n\n**নিয়মাবলী:**\n1. **পয়েন্ট অর্জন:** প্রতিটি অফিসিয়াল টুর্নামেন্ট বা ম্যাচে জিতলে আপনি র‍্যাঙ্কিং পয়েন্ট পাবেন।\n2. **র‍্যাঙ্ক আপডেট:** যত বেশি পয়েন্ট অর্জন করবেন, লিডারবোর্ডে আপনার অবস্থান তত উপরে যাবে।\n3. **সেরা ১০:** প্রতি মাসের শেষে সেরা ১০ প্লেয়ারকে বিশেষ ব্যাজ এবং রিওয়ার্ড দেওয়া হয়।\n\n💡 **দ্রষ্টব্য:** বর্তমান র‍্যাঙ্কিং দেখতে অ্যাপের **'Home'** ট্যাবটি ভিজিট করুন।",
-    "related_en": ["What is GD and Pts?", "How to get prize money?", "How to upload match result?"],
-    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "পুরস্কারের টাকা কীভাবে পাব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
+    "answer_en": "📈 **How the Global Leaderboard Works**\n\n1. Players earn ranking stats and wins by competing in verified Live Tournaments.\n2. Winning matches and championships boosts your win rate, goal stats, and leaderboard position.\n3. Check the **'Home'** or **'Ranks'** section to see the top players in the arena.",
+    "answer_bn": "📈 **লিডারবোর্ড ও র‍্যাঙ্কিং সিস্টেম যেভাবে কাজ করে**\n\nআমাদের গ্লোবাল লিডারবোর্ড প্লেয়ারদের লাইভ টুর্নামেন্টের পারফরম্যান্সের ওপর ভিত্তি করে স্বয়ংক্রিয়ভাবে আপডেট হয়:\n\n**নিয়মাবলী:**\n1. **ম্যাচ জয় ও গোল:** অফিসিয়াল ও লাইভ টুর্নামেন্টে প্রতিটি ম্যাচ জয়, গোল সংখ্যা এবং চ্যাম্পিয়নশিপ আপনার প্রোফাইল স্ট্যাটাসে যুক্ত হয়।\n2. **র‍্যাঙ্ক আপডেট:** আপনার জয়ের সংখ্যা ও পয়েন্ট যত বাড়বে, গ্লোবাল লিডারবোর্ডে আপনার অবস্থান তত উপরে উঠবে।\n3. **সেরা প্লেয়ার তালিকা:** অ্যাপের **'Home'** বা লিডারবোর্ড সেকশনে গিয়ে শীর্ষ প্লেয়ারদের তালিকা দেখতে পারেন।",
+    "related_en": ["What is GD and Pts?", "How to get prize money?", "Difference between Demo and Live tournaments?"],
+    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "পুরস্কারের টাকা কীভাবে পাব?", "ডেমো এবং লাইভ টুর্নামেন্টের মধ্যে পার্থক্য কী?"]
   },
   {
     "id": "notifications",
-    "keywords": ["push", "notify", "bell", "alert", "শব্দ", "নোটিফিকেশন", "পাব", "আসছে না", "notification problem", "sound"],
+    "keywords": [
+      "notifications", "push notification", "bell icon", "notification sound",
+      "নোটিফিকেশন", "বেল আইকন", "অ্যালার্ট", "নোটিফিকেশন পাচ্ছি না", "সাউন্ড হচ্ছে না",
+      "notification ashe na"
+    ],
     "questions": [
       "Not getting notifications?",
       "নোটিফিকেশন পাচ্ছি না কেন?",
-      "Kivabe notify pabo?",
-      "Enable push notifications",
-      "সাউন্ড কেন হচ্ছে না?",
-      "Notification settings check",
       "নোটিফিকেশন চালু কীভাবে করব?",
-      "Problem with notifications"
+      "Kivabe notification pabo?",
+      "Enable push notifications",
+      "অ্যাপের সাউন্ড বা অ্যালার্ট অন করব কীভাবে?"
     ],
-    "answer_en": "To enable push notifications:\n1. Click the 'Bell' icon in the header.\n2. Grant permission if your browser asks.\n3. Go to phone settings > Apps > FC Arena > Notifications > Allow.\n4. This will alert you for match starts and results.",
-    "answer_bn": "🔔 **নোটিফিকেশন বা বেল চালু করার নিয়ম**\n\nআপনার ম্যাচের আপডেট বা টুর্নামেন্টের খবর সাথে সাথে পেতে নোটিফিকেশন অন রাখুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের হেডারে থাকা **'Bell'** (ঘন্টা) আইকনে ক্লিক করুন।\n2. আপনার ব্রাউজার বা ফোন থেকে পারমিশন চাইলে **'Allow'** দিন।\n3. ফোনের **Settings > Apps > FC Arena > Notifications** এ গিয়ে সব অ্যালার্ট চালু করুন।\n\n💡 **দ্রষ্টব্য:** নোটিফিকেশন অন থাকলে ম্যাচ শুরু হওয়ার সময় আপনার ফোন ভাইব্রেট বা সাউন্ড করবে।",
-    "related_en": ["Why can't I login?", "How to update the app?", "How to contact support?"],
-    "related_bn": ["লগইন হচ্ছে না কেন?", "অ্যাপ আপডেট করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
+    "answer_en": "🔔 **How to Enable Notifications**\n\n1. Tap the **Bell icon** in the top header of the app.\n2. Allow browser/phone notification permissions when prompted.\n3. On Android, check **Settings > Apps > FC Arena > Notifications** and make sure it is turned **ON**.",
+    "answer_bn": "🔔 **নোটিফিকেশন চালু করার নিয়ম**\n\nম্যাচ ডিপ্লয়, রেজাল্ট আপডেট এবং টুর্নামেন্টের সব খবর সাথে সাথে পেতে নোটিফিকেশন চালু রাখুন:\n\n**ধাপসমূহ:**\n1. অ্যাপের উপরের হেডারে থাকা **'Bell' (ঘণ্টা) আইকনে** ক্লিক করে আপনার সব নোটিফিকেশন দেখতে পাবেন।\n2. ব্রাউজার বা অ্যাপ থেকে পারমিশন চাইলে **'Allow'** বাটনে ট্যাপ করুন।\n3. ফোনের **Settings > Apps > FC Arena > Notifications** অপশনে গিয়ে নোটিফিকেশন অন আছে কিনা তা নিশ্চিত করুন।",
+    "related_en": ["How to update the app?", "Where are my matches?", "How to talk to opponent?"],
+    "related_bn": ["অ্যাপ আপডেট করব কীভাবে?", "আমার ম্যাচগুলো কোথায় পাব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?"]
   },
   {
     "id": "gd_pts",
-    "keywords": ["gd", "pts", "points", "table", "পয়েন্ট", "টেবিল", "গোল", "ডিফারেন্স", "ranking logic", "group standings"],
+    "keywords": [
+      "gd", "pts", "points table", "goal difference", "group standings", "group table",
+      "পয়েন্ট টেবিল", "পয়েন্ট টেবিল", "গোল ডিফারেন্স", "গ্রুপ টেবিল", "পয়েন্ট সমান হলে",
+      "pts mane ki", "gd mane ki"
+    ],
     "questions": [
       "What is GD and Pts?",
       "পয়েন্ট টেবিল কীভাবে কাজ করে?",
       "Pts and GD meaning?",
-      "Kivabe qualifiers hobo?",
-      "গোল ডিফারেন্স কী?",
+      "গোল ডিফারেন্স (GD) কী?",
       "PTS মানে কী?",
-      "পয়েন্ট সমান হলে কী হবে?",
-      "Group standigs check"
+      "পয়েন্ট সমান হলে কে পরের রাউন্ডে যাবে?",
+      "গ্রুপ থেকে কয়জন কোয়ালিফাই করে?"
     ],
-    "answer_en": "In Group Stage Table:\n1. P: Matches Played.\n2. W/D/L: Win, Draw, Loss.\n3. GD (Goal Difference): Your goals minus opponent's goals.\n4. PTS: Points (Win=3, Draw=1, Loss=0).\n5. Top 2 with highest PTS and GD advance to knockouts.",
-    "answer_bn": "🔢 **পয়েন্ট টেবিলের (PTS & GD) নিয়ম**\n\nগ্রুপ স্টেজের স্ট্যান্ডিংস বোঝার জন্য নিচের বিষয়গুলো খেয়াল করুন:\n\n**টার্মগুলোর অর্থ:**\n- **P (Played):** আপনি কয়টি ম্যাচ খেলেছেন।\n- **W/D/L:** জয়, ড্র এবং হারের সংখ্যা।\n- **GD (Goal Difference):** আপনার দেওয়া মোট গোল থেকে আপনার খাওয়া গোলের বিয়োগফল।\n- **PTS (Points):** জয়ের জন্য ৩ পয়েন্ট, ড্র এর জন্য ১ এবং হারের জন্য ০।\n\n💡 **যোগ্যতা:** সাধারণত পয়েন্ট টেবিলের সেরা ২ জন পরবর্তী নকআউট রাউন্ডে কোয়ালিফাই করে।",
-    "related_en": ["How leaderboard works?", "Where are my matches?", "How to upload match result?"],
-    "related_bn": ["লিডারবোর্ড কীভাবে কাজ করে?", "আমার ম্যাচগুলো কোথায় পাব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
+    "answer_en": "🔢 **How the Group Stage Points Table (PTS & GD) Works**\n\n* **P (Played):** Total matches played.\n* **W / D / L:** Wins, Draws, and Losses.\n* **GD (Goal Difference):** Goals Scored minus Goals Conceded.\n* **PTS (Points):** **Win = 3 pts**, **Draw = 1 pt**, **Loss = 0 pts**.\n* **Qualification:** Once all group matches finish, the **Top 2 players** from each group (sorted first by **PTS**, then by **GD**) qualify for the Knockout stage.",
+    "answer_bn": "🔢 **গ্রুপ পর্বের পয়েন্ট টেবিল (PTS ও GD) এর নিয়ম**\n\nগ্রুপ স্টেজের স্ট্যান্ডিংস বা পয়েন্ট টেবিলের হিসাব নিচে দেওয়া হলো:\n\n- **P (Played):** আপনি মোট কয়টি ম্যাচ খেলেছেন।\n- **W / D / L:** জয় (Win), ড্র (Draw) এবং হার (Loss)-এর সংখ্যা।\n- **GD (Goal Difference):** আপনার দেওয়া মোট গোল থেকে আপনার হজম করা গোলের বিয়োগফল।\n- **PTS (Points):** প্রতিটি জয়ের জন্য **৩ পয়েন্ট**, ড্র-এর জন্য **১ পয়েন্ট** এবং হারের জন্য **০ পয়েন্ট**।\n\n💡 **কোয়ালিফিকেশন নিয়ম:** গ্রুপের সব খেলা শেষে প্রতি গ্রুপ থেকে **শীর্ষ ২ জন (Top 2)** প্লেয়ার নকআউট পর্বে যাবে। পয়েন্ট (PTS) সমান হলে যার গোল ডিফারেন্স (GD) বেশি, সে এগিয়ে থাকবে।",
+    "related_en": ["How do players move to the next round?", "What are the rules for Knockout Draw or Penalty?", "Difference between Knockout and Group+Knockout formats?"],
+    "related_bn": ["প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?", "নকআউট ম্যাচে ড্র বা পেনাল্টির নিয়ম কী?", "নকআউট এবং গ্রুপ+নকআউট ফরম্যাটের পার্থক্য কী?"]
   },
   {
-    "id": "match_chat",
-    "keywords": ["chat", "talk", "opponent", "message", "মেসেজ", "কথা", "প্রতিপক্ষ", "চ্যাট", "coordinate", "lobby id"],
-    "questions": [
-      "How to talk to opponent?",
-      "প্রতিপক্ষের সাথে কথা বলব কীভাবে?",
-      "Kivabe kotha bolbo?",
-      "Match room chat",
-      "অপোনেন্টের সাথে যোগাযোগ কীভাবে?",
-      "Coordinate game time",
-      "Lobby id kothay pabo?",
-      "Chat with him"
+    "id": "tournament_formats",
+    "keywords": [
+      "tournament format", "knockout vs group", "group plus knockout", "single elimination",
+      "টুর্নামেন্ট ফরম্যাট", "নকআউট ফরম্যাট", "গ্রুপ ও নকআউট", "ফরম্যাটের পার্থক্য",
+      "knockout ki", "group stage ki"
     ],
-    "answer_en": "To talk to your opponent:\n1. Open your match from 'My Matches'.\n2. Click the 'Messenger' or 'Chat' icon on the match card.\n3. This will open a direct link to their social profile.\n4. Coordinate the game time and lobby with them there.",
-    "answer_bn": "💬 **প্রতিপক্ষের সাথে যোগাযোগ করার নিয়ম**\n\nম্যাচ শুরুর আগে লবি আইডি বা সময় ঠিক করতে আপনার অপোনেন্টের সাথে কথা বলুন:\n\n**ধাপসমূহ:**\n1. আপনার **'My Matches'** ট্যাব থেকে নির্দিষ্ট ম্যাচটি ওপেন করুন।\n2. ম্যাচ কার্ডের কোণায় থাকা **'Messenger'** বা চ্যাট আইকনে ক্লিক করুন।\n3. এটি আপনাকে সরাসরি প্রতিপক্ষের ফেসবুক প্রোফাইল বা মেসেঞ্জারে নিয়ে যাবে।\n4. সেখানে কথা বলে গেমের সময় ঠিক করে নিন।\n\n💡 **দ্রষ্টব্য:** প্রতিপক্ষ রিপ্লাই না দিলে সাথে সাথে টুর্নামেন্ট হোস্টকে জানান।",
-    "related_en": ["How to upload match result?", "How to find a match by ID?", "High ping in game?"],
-    "related_bn": ["ম্যাচ রিজাল্ট কীভাবে দেব?", "ম্যাচ আইডি দিয়ে কীভাবে খুঁজব?", "গেম ল্যাগ করলে কী করব?"]
+    "questions": [
+      "Difference between Knockout and Group+Knockout formats?",
+      "নকআউট এবং গ্রুপ+নকআউট ফরম্যাটের পার্থক্য কী?",
+      "টুর্নামেন্ট ফরম্যাট কয় ধরনের হয়?",
+      "Knockout ebong Group stage er parthokko ki?",
+      "What is Knockout vs Group+Knockout?"
+    ],
+    "answer_en": "🏆 **Tournament Formats Explained**\n\nFC Arena VS supports two competitive formats:\n1. **Knockout Only:** Direct elimination bracket (Round of 16 -> Quarter-Final -> Semi-Final -> Grand Final). If you lose a match, you are eliminated immediately.\n2. **Group + Knockout:** Players first compete in groups (Group A, B, C, etc.) to earn Points (PTS) and Goal Difference (GD). Once group matches end, the Top 2 from each group advance into the Knockout bracket.",
+    "answer_bn": "🏆 **নকআউট এবং গ্রুপ+নকআউট ফরম্যাটের পার্থক্য**\n\nFC Arena VS-এ দুই ধরনের টুর্নামেন্ট ফরম্যাট রয়েছে:\n\n১. **Knockout (সরাসরি নকআউট):** এখানে শুরু থেকেই এলিমিনেশন রাউন্ড (যেমন: কোয়ার্টার ফাইনাল -> সেমিফাইনাল -> ফাইনাল) খেলা হয়। একটি ম্যাচে হারলেই টুর্নামেন্ট থেকে বাদ পড়তে হয় এবং কোনো ম্যাচ ড্র হতে পারে না।\n২. **Group + Knockout (গ্রুপ ও নকআউট):** এখানে প্রথমে প্লেয়ারদের কয়েকটি গ্রুপে (Group A, B, C...) ভাগ করা হয়। গ্রুপ পর্বে পয়েন্ট টেবিলের (PTS ও GD) ভিত্তিতে প্রতি গ্রুপের সেরা ২ জন প্লেয়ার পরবর্তী নকআউট পর্বে কোয়ালিফাই করে।",
+    "related_en": ["What is GD and Pts?", "How do players move to the next round?", "What are the rules for Knockout Draw or Penalty?"],
+    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?", "নকআউট ম্যাচে ড্র বা পেনাল্টির নিয়ম কী?"]
+  },
+  {
+    "id": "game_disconnected",
+    "keywords": [
+      "disconnected", "network disconnect", "net chole gele", "game crash", "match disconnect",
+      "ডিসকানেক্ট হলে", "নেট চলে গেলে", "খেলা চলাকালীন নেট", "ম্যাচ কেটে গেলে",
+      "khelar majhe net gele ki hobe"
+    ],
+    "questions": [
+      "What happens if internet disconnects during a match?",
+      "ম্যাচ চলাকালীন নেট চলে গেলে বা ডিসকানেক্ট হলে কী নিয়ম?",
+      "খেলার মাঝে নেট চলে গেলে কী হবে?",
+      "Match disconnect hole ki korbo?",
+      "গেম থেকে বের হয়ে গেলে বা ক্র্যাশ করলে কী নিয়ম?"
+    ],
+    "answer_en": "📡 **Rules for Match Disconnection**\n\nUnless the Tournament Host specifies custom rules in the **'Rules'** tab:\n1. If a player disconnects, take an immediate **screenshot** showing the minute and current score.\n2. Contact your opponent on Messenger to play the **remaining minutes** in a new match (keeping the previous score added).\n3. If a player intentionally rage-quits while losing, the opponent gets the win. In case of disagreement, report to the Host with screenshots.",
+    "answer_bn": "📡 **ম্যাচ চলাকালীন নেট চলে গেলে বা ডিসকানেক্ট হলে করণীয়**\n\nটুর্নামেন্টের **'Rules'** ট্যাবে হোস্ট যদি আলাদা কোনো নিয়ম উল্লেখ না করে থাকেন, তবে সাধারণ নিয়ম হলো:\n\n**নিয়মাবলী:**\n1. **স্ক্রিনশট নিন:** খেলা ঠিক কত মিনিটে এবং কত গোলে থাকা অবস্থায় ডিসকানেক্ট হয়েছে, সাথে সাথে তার একটি স্ক্রিনশট নিন।\n2. **বাকি সময় খেলা:** প্রতিপক্ষের সাথে মেসেঞ্জারে কথা বলে নতুন লবিতে শুধুমাত্র **বাকি সময়টুকু** খেলুন এবং আগের গোলগুলোর সাথে নতুন গোল যোগ করে ফাইনাল রেজাল্ট হিসাব করুন।\n3. **ইচ্ছাকৃত বের হয়ে যাওয়া (Rage Quit):** কেউ যদি হারার ভয়ে ইচ্ছাকৃতভাবে গেম কেটে বের হয়ে যায় এবং প্রমাণ না দেয়, তবে হোস্টের সিদ্ধান্তে প্রতিপক্ষকে বিজয়ী ঘোষণা করা হবে।",
+    "related_en": ["High ping in game?", "How to talk to opponent?", "How to upload match result?"],
+    "related_bn": ["গেম ল্যাগ করলে কী করব?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "ম্যাচ রিজাল্ট কীভাবে দেব?"]
   },
   {
     "id": "storage_issue",
-    "keywords": ["storage", "full", "space", "জায়গা", "ফুল", "মোমোরি", "memory", "clear cache", "slow phone"],
+    "keywords": [
+      "storage full", "clear cache", "app slow", "app hang",
+      "মেমোরি ফুল", "ক্যাশ ক্লিয়ার", "অ্যাপ হ্যাং", "অ্যাপ স্লো", "স্টোরেজ সমস্যা",
+      "cache clear korbo kivabe"
+    ],
     "questions": [
       "App taking too much space?",
-      "অ্যাপের সাইজ কমানো যায়?",
-      "Storage full hoye jay?",
+      "মেমোরি ফুল হয়ে গেছে কেন?",
+      "অ্যাপ হ্যাং বা স্লো করলে কী করব?",
       "How to clear app cache?",
-      "মেমোরি ফুল হয়ে গেছে",
-      "Phone slow hoye gese",
-      "Clear Arena data",
-      "অ্যাপ হ্যাং করছে কেন?"
+      "ক্যাশ ডাটা ক্লিয়ার করব কীভাবে?",
+      "Phone slow hoye gese"
     ],
-    "answer_en": "If app is taking space:\n1. Go to browser settings.\n2. Find 'Site Settings' or 'Storage'.\n3. Select FC Arena and click 'Clear Data'.\n4. Re-open the app. This will clear cached images and logs.",
-    "answer_bn": "🧹 **স্টোরেজ বা মেমোরি সমস্যার সমাধান**\n\nযদি অ্যাপটি বেশি জায়গা দখল করে বা স্লো হয়ে যায়, তবে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আপনার ব্রাউজারের (Chrome/Safari) সেটিংসে যান।\n2. সেখান থেকে **'Site Settings'** বা **'Storage'** অপশনে যান।\n3. লিস্ট থেকে 'FC Arena' সিলেক্ট করে **'Clear Data'** এ ক্লিক করুন।\n4. অ্যাপটি আবার ওপেন করুন। এতে অপ্রয়োজনীয় ক্যাশ ফাইল পরিষ্কার হয়ে যাবে।\n\n💡 **দ্রষ্টব্য:** ডাটা ক্লিয়ার করলে আপনাকে আবার লগইন করতে হতে পারে।",
-    "related_en": ["How to update the app?", "Why can't I login?", "High ping in game?"],
-    "related_bn": ["অ্যাপ আপডেট করব কীভাবে?", "লগইন হচ্ছে না কেন?", "গেম ল্যাগ করলে কী করব?"]
+    "answer_en": "🧹 **How to Fix App Lag or Clear Cache**\n\n1. Open your browser/phone Settings.\n2. Go to **Site Settings / Apps > FC Arena > Storage**.\n3. Tap **'Clear Cache'** and reload the app.\n4. You can also clear your Support AI chat history using the **Trash icon** in the top right of this window.",
+    "answer_bn": "🧹 **অ্যাপ স্লো বা স্টোরেজ সমস্যার সমাধান**\n\nঅ্যাপটি যদি কখনো স্লো কাজ করে, তবে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আপনার ফোনের সেটিংস বা ব্রাউজারের **Site Settings > Storage** অপশনে যান।\n2. সেখান থেকে **'Clear Cache'** এ ক্লিক করে অ্যাপটি রিলোড দিন।\n3. চ্যাট হিস্ট্রি পরিষ্কার করতে সাপোর্ট উইন্ডোর উপরে ডান পাশে থাকা **ডিলিট (Trash) আইকনে** ক্লিক করতে পারেন।",
+    "related_en": ["How to update the app?", "High ping in game?", "Why can't I login?"],
+    "related_bn": ["অ্যাপ আপডেট করব কীভাবে?", "গেম ল্যাগ করলে কী করব?", "লগইন হচ্ছে না কেন?"]
   },
   {
     "id": "internet_speed",
-    "keywords": ["internet", "ping", "lag", "slow", "নেট", "স্লো", "পিংক", "ল্যাগ", "network issue", "connection"],
+    "keywords": [
+      "high ping", "game lag", "slow internet", "network lag",
+      "গেম ল্যাগ", "হাই পিং", "নেট স্লো", "পিং সমস্যা",
+      "ping high keno", "game lag korle ki korbo"
+    ],
     "questions": [
       "High ping in game?",
       "গেম ল্যাগ করলে কী করব?",
+      "হাই পিং সমস্যার সমাধান কী?",
       "Net slow thakle ki hobe?",
-      "Fix internet issues",
       "Ping high keno?",
-      "Connection problem",
-      "গেম আটকে যাচ্ছে",
-      "নেট ঠিক করব কীভাবে?"
+      "গেম আটকে যাচ্ছে কেন?"
     ],
-    "answer_en": "For smooth gameplay:\n1. Use a stable Wi-Fi or 4G/5G connection.\n2. Ensure no heavy downloads in background.\n3. If ping is high, restart your router or toggle Flight Mode.\n4. Play in the server nearest to you (Asia/Global).",
-    "answer_bn": "🚀 **স্মুথ গেমপ্লে এবং পিং সমস্যার সমাধান**\n\nগেম ল্যাগ করলে বা পিং হাই থাকলে নিচের বিষয়গুলো মেনে চলুন:\n\n**পরামর্শসমূহ:**\n1. **সংযোগ:** একটি স্থিতিশীল ওয়াইফাই বা ৪জি সংযোগ ব্যবহার করার চেষ্টা করুন।\n2. **ব্যাকগ্রাউন্ড অ্যাপ:** গেম খেলার সময় ফোনে অন্য কোনো বড় ডাউনলোড বা সোশ্যাল মিডিয়া অ্যাপ বন্ধ রাখুন।\n3. **ফ্লাইট মোড:** নেট সমস্যা করলে একবার ফোনের ফ্লাইট মোড অন-অফ করে ডাটা কানেকশন চেক করুন।\n\n💡 **দ্রষ্টব্য:** গেমের ভেতর রিজিওনাল সার্ভার (Asia) সিলেক্ট করলে পিং কম পাওয়া যায়।",
-    "related_en": ["App taking too much space?", "How to talk to opponent?", "Where to find FC Mobile UID?"],
-    "related_bn": ["মেমোরি ফুল হয়ে গেছে কেন?", "প্রতিপক্ষের সাথে কথা বলব কীভাবে?", "ইউআইডি (UID) কোথায় পাব?"]
+    "answer_bn": "🚀 **গেম ল্যাগ এবং হাই পিং সমস্যার সমাধান**\n\nFC Mobile খেলার সময় স্মুথ পারফরম্যান্স পেতে নিচের বিষয়গুলো খেয়াল রাখুন:\n\n**পরামর্শসমূহ:**\n1. **স্থিতিশীল নেটওয়ার্ক:** ম্যাচ শুরুর আগে ভালো ওয়াইফাই বা শক্তিশালী ৪জি/৫জি নেটওয়ার্ক নিশ্চিত করুন।\n2. **ব্যাকগ্রাউন্ড অ্যাপ বন্ধ করুন:** খেলার সময় ফোনের ব্যাকগ্রাউন্ডে থাকা ডাউনলোড বা অন্যান্য ভারী অ্যাপ বন্ধ রাখুন।\n3. **ফ্লাইট মোড রিসেট:** ম্যাচের আগে একবার ফোনের Airplane/Flight Mode অন-অফ করে নিলে নেটওয়ার্ক রিফ্রেশ হয়।",
+    "answer_en": "🚀 **How to Reduce High Ping & Game Lag**\n\n1. Use a stable Wi-Fi or strong 4G/5G connection.\n2. Close background downloads and heavy social apps before starting your FC Mobile match.\n3. Toggle Airplane Mode on and off before your match to refresh your mobile network.",
+    "related_en": ["What happens if internet disconnects during a match?", "How to talk to opponent?", "App taking too much space?"],
+    "related_bn": ["ম্যাচ চলাকালীন নেট চলে গেলে বা ডিসকানেক্ট হলে কী নিয়ম?", "প্রতিপক্ষের সাথে কীভাবে কথা বলব?", "মেমোরি ফুল হয়ে গেছে কেন?"]
   },
   {
     "id": "add_players",
-    "keywords": ["add player", "enlist player", "player entry", "কিভাবে প্লেয়ার এড করব", "প্লেয়ার এড", "approve player"],
+    "keywords": [
+      "add players", "approve players", "approve join request", "enlist player", "manage players",
+      "প্লেয়ার এড", "প্লেয়ার এড", "প্লেয়ার অ্যাপ্রুভ", "জয়েন রিকোয়েস্ট অ্যাপ্রুভ",
+      "player add korbo kivabe", "player approve"
+    ],
     "questions": [
       "How to add players?",
       "প্লেয়ার এড করব কীভাবে?",
+      "প্লেয়ার অ্যাপ্রুভ করব কীভাবে?",
       "Kivabe player enlist korbo?",
-      "How to approve join request?"
+      "How to approve join request?",
+      "টুর্নামেন্টে প্লেয়ারদের রিকোয়েস্ট এক্সেপ্ট করব কীভাবে?"
     ],
-    "answer_en": "To add/approve players:\n1. Go to 'Manage' tab in your tournament.\n2. Scroll down to 'Players' or 'Participants' section.\n3. You will see pending requests.\n4. Click the 'Green Check' button to approve them.",
-    "answer_bn": "প্লেয়ার এড বা অ্যাপ্রুভ করতে:\n১. আপনার টুর্নামেন্টের 'Manage' ট্যাবে যান।\n২. নিচে 'Players' বা 'Participants' সেকশনে স্ক্রল করুন।\n৩. সেখানে আপনি পেন্ডিং রিকোয়েস্টগুলো দেখতে পাবেন।\n৪. প্লেয়ারকে এড করতে 'Green Check' বাটনে ক্লিক করুন।",
-    "related_en": ["How to deploy matches?", "How to setup rules?", "How to create a tournament?"],
-    "related_bn": ["ম্যাচ ডিপ্লয় করব কীভাবে?", "রুল সেটআপ করব কীভাবে?", "টুর্নামেন্ট তৈরি করব কীভাবে?"]
+    "answer_en": "👥 **How to Add or Approve Players (For Hosts)**\n\n1. Open your tournament and go to the **'Manage'** or **'Players'** tab.\n2. Review the list of **Pending Requests**.\n3. Check the player's IGN, UID, and Messenger link.\n4. Tap the **Approve (Check)** button to accept them into your tournament, or manually add players from the Manage section.",
+    "answer_bn": "👥 **টুর্নামেন্টে প্লেয়ার অ্যাড বা অ্যাপ্রুভ করার নিয়ম (হোস্টদের জন্য)**\n\nআপনার টুর্নামেন্টে জয়েন রিকোয়েস্ট দেওয়া প্লেয়ারদের যুক্ত করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. আপনার তৈরি করা টুর্নামেন্টটি ওপেন করে **'Manage'** ট্যাবে যান।\n2. নিচে **'Players' / 'Pending Requests'** সেকশনে স্ক্রল করুন।\n3. প্লেয়ারের প্রোফাইল, IGN এবং UID ঠিক থাকলে সবুজ **'Approve' (চেক মার্ক)** বাটনে ক্লিক করুন।\n4. সব স্লট পূর্ণ হয়ে গেলে আপনি গ্রুপ এবং ম্যাচ ডিপ্লয় করতে পারবেন।",
+    "related_en": ["How to deploy matches?", "Auto vs Manual Match Deployment?", "How to setup rules?"],
+    "related_bn": ["ম্যাচ ডিপ্লয় করব কীভাবে?", "অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?", "রুল সেটআপ করব কীভাবে?"]
   },
   {
     "id": "deploy_matches",
-    "keywords": ["deploy matches", "generate fixtures", "start tournament", "ম্যাচ ডিপ্লয়", "খেলা শুরু", "fixture create"],
+    "keywords": [
+      "deploy matches", "generate fixtures", "start tournament", "auto group setup", "auto match deploy",
+      "ম্যাচ ডিপ্লয়", "ম্যাচ তৈরি", "ফিক্সচার তৈরি", "গ্রুপ তৈরি", "খেলা শুরু করব কীভাবে",
+      "match deploy korbo kivabe", "fixture kivabe banabo"
+    ],
     "questions": [
       "How to deploy matches?",
       "ম্যাচ ডিপ্লয় করব কীভাবে?",
+      "টুর্নামেন্টের ফিক্সচার তৈরি করব কীভাবে?",
       "Kivabe fixture toiri korbo?",
-      "How to start the cup?"
+      "How to start the cup?",
+      "গ্রুপ এবং ম্যাচ কীভাবে সাজাব?"
     ],
-    "answer_en": "To deploy match fixtures:\n1. Open your tournament and go to 'Manage'.\n2. Ensure you have enough approved players.\n3. Click 'Auto Group Setup' (if Group stage).\n4. Then click 'Auto Match Deploy'.\n5. All fixtures will be generated instantly.",
-    "answer_bn": "ম্যাচ ফিক্সচার বা ডিপ্লয় করতে:\n১. টুর্নামেন্ট ওপেন করে 'Manage' এ যান।\n২. নিশ্চিত করুন আপনার কাছে পর্যাপ্ত অ্যাপ্রুভড প্লেয়ার আছে।\n৩. 'Auto Group Setup' এ ক্লিক করুন (যদি গ্রুপ স্টেজ হয়)।\n৪. এরপর 'Auto Match Deploy' বাটনে ক্লিক করুন।\n৫. সাথে সাথে সব ম্যাচ তৈরি হয়ে যাবে।",
-    "related_en": ["How to add players?", "How to setup rules?", "How to create a tournament?"],
-    "related_bn": ["প্লেয়ার এড করব কীভাবে?", "রুল সেটআপ করব কীভাবে?", "টুর্নামেন্ট তৈরি করব কীভাবে?"]
+    "answer_en": "⚡ **How to Deploy Groups & Match Fixtures (For Hosts)**\n\n1. Open your tournament and go to the **'Manage'** tab.\n2. Make sure all player slots are approved.\n3. If your format is **Group + Knockout**, first tap **'Auto Group Setup'** (or assign groups manually).\n4. Next, tap **'Auto Match Deploy'** to automatically generate all fixtures and start the tournament!",
+    "answer_bn": "⚡ **গ্রুপ ও ম্যাচ ফিক্সচার ডিপ্লয় করার নিয়ম (হোস্টদের জন্য)**\n\nসব প্লেয়ার অ্যাপ্রুভ করার পর টুর্নামেন্টের খেলা শুরু করতে নিচের ধাপগুলো অনুসরণ করুন:\n\n**ধাপসমূহ:**\n1. টুর্নামেন্ট ওপেন করে **'Manage'** ট্যাবে যান।\n2. আপনার টুর্নামেন্ট যদি **Group + Knockout** ফরম্যাটের হয়, তবে প্রথমে **'Auto Group Setup'** বাটনে ক্লিক করে গ্রুপ তৈরি করুন।\n3. এরপর **'Auto Match Deploy'** বাটনে ক্লিক করুন।\n4. সাথে সাথে সব ম্যাচের ফিক্সচার তৈরি হয়ে যাবে এবং টুর্নামেন্টের স্ট্যাটাস **'ONGOING'** হয়ে যাবে।",
+    "related_en": ["Auto vs Manual Match Deployment?", "How do players move to the next round?", "How to add players?"],
+    "related_bn": ["অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?", "প্লেয়ার এড করব কীভাবে?"]
   },
   {
     "id": "setup_rules",
-    "keywords": ["setup rules", "edit rules", "tournament rules", "রুল সেটআপ", "নিয়মাবলী", "change rules"],
+    "keywords": [
+      "setup rules", "edit rules", "tournament rules",
+      "রুল সেটআপ", "টুর্নামেন্টের নিয়মাবলী", "রুলস এডিট", "নিয়ম লিখব কীভাবে",
+      "rules kivabe likhbo", "edit cup rules"
+    ],
     "questions": [
       "How to setup rules?",
       "রুল সেটআপ করব কীভাবে?",
+      "টুর্নামেন্টের রুলস এডিট করব কীভাবে?",
       "Kivabe niyom likhbo?",
       "How to edit cup rules?"
     ],
-    "answer_en": "To setup or edit rules:\n1. Go to 'Rules' tab in tournament detail.\n2. If you are the Host, you will see an 'Edit Rules' button.\n3. Add new rules or modify existing ones.\n4. Click 'Save Rules' to update.",
-    "answer_bn": "রুল সেটআপ বা এডিট করতে:\n১. টুর্নামেন্ট ডিটেইলসের 'Rules' ট্যাবে যান।\n২. আপনি হোস্ট হলে সেখানে 'Edit Rules' বাটন দেখতে পাবেন।\n৩. নতুন নিয়ম যোগ করুন বা আগেরগুলো পরিবর্তন করুন।\n৪. 'Save Rules' বাটনে ক্লিক করে আপডেট করুন।",
+    "answer_en": "📜 **How to Setup or Edit Tournament Rules**\n\n1. Open your tournament and go to the **'Rules'** or **'Manage'** tab.\n2. As the Host, tap **'Edit Rules'**.\n3. Write clear guidelines (match half length, disconnection rule, deadline).\n4. Tap **'Save Rules'** to update immediately.",
+    "answer_bn": "📜 **টুর্নামেন্টের রুলস সেটআপ বা এডিট করার নিয়ম**\n\n১. আপনার টুর্নামেন্ট ডিটেইলস পেজে গিয়ে **'Rules'** বা **'Manage'** ট্যাবে যান।\n২. আপনি হোস্ট হলে সেখানে রুলস এডিট করার অপশন দেখতে পাবেন।\n৩. খেলার হাফ টাইম, ডিসকানেক্ট নিয়ম ও ডেডলাইন স্পষ্টভাবে লিখে **'Save'** বাটনে ক্লিক করুন।",
     "related_en": ["How to add players?", "How to deploy matches?", "How to create a tournament?"],
     "related_bn": ["প্লেয়ার এড করব কীভাবে?", "ম্যাচ ডিপ্লয় করব কীভাবে?", "টুর্নামেন্ট তৈরি করব কীভাবে?"]
   },
   {
     "id": "match_deployment_methods",
-    "keywords": ["deployment", "auto vs manual", "ম্যাচ তৈরি", "manual match", "auto deploy", "fixture creation"],
+    "keywords": [
+      "auto vs manual deploy", "manual match deploy", "deployment methods",
+      "অটো এবং ম্যানুয়াল ম্যাচ", "ম্যানুয়ালি ম্যাচ তৈরি", "auto vs manual match"
+    ],
     "questions": [
       "Auto vs Manual Match Deployment?",
       "অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?",
-      "Kivabe match deploy korbo?",
       "Which deployment method should I use?",
-      "ম্যানুয়ালি ম্যাচ তৈরি করা যায়?"
+      "ম্যানুয়ালি ম্যাচ তৈরি করা যায় কীভাবে?"
     ],
-    "answer_en": "You have two ways to deploy matches in your arena:\n\n1. **Auto Match Deploy (Recommended):** This system automatically generates all group or knockout fixtures based on your player list. It's fast and error-free.\n2. **Manual Match Deploy:** Best for custom events or friendly matches. You manually select Home and Away players, set a specific time, and create individual fixtures.\n\nTo access these, go to the 'Manage' tab in your tournament dashboard.",
-    "answer_bn": "আপনার এরিনাতে ম্যাচ ডিপ্লয় করার দুটি উপায় আছে:\n\n১. **অটো ম্যাচ ডিপ্লয় (সুপারিশকৃত):** এই সিস্টেমটি আপনার প্লেয়ার লিস্টের ওপর ভিত্তি করে গ্রুপ বা নকআউটের সব ম্যাচ স্বয়ংক্রিয়ভাবে তৈরি করে দেয়। এটি দ্রুত এবং নির্ভুল।\n২. **ম্যানুয়াল ম্যাচ ডিপ্লয়:** কাস্টম ইভেন্ট বা ফ্রেন্ডলি ম্যাচের জন্য এটি সেরা। আপনি নিজেই হোম এবং অ্যাওয়ে প্লেয়ার সিলেক্ট করতে পারেন এবং নির্দিষ্ট সময় সেট করে আলাদা আলাদা ফিক্সচার তৈরি করতে পারেন।\n\nএই অপশনগুলো পেতে আপনার টুর্নামেন্ট ড্যাশবোর্ডের 'Manage' ট্যাবে যান।",
-    "related_en": ["How to deploy matches?", "How automatic progression works?", "How to add players?"],
-    "related_bn": ["ম্যাচ ডিপ্লয় করব কীভাবে?", "অটো প্রগ্রেশন কীভাবে কাজ করে?", "প্লেয়ার এড করব কীভাবে?"]
+    "answer_en": "⚙️ **Auto vs. Manual Match Deployment**\n\n1. **Auto Match Deploy (Recommended):** Automatically generates balanced round-robin group fixtures or knockout brackets with one click.\n2. **Manual Match Deploy:** Lets the host manually pick Player 1 and Player 2, choose the stage, and create custom individual matches.",
+    "answer_bn": "⚙️ **অটো এবং ম্যানুয়াল ম্যাচ ডিপ্লয়মেন্টের পার্থক্য**\n\nআপনার টুর্নামেন্টে ম্যাচ তৈরি করার দুটি পদ্ধতি রয়েছে:\n\n১. **Auto Match Deploy (সুপারিশকৃত):** মাত্র এক ক্লিকে আপনার প্লেয়ার লিস্ট বা গ্রুপ অনুযায়ী সব ম্যাচ এবং নকআউট ব্র্যাকেট স্বয়ংক্রিয়ভাবে ও নির্ভুলভাবে তৈরি হয়ে যায়।\n২. **Manual Match Deploy:** আপনি যদি নিজের ইচ্ছেমতো নির্দিষ্ট দুজন প্লেয়ারের মধ্যে কাস্টম ম্যাচ সেট করতে চান, তবে ম্যানুয়াল অপশন ব্যবহার করতে পারেন।",
+    "related_en": ["How to deploy matches?", "How do players move to the next round?", "How to add players?"],
+    "related_bn": ["ম্যাচ ডিপ্লয় করব কীভাবে?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?", "প্লেয়ার এড করব কীভাবে?"]
   },
   {
     "id": "automatic_progression",
-    "keywords": ["progression", "winners", "next round", "বিজয়ীরা কীভাবে যাবে", "পরের রাউন্ড", "advancement", "bracket update"],
+    "keywords": [
+      "auto progression", "automatic progression", "next round", "advance to next round", "bracket update",
+      "পরের রাউন্ডে", "অটো প্রগ্রেশন", "বিজয়ীরা পরের রাউন্ডে", "সেমিফাইনাল থেকে ফাইনাল",
+      "porer round e kivabe jabe", "winner progression"
+    ],
     "questions": [
       "How do players move to the next round?",
       "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?",
+      "অটো প্রগ্রেশন কীভাবে কাজ করে?",
+      "How automatic progression works?",
       "Kivabe winner ra porer round e jabe?",
       "Does the bracket update automatically?",
-      "বিজয়ীদের নাম কীভাবে পরের ম্যাচে আসবে?"
+      "গ্রুপ স্টেজ শেষে নকআউট ম্যাচ কীভাবে তৈরি হয়?"
     ],
-    "answer_en": "Our system features a 'Smart Auto-Progression' logic:\n\n*   **Group to Knockout:** Once all group matches are completed, the system automatically identifies the Top 2 players from each group (based on PTS and GD) and generates the Round of 16/Quarter-Final fixtures.\n*   **Knockout Advancement:** After a knockout match result is confirmed, the winner is automatically moved to the corresponding slot in the next stage (e.g., SEMI to FINAL).\n\n**Note:** Progression triggers immediately after the host confirms the match results. Ensure the 'Auto-Progression' toggle is ACTIVE in the Manage tab.",
-    "answer_bn": "আমাদের অ্যাপে 'স্মার্ট অটো-প্রগ্রেশন' লজিক ব্যবহার করা হয়েছে:\n\n*   **গ্রুপ থেকে নকআউট:** গ্রুপ পর্বের সব ম্যাচ শেষ হওয়ার পর, সিস্টেম স্বয়ংক্রিয়ভাবে প্রতি গ্রুপের সেরা ২ জন প্লেয়ারকে (পয়েন্ট এবং গোল ডিফারেন্সের ভিত্তিতে) খুঁজে বের করে এবং পরবর্তী রাউন্ডের ফিক্সচার তৈরি করে দেয়।\n*   **নকআউট প্রগ্রেশন:** নকআউট ম্যাচের রেজাল্ট কনফার্ম হওয়ার সাথে সাথে বিজয়ী প্লেয়ার স্বয়ংক্রিয়ভাবে পরবর্তী স্টেজের নির্ধারিত স্লটে (যেমন: সেমি থেকে ফাইনাল) চলে যায়।\n\n**দ্রষ্টব্য:** হোস্ট রেজাল্ট কনফার্ম করার সাথে সাথেই এই প্রগ্রেশন কাজ করে। নিশ্চিত করুন যে 'Manage' ট্যাবে 'Auto-Progression' অপশনটি চালু (ACTIVE) আছে।",
-    "related_en": ["What is GD and Pts?", "How to deploy matches?", "Auto vs Manual Match Deployment?"],
-    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "ম্যাচ ডিপ্লয় করব কীভাবে?", "অটো এবং ম্যানুয়াল ম্যাচ তৈরির পার্থক্য কী?"]
+    "answer_en": "🚀 **How Smart Auto-Progression Works**\n\n* **Group to Knockout:** As soon as all group stage matches are marked **Completed**, the system automatically takes the **Top 2 players** from each group (by PTS and GD) and generates the Knockout stage fixtures!\n* **Knockout to Final:** Whenever a knockout match result (e.g., Quarter-Final or Semi-Final) is confirmed, the winning player automatically advances into the next round's bracket slot.",
+    "answer_bn": "🚀 **স্মার্ট অটো-প্রগ্রেশন ও পরের রাউন্ডে যাওয়ার নিয়ম**\n\nআমাদের অ্যাপে স্বয়ংক্রিয় ব্র্যাকেট প্রগ্রেশন সিস্টেম রয়েছে:\n\n* **গ্রুপ থেকে নকআউট:** গ্রুপ পর্বের সবগুলো ম্যাচের রেজাল্ট কনফার্ম হওয়ার সাথে সাথে সিস্টেম স্বয়ংক্রিয়ভাবে প্রতি গ্রুপের সেরা ২ জন প্লেয়ারকে (PTS ও GD অনুযায়ী) নিয়ে পরবর্তী নকআউট রাউন্ডের ম্যাচ তৈরি করে দেয়।\n* **নকআউট প্রগ্রেশন:** কোয়ার্টার ফাইনাল বা সেমিফাইনালের রেজাল্ট কনফার্ম হওয়ার সাথে সাথে বিজয়ী প্লেয়ার স্বয়ংক্রিয়ভাবে পরের রাউন্ডের (যেমন: ফাইনাল) নির্ধারিত স্লটে চলে যায়।\n\n💡 **দ্রষ্টব্য:** নকআউট পর্বের ম্যাচের রেজাল্ট অবশ্যই একজন বিজয়ী ও একজন পরাজিত হিসেবে সাবমিট করতে হবে।",
+    "related_en": ["What is GD and Pts?", "What are the rules for Knockout Draw or Penalty?", "How to deploy matches?"],
+    "related_bn": ["পয়েন্ট টেবিল কীভাবে কাজ করে?", "নকআউট ম্যাচে ড্র বা পেনাল্টির নিয়ম কী?", "ম্যাচ ডিপ্লয় করব কীভাবে?"]
   },
   {
     "id": "demo_vs_live",
-    "keywords": ["demo", "local storage", "লাইভ টুর্নামেন্ট", "practice", "offline mode", "demo mode", "difference"],
+    "keywords": [
+      "demo vs live", "demo tournament", "live tournament", "practice tournament",
+      "ডেমো এবং লাইভ", "ডেমো টুর্নামেন্ট", "লাইভ টুর্নামেন্ট", "demo mode"
+    ],
     "questions": [
       "Difference between Demo and Live tournaments?",
       "ডেমো এবং লাইভ টুর্নামেন্টের মধ্যে পার্থক্য কী?",
       "Kivabe demo tournament khelbo?",
       "Is demo tournament data saved online?",
-      "ডেমো কি সবাই দেখতে পাবে?"
+      "ডেমো টুর্নামেন্ট কী সবাই দেখতে পাবে?"
     ],
-    "answer_en": "Arena VS offers two types of tournament environments:\n\n1. **Live Tournament:** All data is saved on our secure Firebase cloud database. These are public, and results affect the global leaderboard.\n2. **Demo Tournament:** These are saved ONLY on your device's Local Storage. They are intended for practice or simulation. Other users cannot see your demo tournaments, and they do not require an activation key.\n\nDemo mode is perfect for hosts who want to test their bracket logic before hosting a real prize-pool event.",
-    "answer_bn": "Arena VS-এ দুই ধরনের টুর্নামেন্ট এনভায়রনমেন্ট আছে:\n\n১. **লাইভ টুর্নামেন্ট:** সব ডাটা আমাদের সুরক্ষিত ফায়ারবেস ক্লাউড ডাটাবেসে সেভ হয়। এগুলো পাবলিক টুর্নামেন্ট এবং এর ফলাফল গ্লোবাল লিডারবোর্ডে প্রভাব ফেলে।\n২. **ডেমো টুর্নামেন্ট:** এগুলোর তথ্য শুধুমাত্র আপনার ডিভাইসের লোকাল স্টোরেজে (Local Storage) সেভ হয়। এগুলো মূলত প্র্যাকটিস বা সিমুলেশনের জন্য। অন্য কোনো ইউজার আপনার ডেমো টুর্নামেন্ট দেখতে পাবে না এবং এটি তৈরি করতে কোনো এক্টিভেশন কি লাগে না।\n\nডেমো মোড সেই সব হোস্টদের জন্য সেরা যারা আসল টুর্নামেন্ট করার আগে ব্র্যাকেট লজিক টেস্ট করে নিতে চান।",
-    "related_en": ["How to create a tournament?", "How automatic progression works?", "Why is my account frozen?"],
-    "related_bn": ["টুর্নামেন্ট তৈরি করব কীভাবে?", "অটো প্রগ্রেশন কীভাবে কাজ করে?", "অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?"]
+    "answer_en": "🧪 **Demo vs. Live Tournaments**\n\n1. **Live Tournament:** Saved on the cloud database, visible to all players, and counts toward the global leaderboard.\n2. **Demo Tournament:** Saved locally on your device only for testing brackets, group progression, and practice. Other users cannot see your demo tournaments.",
+    "answer_bn": "🧪 **ডেমো (Demo) এবং লাইভ (Live) টুর্নামেন্টের পার্থক্য**\n\n১. **লাইভ টুর্নামেন্ট:** এর সব তথ্য ক্লাউড ডাটাবেসে সেভ হয়, অ্যাপের সকল ইউজার এটি দেখতে ও জয়েন করতে পারে এবং এর ফলাফল গ্লোবাল লিডারবোর্ডে যুক্ত হয়।\n২. **ডেমো টুর্নামেন্ট:** এটি শুধুমাত্র আপনার নিজের ফোনে প্র্যাকটিস বা ব্র্যাকেট টেস্ট করার জন্য। এটি অন্য কেউ দেখতে পাবে না এবং এটি তৈরি করতে কোনো পাবলিশার রোল লাগে না।",
+    "related_en": ["How to create a tournament?", "How to get Publisher role?", "How do players move to the next round?"],
+    "related_bn": ["টুর্নামেন্ট তৈরি করব কীভাবে?", "পাবলিশার বা হোস্ট রোল কীভাবে পাব?", "প্লেয়াররা পরের রাউন্ডে কীভাবে যাবে?"]
   },
   {
     "id": "tournament_status_guide",
-    "keywords": ["status", "open", "ongoing", "finished", "টুর্নামেন্ট স্ট্যাটাস", "অবস্থা", "ended"],
+    "keywords": [
+      "tournament status", "open ongoing finished", "cup status",
+      "টুর্নামেন্টের স্ট্যাটাস", "ওপেন অনগোয়িং ফিনিশড", "ongoing mane ki"
+    ],
     "questions": [
       "What do different tournament statuses mean?",
       "টুর্নামেন্টের স্ট্যাটাসগুলোর মানে কী?",
       "Keno ongoing dekhasse?",
       "When does a cup finish?",
-      "Open vs Ongoing?"
+      "OPEN, ONGOING এবং FINISHED এর মানে কী?"
     ],
-    "answer_en": "A tournament goes through three main stages:\n\n*   **OPEN:** Registration is currently active. Players can join the arena using the 'Join' button.\n*   **ONGOING:** Registration is closed, and matches have been deployed. Players are actively competing in fixtures.\n*   **FINISHED:** The Grand Final has been played, and a champion has been crowned. No more matches can be played in this cup.\n\nYou can see the current status of any cup at the top-left corner of the tournament card.",
-    "answer_bn": "একটি টুর্নামেন্ট তিনটি প্রধান ধাপের মধ্য দিয়ে যায়:\n\n*   **OPEN:** বর্তমানে রেজিস্ট্রেশন চলছে। প্লেয়াররা 'Join' বাটন ব্যবহার করে অংশগ্রহণ করতে পারবে।\n*   **ONGOING:** রেজিস্ট্রেশন বন্ধ এবং ম্যাচ শুরু হয়ে গেছে। প্লেয়াররা এখন টুর্নামেন্টে একে অপরের সাথে খেলছে।\n*   **FINISHED:** গ্র্যান্ড ফাইনাল শেষ এবং একজন চ্যাম্পিয়ন নির্ধারিত হয়ে গেছে। এই কাপে আর কোনো ম্যাচ বাকি নেই।\n\nযেকোনো কাপের কার্ডের উপরে বাম কোণায় আপনি বর্তমান স্ট্যাটাস দেখতে পাবেন।",
-    "related_en": ["How to join a tournament?", "How to get prize money?", "Where are my matches?"],
-    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "পুরস্কারের টাকা কীভাবে পাব?", "আমার ম্যাচগুলো কোথায় পাব?"]
+    "answer_en": "📌 **Tournament Status Guide**\n\n* **OPEN:** Registration is open—players can join.\n* **ONGOING:** Registration is closed and matches are currently being played.\n* **FINISHED:** The Grand Final is completed and the champion has been crowned.",
+    "answer_bn": "📌 **টুর্নামেন্টের স্ট্যাটাসগুলোর অর্থ**\n\n* **OPEN:** বর্তমানে রেজিস্ট্রেশন চলছে, প্লেয়াররা **'Join Arena'** বাটনে ক্লিক করে অংশগ্রহণ করতে পারবে।\n* **ONGOING:** রেজিস্ট্রেশন শেষ এবং ম্যাচ শুরু হয়ে গেছে। এখন আর নতুন কেউ জয়েন করতে পারবে না।\n* **FINISHED:** ফাইনাল খেলা শেষ এবং টুর্নামেন্টের চ্যাম্পিয়ন নির্ধারিত হয়ে গেছে।",
+    "related_en": ["How to join a tournament?", "Where are my matches?", "How to get prize money?"],
+    "related_bn": ["টুর্নামেন্টে জয়েন করব কীভাবে?", "আমার ম্যাচগুলো কোথায় পাব?", "পুরস্কারের টাকা কীভাবে পাব?"]
   },
   {
     "id": "security_fairplay_policy",
-    "keywords": ["fairplay", "cheating", "ban", "সিকিউরিটি", "নীতিমালা", "নিরাপত্তা", "report player", "fake score"],
+    "keywords": [
+      "security policy", "fairplay policy", "anti cheat", "community rules",
+      "নিরাপত্তা নীতিমালা", "ফেয়ার প্লে", "অ্যাপের নিয়ম", "সিকিউরিটি পলিসি"
+    ],
     "questions": [
       "Security and Fair-Play Policy?",
       "নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা কী?",
-      "Amr id safe?",
-      "How to report fake scores?",
-      "অ্যাপের রুলস কী কী?"
+      "অ্যাপের রুলস এবং নীতিমালা কী কী?",
+      "How does Arena VS prevent cheating?"
     ],
-    "answer_en": "To maintain a professional environment, Arena VS enforces strict rules:\n\n*   **Anti-Cheat:** Using game hacks or mods in FC Mobile will result in a permanent ban from Arena VS.\n*   **Fake Scores:** Submitting fake scores or screenshots is a major violation. Hosts verify every result before finalizing.\n*   **Multiple Accounts:** One player can only have one Arena ID. Multiple accounts linked to the same person will be frozen.\n*   **Reporting:** If you suspect unfair play, record the game and contact an Admin immediately via Telegram with the Match ID.",
-    "answer_bn": "একটি প্রফেশনাল পরিবেশ বজায় রাখতে, Arena VS কঠোর নিয়ম মেনে চলে:\n\n*   **অ্যান্টি-চিট:** FC Mobile-এ কোনো হ্যাক বা মড ব্যবহার করলে Arena VS থেকে স্থায়ীভাবে ব্যান করা হবে।\n*   **ফেক স্কোর:** মিথ্যে স্কোর বা এডিট করা স্ক্রিনশট জমা দেওয়া একটি বড় অপরাধ। হোস্ট প্রতিটি রেজাল্ট ভালো করে চেক করে কনফার্ম করেন।\n*   **একাধিক অ্যাকাউন্ট:** একজন প্লেয়ারের শুধুমাত্র একটি এরিনা আইডি থাকতে পারবে। একই ব্যক্তির একাধিক আইডি পাওয়া গেলে সেগুলো বন্ধ করে দেওয়া হবে।\n*   **রিপোর্টিং:** আপনি যদি কোনো অন্যায়ের সন্দেহ করেন, তবে খেলার ভিডিও রেকর্ড করুন এবং ম্যাচ আইডিসহ টেলিগ্রামে অ্যাডমিনের সাথে যোগাযোগ করুন।",
-    "related_en": ["Why is my account frozen?", "How to contact support?", "How to report a cheater?"],
-    "related_bn": ["অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?", "চিটার রিপোর্ট করব কীভাবে?"]
+    "answer_en": "🛡️ **Security & Fair-Play Policy**\n\n* **1 Player = 1 Account:** Multiple accounts on the same device are strictly prohibited.\n* **Verified Results:** Every match score requires opponent confirmation or Host verification.\n* **Zero Tolerance for Cheating:** Hacks, edited screenshots, or abusive behavior result in an immediate ban.",
+    "answer_bn": "🛡️ **নিরাপত্তা এবং ফেয়ার-প্লে নীতিমালা**\n\nএকটি স্বচ্ছ ও প্রতিযোগিতামূলক গেমিং পরিবেশ বজায় রাখতে আমাদের নীতিমালা:\n\n* **একজন প্লেয়ার, একটি অ্যাকাউন্ট:** একই ডিভাইসে একাধিক অ্যাকাউন্ট ব্যবহার করা সম্পূর্ণ নিষিদ্ধ।\n* **ভেরিফাইড রেজাল্ট:** প্রতিটি ম্যাচের স্কোর প্রতিপক্ষ বা হোস্টের কনফার্মেশনের মাধ্যমে চূড়ান্ত হয়।\n* **জিরো টলারেন্স:** হ্যাকিং, এডিট করা ভুয়া স্ক্রিনশট বা গালিগালাজ করলে স্থায়ীভাবে ব্যান করা হয়।",
+    "related_en": ["Why is my account frozen?", "How to report a cheater?", "How to contact support?"],
+    "related_bn": ["অ্যাকাউন্ট কেন বন্ধ হয়ে গেল?", "চিটার রিপোর্ট করব কীভাবে?", "অ্যাডমিনের সাথে কীভাবে কথা বলব?"]
   }
 ]
