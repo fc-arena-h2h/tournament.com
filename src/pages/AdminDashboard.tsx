@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, getDoc, deleteDoc, limit, orderBy, Timestamp, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
-  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon, Download
+  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon, Download, AlertCircle, Edit3, RotateCcw
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { MatchesPage } from '@/src/pages/Matches';
 import { GameLoader } from '@/src/components/ui/GameLoader';
 import { getDemoTournaments, deleteDemoTournament } from '@/src/lib/localTournaments';
+import { notifyMatchParticipants } from '@/src/lib/notifications';
 
 
 interface Registration {
@@ -47,8 +49,12 @@ export const AdminDashboard = ({
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [adminViewMode, setAdminViewMode] = useState<'dashboard' | 'matches'>('dashboard');
-  const [activeSection, setActiveSection] = useState<'tournaments' | 'access' | 'keys'>('tournaments');
+  const [activeSection, setActiveSection] = useState<'tournaments' | 'access' | 'reports' | 'keys'>('tournaments');
   const [regFilter, setRegFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
+  const [reportedMatches, setReportedMatches] = useState<any[]>([]);
+  const [editingPortalMatch, setEditingPortalMatch] = useState<any | null>(null);
+  const [portalEditScores, setPortalEditScores] = useState({ home: 0, away: 0 });
+  const [isSavingPortalMatch, setIsSavingPortalMatch] = useState(false);
   const [licenseKeys, setLicenseKeys] = useState<any[]>([]);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [settings, setSettings] = useState({ telegramLink: 'https://t.me/your_admin_telegram' });
@@ -74,7 +80,7 @@ export const AdminDashboard = ({
 
       const tournamentIds = Object.keys(tMap);
       if (tournamentIds.length > 0 && userProfile.role !== 'admin') {
-        // Publishers only see registrations for their own tournaments
+        // Publishers only see registrations & reported matches for their own tournaments
         const rQ = query(collection(db, 'registrations'), where('tournamentId', 'in', tournamentIds.slice(0, 30)), limit(100));
         const unsubRegs = onSnapshot(rQ, (regSnap) => {
           setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
@@ -83,9 +89,23 @@ export const AdminDashboard = ({
           console.error("Admin Regs Error (Publisher):", error);
           setLoading(false);
         });
-        return () => unsubRegs();
+
+        const mQ = query(
+          collection(db, 'matches'),
+          where('tournamentId', 'in', tournamentIds.slice(0, 30)),
+          limit(150)
+        );
+        const unsubMatches = onSnapshot(mQ, (mSnap) => {
+          const allM = mSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          setReportedMatches(allM.filter(m => m.status === 'disputed' || m.status === 'reported'));
+        });
+
+        return () => {
+          unsubRegs();
+          unsubMatches();
+        };
       } else if (userProfile.role === 'admin') {
-        // Admins see all registrations
+        // Admins see all registrations & all reported/disputed matches
         const rQ = query(collection(db, 'registrations'), orderBy('createdAt', 'desc'), limit(100));
         const unsubRegs = onSnapshot(rQ, (regSnap) => {
           setRegistrations(regSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration)));
@@ -94,8 +114,22 @@ export const AdminDashboard = ({
           console.error("Admin Regs Error (Admin):", error);
           setLoading(false);
         });
-        return () => unsubRegs();
+
+        const mQ = query(
+          collection(db, 'matches'),
+          where('status', 'in', ['disputed', 'reported']),
+          limit(100)
+        );
+        const unsubMatches = onSnapshot(mQ, (mSnap) => {
+          setReportedMatches(mSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+        });
+
+        return () => {
+          unsubRegs();
+          unsubMatches();
+        };
       } else {
+        setReportedMatches([]);
         setLoading(false);
       }
     }, (error) => {
@@ -244,6 +278,66 @@ export const AdminDashboard = ({
     }
   };
 
+  const handlePortalConfirmMatch = async (match: any) => {
+    try {
+      const hScore = match.homeScore ?? 0;
+      const aScore = match.awayScore ?? 0;
+      await updateDoc(doc(db, 'matches', match.id), {
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+      const winnerName = hScore > aScore ? match.homePlayerName : (aScore > hScore ? match.awayPlayerName : 'Draw');
+      notifyMatchParticipants({
+        homePlayerId: match.homePlayerId,
+        awayPlayerId: match.awayPlayerId,
+        title: '🏆 Match Result Confirmed!',
+        message: `${match.homePlayerName} (${hScore}) - (${aScore}) ${match.awayPlayerName}. Winner: ${winnerName}!`,
+        type: 'match_result',
+        tournamentId: match.tournamentId,
+        matchId: match.id
+      }).catch(() => {});
+      alert('Match result confirmed and finalized!');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `matches/${match.id}`);
+    }
+  };
+
+  const handlePortalResetMatch = async (match: any) => {
+    try {
+      await updateDoc(doc(db, 'matches', match.id), {
+        status: 'scheduled',
+        homeScore: null,
+        awayScore: null,
+        penaltyWinnerId: null,
+        reporterId: null,
+        disputeReason: null,
+        updatedAt: serverTimestamp()
+      });
+      alert('Match has been reset to scheduled status.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `matches/${match.id}`);
+    }
+  };
+
+  const handlePortalSaveEditedMatch = async () => {
+    if (!editingPortalMatch) return;
+    setIsSavingPortalMatch(true);
+    try {
+      await updateDoc(doc(db, 'matches', editingPortalMatch.id), {
+        homeScore: portalEditScores.home,
+        awayScore: portalEditScores.away,
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+      alert('Match score updated and finalized!');
+      setEditingPortalMatch(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `matches/${editingPortalMatch.id}`);
+    } finally {
+      setIsSavingPortalMatch(false);
+    }
+  };
+
   if (loading) return <GameLoader fullScreen={false} text="LOADING DASHBOARD..." />;
 
   return (
@@ -300,6 +394,14 @@ export const AdminDashboard = ({
 
           <div className="mx-2 p-1.5 nm-inset rounded-[1.6rem] bg-[#e6e6e9] border-2 border-white/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
             <button onClick={() => setActiveSection('tournaments')} className={cn("flex-1 py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5", activeSection === 'tournaments' ? "nm-flat bg-[#f0f0f3] text-indigo-600 shadow-sm" : "text-slate-500")}><Trophy size={14} /> Tournaments</button>
+            <button onClick={() => setActiveSection('reports')} className={cn("flex-1 py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative", activeSection === 'reports' ? "nm-flat bg-[#f0f0f3] text-rose-600 shadow-sm" : "text-slate-500")}>
+              <AlertCircle size={14} /> Reports
+              {reportedMatches.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[8px] font-black">
+                  {reportedMatches.length}
+                </span>
+              )}
+            </button>
             <button onClick={() => setActiveSection('access')} className={cn("flex-1 py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5", activeSection === 'access' ? "nm-flat bg-[#f0f0f3] text-amber-600 shadow-sm" : "text-slate-500")}><Users size={14} /> Access</button>
             {userProfile?.role === 'admin' && (
               <button onClick={() => setActiveSection('keys')} className={cn("flex-1 py-3 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5", activeSection === 'keys' ? "nm-flat bg-[#f0f0f3] text-emerald-600 shadow-sm" : "text-slate-500")}><Shield size={14} /> Keys</button>
@@ -544,6 +646,170 @@ export const AdminDashboard = ({
 
 
 
+          {activeSection === 'reports' && (
+            <section className="space-y-6 animate-in fade-in">
+              <div className="px-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Reported & Pending Match Results</h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    Review opponent reports, confirm, edit, or reset matches
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-black uppercase tracking-widest">
+                  {reportedMatches.length} Matches
+                </span>
+              </div>
+
+              <div className="space-y-4 px-2">
+                {reportedMatches.length === 0 ? (
+                  <div className="py-16 text-center space-y-3 nm-inset rounded-[2.5rem] bg-slate-50/50">
+                    <CheckCircle size={40} className="mx-auto text-emerald-300" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
+                      No reported or pending match results right now
+                    </p>
+                  </div>
+                ) : (
+                  reportedMatches.map((m) => (
+                    <Card key={m.id} className="p-6 border-2 border-white bg-white space-y-4 shadow-md">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                            {tournaments[m.tournamentId]?.title || 'Tournament Match'}
+                          </span>
+                          <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest">
+                            {m.stage === 'group' ? `Group Stage · Group ${m.groupId}` : m.stage || 'Match'} {m.matchId ? `· ID: ${m.matchId}` : ''}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border",
+                          m.status === 'disputed'
+                            ? "bg-rose-50 text-rose-600 border-rose-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        )}>
+                          {m.status === 'disputed' ? 'REPORTED BY OPPONENT' : 'PENDING CONFIRMATION'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="flex-1 text-left min-w-0">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">HOME</span>
+                          <span className="text-xs font-black text-slate-900 uppercase italic truncate block">{m.homePlayerName}</span>
+                        </div>
+                        <div className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-lg font-black italic text-indigo-600">
+                          {m.homeScore ?? 0} - {m.awayScore ?? 0}
+                        </div>
+                        <div className="flex-1 text-right min-w-0">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">AWAY</span>
+                          <span className="text-xs font-black text-slate-900 uppercase italic truncate block">{m.awayPlayerName}</span>
+                        </div>
+                      </div>
+
+                      {m.disputeReason && m.status === 'disputed' && (
+                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-[9px] font-bold text-rose-800">
+                          Report Reason: {m.disputeReason}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePortalConfirmMatch(m)}
+                          className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[8.5px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                        >
+                          <CheckCircle size={13} /> Confirm Result
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPortalMatch(m);
+                            setPortalEditScores({
+                              home: m.homeScore ?? 0,
+                              away: m.awayScore ?? 0
+                            });
+                          }}
+                          className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[8.5px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                        >
+                          <Edit3 size={13} /> Edit Result
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePortalResetMatch(m)}
+                          className="h-10 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[8.5px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                        >
+                          <RotateCcw size={13} /> Reset Match
+                        </button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {editingPortalMatch && createPortal(
+            <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4 sm:p-6">
+              <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative">
+                <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
+                      <Edit3 size={20} className="text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">EDIT RESULT</h3>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        Modify & finalize reported match scoreline
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setEditingPortalMatch(null)}
+                    className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-6 sm:p-8 space-y-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 space-y-3">
+                      <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">
+                        {editingPortalMatch.homePlayerName}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={portalEditScores.home}
+                        onChange={(e) => setPortalEditScores({ ...portalEditScores, home: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all"
+                      />
+                    </div>
+                    <span className="text-xl font-black text-slate-400 italic pt-6">VS</span>
+                    <div className="flex-1 space-y-3">
+                      <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">
+                        {editingPortalMatch.awayPlayerName}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={portalEditScores.away}
+                        onChange={(e) => setPortalEditScores({ ...portalEditScores, away: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handlePortalSaveEditedMatch}
+                    disabled={isSavingPortalMatch}
+                    className="w-full h-16 rounded-[2rem] bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-[12px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/25 active:scale-95 transition-all"
+                  >
+                    {isSavingPortalMatch ? 'SAVING...' : 'SAVE & FINALIZE RESULT'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
         </>
       )}
     </div>

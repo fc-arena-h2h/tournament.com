@@ -1,87 +1,76 @@
-# Replacement of Gemini AI with Local Client-Side AI
+# ম্যাচ রেজাল্ট স্ক্রিনশট লোকাল OCR ভেরিফিকেশন প্ল্যান (Local OCR Match Verification Plan)
 
-This project replaces the current Gemini API-based support assistant with a lightweight, browser-based AI that works offline. It uses fuzzy text matching to provide instant answers from a predefined FAQ dataset.
+হ্যাঁ, আপনার চাহিদা অনুযায়ী **ডাটাবেজে কোনো ছবি বা স্ক্রিনশট সেভ না করেই** সরাসরি অ্যাপের ভেতরে (ক্লায়েন্ট-সাইড/ব্রাউজারে লোকালভাবে) OCR প্রযুক্তির মাধ্যমে ম্যাচ রেজাল্টের স্ক্রিনশট স্ক্যান এবং যাচাই করা **১০০% সম্ভব**।
 
-### User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Based on your preferences, the AI will run entirely in the user's browser using a lightweight library (`Fuse.js`) instead of large machine learning models. This ensures the app remains fast and works even without an internet connection.
-
-- **Confirmed Decision (Location)**: Browser-based local execution (Offline Support).
-- **Confirmed Decision (Library)**: Lightweight NLP (Keyword and fuzzy matching).
-- **Confirmed Decision (Storage)**: Static JSON file for FAQ data.
+নিচে এই ফিচারটি কীভাবে কাজ করবে এবং কীভাবে আমরা এটি ইমপ্লিমেন্ট করব তার বিস্তারিত পরিকল্পনা তুলে ধরা হলো:
 
 ---
 
-## 1. Overview & Core Concept
+## ১. ফিচার ওভারভিউ এবং মূল লজিক (Core Requirements & Workflow)
 
-- **What It Does**: The support chat will now search through a local `faqs.json` file to find the most relevant answer to a user's question. If no close match is found, it will suggest contacting support via Telegram.
-- **Target Audience**: Players who need quick help with tournament rules, account issues, or app features, regardless of their connectivity status.
-- **Key Value**: Instant responses, zero API costs, and full offline functionality.
+1. **শতভাগ লোকাল প্রসেসিং (Zero Database Storage):**
+   - প্লেয়ার যখন স্ক্রিনশট সিলেক্ট করবে, ছবিটি শুধু ব্রাউজার মেমোরিতে (`File` / `ObjectURL`) লোড হবে।
+   - ফায়ারবেস স্টোরেজ (Firebase Storage) বা ফায়ারস্টোর ডাটাবেজে (Firestore) কোনো ছবি আপলোড বা সেভ হবে না, ফলে আপনার ডাটাবেজ স্টোরেজ বা ব্যান্ডউইথ খরচ হবে না।
+   - ক্যানভাস প্রি-প্রসেসিং (Canvas Pre-processing) ও ক্লায়েন্ট-সাইড OCR ইঞ্জিন (`tesseract.js`) ব্যবহার করে অ্যাপের ভেতরেই ছবির টেক্সট রিড করা হবে।
 
----
+2. **কার জন্য বাধ্যতামূলক এবং কার জন্য ঐচ্ছিক (Role-Based Enforcement):**
+   - **সাধারণ প্লেয়ার (Regular Players):** স্কোর টাইপ করার পাশাপাশি ম্যাচের স্ক্রিনশট আপলোড করা এবং OCR ভেরিফিকেশনে পাস করা **বাধ্যতামূলক**। ভেরিফিকেশন সফল না হওয়া পর্যন্ত সাবমিট বাটন লক থাকবে।
+   - **অ্যাডমিন ও টুর্নামেন্ট পাবলিশার (Admin & Tournament Host):** অ্যাডমিন বা ওই টুর্নামেন্টের পাবলিশারদের জন্য স্ক্রিনশট আপলোড **ঐচ্ছিক (Optional)**। তারা চাইলে স্ক্রিনশট ছাড়াই সরাসরি স্কোর সাবমিট বা এডিট করতে পারবেন, আবার চাইলে স্ক্রিনশট দিয়ে টেস্টও করতে পারবেন।
 
-## 2. User Experience & Visual Design
-
-- **Key User Flows**:
-    1. User opens the "Support AI" modal.
-    2. User types a query (e.g., "how to join").
-    3. The app instantly filters the `faqs.json` using fuzzy matching.
-    4. The best match is displayed as the "AI" response.
-    5. If similarity is low, a fallback message with a Telegram link is shown.
-- **Visual Identity**: The existing Neumorphic "Arena Assistant" UI will be preserved to maintain consistency with the rest of the application.
-- **Interactive Feedback**: A short "Thinking..." animation (approx. 300ms) will be added to simulate processing, even though the result is nearly instantaneous.
+3. **সঠিকতা যাচাইয়ের নিয়ম (Strict Exact Match Verification):**
+   - **প্লেয়ারদের নাম যাচাই:** ম্যাচে নির্ধারিত দুই প্লেয়ারের নাম (`homePlayerName` এবং `awayPlayerName` / `inGameName`) স্ক্রিনশট থেকে প্রাপ্ত টেক্সটের ভেতরে হুবহু (Exact Match) থাকতে হবে।
+   - **গোল সংখ্যা (Scoreline) যাচাই:** প্লেয়ার ইনপুট বক্সে যে স্কোর লিখেছে (`homeScore` এবং `awayScore`), স্ক্রিনশট থেকে স্ক্যান করা গোল সংখ্যার সাথে সেটি হুবহু মিলতে হবে।
+   - **সাবমিশন ব্লক (Block on Mismatch):** যদি প্লেয়ারের নাম বা গোল সংখ্যার যেকোনো একটি না মেলে, তবে অ্যাপ সাথে সাথে স্পষ্ট এরর মেসেজ দেখাবে (যেমন: কোন প্লেয়ারের নাম বা কোন স্কোরটি মেলেনি) এবং **রেজাল্ট সাবমিট করা সম্পূর্ণ ব্লক করে রাখবে** যতক্ষণ না সঠিক স্ক্রিনশট ও সঠিক স্কোর দেওয়া হয়।
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## ২. কারিগরি আর্কিটেকচার (Technical Architecture)
 
-- **Decision 1: Matching Algorithm**
-    - *Chosen Approach*: `Fuse.js` (Fuzzy Search).
-    - *Why*: It handles typos and partial matches well, which is crucial for a support bot where users might misspell technical terms.
-- **Decision 2: Multilingual Support**
-    - *Chosen Approach*: Triple-key dataset (Bangla, English, Banglish).
-    - *Why*: As per your screenshots, users often mix languages. Including all three versions in the search index ensures high accuracy.
+### ধাপ ১: ক্লায়েন্ট-সাইড OCR লাইব্রেরি ও ইমেজ প্রি-প্রসেসিং (`/src/utils/matchOcrVerifier.ts`)
+- **`tesseract.js` ইন্টিগ্রেশন:** ব্রাউজার ও APK (Capacitor WebView) উভয় পরিবেশে অফলাইন/অনলাইন ওয়ার্কারের মাধ্যমে লোকাল টেক্সট রিকগনিশন চালাবে।
+- **ইমেজ এনহ্যান্সমেন্ট (Canvas Contrast & Grayscale Filter):** গেমের স্ক্রিনশট (যেমন EA FC / eFootball)-এর গাঢ় বা রঙিন ব্যাকগ্রাউন্ড থেকে লেখা ও সংখ্যা যেন নিখুঁতভাবে পড়া যায়, সেজন্য স্ক্যান করার আগে HTML5 `<canvas>`-এর মাধ্যমে ছবিটিকে লোকালভাবে Grayscale এবং High-Contrast করে নেওয়া হবে।
+- **ডাটা এক্সট্রাকশন ও ভ্যালিডেশন ফাংশন (`verifyMatchScreenshotLocally`):**
+  - ইনপুট হিসেবে নেবে: `imageFile`, `expectedHomeName`, `expectedAwayName`, `enteredHomeScore`, `enteredAwayScore`।
+  - আউটপুট হিসেবে দেবে:
+    - `isVerified: boolean`
+    - `homeNameMatched: boolean`
+    - `awayNameMatched: boolean`
+    - `scoreMatched: boolean`
+    - `extractedText: string`
+    - `detectedScores: { home?: number; away?: number }`
+    - `feedbackMessage: string` (কেন পাস বা ফেইল করেছে তার স্পষ্ট ব্যাখ্যা)
+
+### ধাপ ২: রিপোর্ট রেজাল্ট মোডাল আপডেট (`/src/pages/ArenaDetail.tsx`)
+`renderReportResultModal()`-এর ভেতরে নিচের পরিবর্তনগুলো যুক্ত হবে:
+1. **স্ক্রিনশট আপলোড ড্রপজোন (Screenshot Upload Zone):**
+   - স্কোর ইনপুট বক্সের নিচে একটি ক্লিন ও প্রিমিয়াম আপলোড কার্ড থাকবে যেখানে প্লেয়ার স্ক্রিনশট সিলেক্ট করতে পারবে এবং ছোট প্রিভিউ দেখতে পাবে।
+2. **অটোমেটিক লোকাল স্ক্যানিং ও প্রগ্রেস বার:**
+   - স্ক্রিনশট সিলেক্ট করার সাথে সাথে লোকাল OCR স্ক্যান শুরু হবে (`Scanning Match Screenshot... 0% - 100%`)।
+   - ইউজার যদি স্ক্রিনশট আপলোড করার পর উপরে স্কোর পরিবর্তন করে, তবে নতুন স্কোরের সাথে স্ক্রিনশটের স্ক্যান করা ডাটা তাৎক্ষণিকভাবে পুনরায় মিলিয়ে দেখা হবে।
+3. **ভেরিফিকেশন চেকলিস্ট ব্যাজ (Live Verification Checklist):**
+   - স্ক্যান শেষ হলে ৩টি স্পষ্ট স্ট্যাটাস ব্যাজ দেখাবে:
+     - `Home Player Name`: Matched / Not Found
+     - `Away Player Name`: Matched / Not Found
+     - `Match Scoreline`: Matched / Mismatch
+4. **সাবমিট বাটন কন্ট্রোল (`submitFinalReport`):**
+   - সাধারণ প্লেয়ারদের ক্ষেত্রে `ocrVerification?.isVerified === true` না হওয়া পর্যন্ত সাবমিট বাটন ডিজেবল (`LOCKED - VERIFICATION REQUIRED`) থাকবে।
+   - মোডাল বন্ধ করা হলে বা রেজাল্ট সাবমিট হয়ে গেলে মেমোরি থেকে স্ক্রিনশট প্রিভিউ (`URL.revokeObjectURL`) সম্পূর্ণ মুছে ফেলা হবে।
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## ৩. ইউজার ইন্টারফেস ও ভিজ্যুয়াল ডিজাইন (UI & UX Flow)
 
-### Component Hierarchy
+- **মোডাল লেআউট:** বর্তমান সাদা ও পরিচ্ছন্ন `REPORT RESULT` মোডালের ডিজাইনের সাথে মিল রেখে `Slate/Indigo/Amber` থিমে স্ক্রিনশট ভেরিফিকেশন বক্স তৈরি করা হবে।
+- **স্ট্যাটাস কালার কোডিং:**
+  - **Scanning State:** Indigo পালস অ্যানিমেশন ও প্রগ্রেস ইন্ডিকেটর।
+  - **Verified State (100% Match):** Emerald Green বর্ডার ও চেকমার্ক (`Screenshot Verified: Player names & scores match!`)।
+  - **Mismatch State (Blocked):** Rose Red বর্ডার ও অ্যালার্ট মেসেজ—ঠিক কোন নাম বা স্কোরটি স্ক্রিনশটের সাথে মেলেনি তা দেখিয়ে দেবে এবং পুনরায় সঠিক স্ক্রিনশট বা সঠিক স্কোর দেওয়ার নির্দেশনা দেবে।
 
-```
-┌──────────────────┐      ┌──────────────────────┐
-│    SupportAI     │◄────►│      Fuse.js         │
-│   (React Component)│      │  (Search Engine)     │
-└─────────┬────────┘      └──────────▲───────────┘
-          │                          │
-          ▼                          │
-┌──────────────────┐      ┌──────────┴───────────┐
-│   faqs.json      │      │   localStorage       │
-│ (Static Dataset) │      │ (Chat History/Limits)│
-└──────────────────┘      └──────────────────────┘
-```
+---
 
-### Data Model (faqs.json)
+## ৪. কাজের ধাপসমূহ (Step-by-Step Execution Plan)
 
-```json
-[
-  {
-    "id": "join_tournament",
-    "keywords": ["join", "registration", "অংশগ্রহণ", "লগইন"],
-    "questions": [
-      "How to join a tournament?",
-      "টুর্নামেন্টে কিভাবে জয়েন করব?",
-      "tournament e kivabe join korbo?"
-    ],
-    "answer": "To join a tournament, go to the Arena tab, select a tournament, and click 'Join Arena'. Make sure your profile is complete."
-  }
-]
-```
-
-### Key Sequences
-
-1. **Initialization**: On component mount, `faqs.json` is loaded and the `Fuse` index is created.
-2. **Processing**: `fuse.search(userInput)` returns a list of results ranked by score.
-3. **Thresholding**: If the top result score is > 0.4 (distance-based), it is accepted. Otherwise, fallback is triggered.
-4. **Offline**: `vite-plugin-pwa` is configured to precache `faqs.json` so the bot works even when the server is unreachable.
+1. **প্যাকেজ ইনস্টলেশন:** ক্লায়েন্ট-সাইড OCR-এর জন্য `tesseract.js` প্যাকেজ যুক্ত করা।
+2. **OCR ইউটিলিটি তৈরি (`/src/utils/matchOcrVerifier.ts`):** ক্যানভাস ইমেজ প্রি-প্রসেসিং, টেক্সট এক্সট্রাকশন এবং Strict Exact Name & Score Matching লজিক তৈরি করা।
+3. **UI ও ভ্যালিডেশন যুক্ত করা (`/src/pages/ArenaDetail.tsx`):** `renderReportResultModal` এবং `submitFinalReport` ফাংশনে স্ক্রিনশট আপলোড, রিয়েল-টাইম ভেরিফিকেশন স্ট্যাটাস এবং প্লেয়ারদের জন্য সাবমিশন লক যুক্ত করা।
+4. **বিল্ড ও যাচাই (`compile_applet`):** সম্পূর্ণ কোড কম্পাইল করে কোনো টাইপস্ক্রিপ্ট বা রানটাইম এরর নেই তা নিশ্চিত করা।

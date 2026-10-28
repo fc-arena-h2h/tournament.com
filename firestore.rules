@@ -99,17 +99,18 @@ service cloud.firestore {
         && data.awayPlayerId is string
         && data.status in ['scheduled', 'reported', 'disputed', 'completed', 'draft']
         && (data.participants is list && data.participants.size() <= 2)
-        && (!('homeScore' in data) || data.homeScore is number)
-        && (!('awayScore' in data) || data.awayScore is number)
-        && (!('reporterId' in data) || data.reporterId is string)
-        && (!('groupId' in data) || data.groupId is string)
+        && (!('homeScore' in data) || data.homeScore == null || data.homeScore is number)
+        && (!('awayScore' in data) || data.awayScore == null || data.awayScore is number)
+        && (!('penaltyWinnerId' in data) || data.penaltyWinnerId == null || data.penaltyWinnerId is string)
+        && (!('reporterId' in data) || data.reporterId == null || data.reporterId is string)
+        && (!('groupId' in data) || data.groupId == null || data.groupId is string)
         && (!('stage' in data) || data.stage is string)
         && (!('matchId' in data) || data.matchId is string)
         && (!('homePlayerName' in data) || data.homePlayerName is string)
         && (!('awayPlayerName' in data) || data.awayPlayerName is string)
-        && (!('scheduledTime' in data) || data.scheduledTime is timestamp)
-        && (!('screenshotUrl' in data) || data.screenshotUrl is string)
-        && (!('disputeReason' in data) || data.disputeReason is string)
+        && (!('scheduledTime' in data) || data.scheduledTime == null || data.scheduledTime is timestamp)
+        && (!('screenshotUrl' in data) || data.screenshotUrl == null || data.screenshotUrl is string)
+        && (!('disputeReason' in data) || data.disputeReason == null || data.disputeReason is string)
         && (!('updatedAt' in data) || data.updatedAt is timestamp)
         && (!('createdAt' in data) || data.createdAt is timestamp);
     }
@@ -182,18 +183,21 @@ service cloud.firestore {
       allow create: if isPublisherOf(incoming().tournamentId) && isValidMatch(incoming());
       allow update: if isAdmin() || 
         isPublisherOf(existing().tournamentId) ||
-        (isSignedIn() && (request.auth.uid == existing().homePlayerId || request.auth.uid == existing().awayPlayerId) &&
-          (
-            // Action: Report Result
-            (existing().status == 'scheduled' && incoming().status == 'reported' && 
-             (get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.get('resultUploadType', 'players') == 'players') &&
-             incoming().diff(existing()).affectedKeys().hasOnly(['homeScore', 'awayScore', 'status', 'reporterId', 'updatedAt', 'penaltyWinnerId'])) ||
-            // Action: Confirm Result (Opponent)
-            (existing().status == 'reported' && incoming().status == 'completed' && existing().reporterId != request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-            // Action: Dispute Result
-            (existing().status == 'reported' && incoming().status == 'disputed' && existing().reporterId != request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'disputeReason', 'updatedAt']))
-          )
-        ) && isValidMatch(incoming());
+        (isSignedIn() && (
+          // Action: Report Result (Home Player only)
+          (request.auth.uid == existing().homePlayerId &&
+           existing().status == 'scheduled' && incoming().status == 'reported' && 
+           (get(/databases/$(database)/documents/tournaments/$(existing().tournamentId)).data.get('resultUploadType', 'players') == 'players') &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['homeScore', 'awayScore', 'status', 'reporterId', 'updatedAt', 'penaltyWinnerId'])) ||
+          // Action: Confirm Result (Away Player / Opponent)
+          (request.auth.uid == existing().awayPlayerId &&
+           existing().status == 'reported' && incoming().status == 'completed' &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+          // Action: Report / Dispute Result (Away Player / Opponent)
+          (request.auth.uid == existing().awayPlayerId &&
+           existing().status == 'reported' && incoming().status == 'disputed' &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'disputeReason', 'updatedAt']))
+        ) && isValidMatch(incoming()));
       allow delete: if isAdmin() || isPublisherOf(existing().tournamentId) || (isSignedIn() && existing().get('publisherId', '') == request.auth.uid);
     }
 
