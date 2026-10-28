@@ -606,30 +606,68 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
         targetGroups.forEach(gName => {
           const gPlayers = approved.filter(p => p.groupId === gName);
-          for (let i = 0; i < gPlayers.length; i++) {
-            for (let j = i + 1; j < gPlayers.length; j++) {
-              const p1 = gPlayers[i];
-              const p2 = gPlayers[j];
-              const p1Profile = profiles[p1.userId];
-              const p2Profile = profiles[p2.userId];
+          const n = gPlayers.length;
+          if (n < 2) return;
 
-              newMatches.push({
-                tournamentId: tournament.id,
-                matchId: generateMatchId(),
-                homePlayerId: p1.userId,
-                awayPlayerId: p2.userId,
-                homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
-                awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
-                participants: [p1.userId, p2.userId],
-                status: 'scheduled',
-                stage: 'group',
-                groupId: gName,
-                publisherId: tournament.publisherId,
-                scheduledTime: serverTimestamp(),
-                createdAt: serverTimestamp()
-              });
+          // Build balanced Home/Away index pairs [homeIdx, awayIdx] so no player has all Home or all Away matches
+          const indexPairs: Array<[number, number]> = [];
+          if (n === 4) {
+            // Canonical 4-player 3-round FIFA schedule:
+            // P0: 2H, 1A | P1: 1H, 2A | P2: 1H, 2A | P3: 2H, 1A
+            indexPairs.push(
+              [0, 1], [2, 3], // Round 1
+              [1, 2], [3, 0], // Round 2
+              [0, 2], [3, 1]  // Round 3
+            );
+          } else if (n === 3) {
+            // Canonical 3-player cycle: each player gets 1 Home and 1 Away match
+            indexPairs.push([0, 1], [1, 2], [2, 0]);
+          } else {
+            // General N-player balanced round-robin tracker
+            const homeCounts = new Array(n).fill(0);
+            const awayCounts = new Array(n).fill(0);
+            for (let i = 0; i < n; i++) {
+              for (let j = i + 1; j < n; j++) {
+                const iNetHome = homeCounts[i] - awayCounts[i];
+                const jNetHome = homeCounts[j] - awayCounts[j];
+                let homeIdx = i;
+                let awayIdx = j;
+                if (iNetHome > jNetHome) {
+                  homeIdx = j;
+                  awayIdx = i;
+                } else if (iNetHome === jNetHome && ((i + j) % 2 === 1)) {
+                  homeIdx = j;
+                  awayIdx = i;
+                }
+                homeCounts[homeIdx]++;
+                awayCounts[awayIdx]++;
+                indexPairs.push([homeIdx, awayIdx]);
+              }
             }
           }
+
+          indexPairs.forEach(([homeIdx, awayIdx]) => {
+            const p1 = gPlayers[homeIdx];
+            const p2 = gPlayers[awayIdx];
+            const p1Profile = profiles[p1.userId];
+            const p2Profile = profiles[p2.userId];
+
+            newMatches.push({
+              tournamentId: tournament.id,
+              matchId: generateMatchId(),
+              homePlayerId: p1.userId,
+              awayPlayerId: p2.userId,
+              homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
+              awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
+              participants: [p1.userId, p2.userId],
+              status: 'scheduled',
+              stage: 'group',
+              groupId: gName,
+              publisherId: tournament.publisherId,
+              scheduledTime: serverTimestamp(),
+              createdAt: serverTimestamp()
+            });
+          });
         });
       }
 
