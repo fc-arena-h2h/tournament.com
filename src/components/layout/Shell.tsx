@@ -115,20 +115,11 @@ export const Header = ({
             </button>
           ) : (
             <div className="relative group">
-              <div className="w-14 h-14 rounded-[1.2rem] bg-fc-dark border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
-                <Logo size={42} variant="color" className="relative z-10" />
-                
-                {/* Pro Badge */}
-                <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-600 text-white text-[6px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg border border-white/20 transform rotate-12 group-hover:rotate-0 transition-transform">
-                  Pro
-                </div>
+              <div className="w-14 h-14 rounded-[1.2rem] bg-[#0c1445] border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
+                <Logo size={52} variant="color" className="relative z-10 w-full h-full rounded-none" />
                 
                 {/* Neon Accent Line */}
-                <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none" />
-              </div>
-              {/* Badge */}
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-lg bg-fc-green border-2 border-white flex items-center justify-center text-[6px] font-black text-white italic shadow-lg z-20">
-                FC
+                <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none z-20" />
               </div>
             </div>
           )}

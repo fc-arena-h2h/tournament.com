@@ -731,6 +731,17 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       const homeName = p1Profile?.inGameName || p1Reg?.gameName || 'Player 1';
       const awayName = p2Profile?.inGameName || p2Reg?.gameName || 'Player 2';
 
+      const effectiveStage = isKnockoutOnly && manualMatchForm.stage === 'group'
+        ? (knockoutStages[0] || 'QTR')
+        : manualMatchForm.stage;
+
+      const autoDetectedGroup =
+        p1Reg?.groupId && p2Reg?.groupId && p1Reg.groupId === p2Reg.groupId && p1Reg.groupId !== 'knockout'
+          ? p1Reg.groupId
+          : manualMatchForm.groupId;
+
+      const effectiveGroupId = effectiveStage === 'group' ? autoDetectedGroup : 'knockout';
+
       if (isDemo) {
         const newMatch = addDemoMatch(tournament.id, {
           tournamentId: tournament.id,
@@ -740,8 +751,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           homePlayerName: homeName,
           awayPlayerName: awayName,
           status: 'scheduled',
-          stage: manualMatchForm.stage,
-          groupId: manualMatchForm.groupId,
+          stage: effectiveStage,
+          groupId: effectiveGroupId,
           scheduledTime: { toMillis: () => scheduledTimestamp.toMillis() }
         });
         setMatches(prev => [...prev, newMatch as any]);
@@ -755,8 +766,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           awayPlayerName: awayName,
           participants: [manualMatchForm.homeUserId, manualMatchForm.awayUserId],
           status: 'scheduled',
-          stage: manualMatchForm.stage,
-          groupId: manualMatchForm.groupId,
+          stage: effectiveStage,
+          groupId: effectiveGroupId,
           publisherId: tournament.publisherId,
           scheduledTime: scheduledTimestamp,
           createdAt: serverTimestamp()
@@ -776,7 +787,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
       alert('Manual Match Deploy complete!');
       setShowManualMatchModal(false);
-      setManualMatchForm({ homeUserId: '', awayUserId: '', stage: 'group', groupId: 'A', scheduledDate: '', scheduledTime: '' });
+      setManualMatchForm({
+        homeUserId: '',
+        awayUserId: '',
+        stage: isKnockoutOnly ? (knockoutStages[0] || 'QTR') : 'group',
+        groupId: 'A',
+        scheduledDate: '',
+        scheduledTime: ''
+      });
     } catch (err) {
       console.error('Manual match create error:', err);
       alert('Manual Match Deploy failed!');
@@ -5245,15 +5263,31 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-2">Home Player (Player 1)</label>
                    <select 
                      value={manualMatchForm.homeUserId}
-                     onChange={(e) => setManualMatchForm({...manualMatchForm, homeUserId: e.target.value})}
+                     onChange={(e) => {
+                       const newHomeId = e.target.value;
+                       const homeP = participants.find(p => p.userId === newHomeId);
+                       const awayP = participants.find(p => p.userId === manualMatchForm.awayUserId);
+                       let nextGroupId = manualMatchForm.groupId;
+                       if (homeP?.groupId && awayP?.groupId && homeP.groupId === awayP.groupId) {
+                         nextGroupId = homeP.groupId;
+                       } else if (homeP?.groupId && !awayP?.groupId) {
+                         nextGroupId = homeP.groupId;
+                       }
+                       setManualMatchForm({
+                         ...manualMatchForm,
+                         homeUserId: newHomeId,
+                         groupId: nextGroupId
+                       });
+                     }}
                      className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black uppercase text-slate-800 outline-none"
                    >
                      <option value="">Select Home Player</option>
                      {participants.filter(p => p.status === 'approved').map(p => {
                        const prof = profiles[p.userId];
+                       const isKnockoutStage = isKnockoutOnly || manualMatchForm.stage !== 'group';
                        return (
                          <option key={p.userId} value={p.userId}>
-                           {prof?.inGameName || p.gameName} (Group {p.groupId || '-'})
+                           {prof?.inGameName || p.gameName}{!isKnockoutStage && p.groupId ? ` (Group ${p.groupId})` : ''}
                          </option>
                        );
                      })}
@@ -5264,48 +5298,66 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-2">Away Player (Player 2)</label>
                    <select 
                      value={manualMatchForm.awayUserId}
-                     onChange={(e) => setManualMatchForm({...manualMatchForm, awayUserId: e.target.value})}
+                     onChange={(e) => {
+                       const newAwayId = e.target.value;
+                       const homeP = participants.find(p => p.userId === manualMatchForm.homeUserId);
+                       const awayP = participants.find(p => p.userId === newAwayId);
+                       let nextGroupId = manualMatchForm.groupId;
+                       if (homeP?.groupId && awayP?.groupId && homeP.groupId === awayP.groupId) {
+                         nextGroupId = awayP.groupId;
+                       } else if (awayP?.groupId && !homeP?.groupId) {
+                         nextGroupId = awayP.groupId;
+                       }
+                       setManualMatchForm({
+                         ...manualMatchForm,
+                         awayUserId: newAwayId,
+                         groupId: nextGroupId
+                       });
+                     }}
                      className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black uppercase text-slate-800 outline-none"
                    >
                      <option value="">Select Away Player</option>
                      {participants.filter(p => p.status === 'approved').map(p => {
                        const prof = profiles[p.userId];
+                       const isKnockoutStage = isKnockoutOnly || manualMatchForm.stage !== 'group';
                        return (
                          <option key={p.userId} value={p.userId}>
-                           {prof?.inGameName || p.gameName} (Group {p.groupId || '-'})
+                           {prof?.inGameName || p.gameName}{!isKnockoutStage && p.groupId ? ` (Group ${p.groupId})` : ''}
                          </option>
                        );
                      })}
                    </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className={cn("grid gap-3", (!isKnockoutOnly && manualMatchForm.stage === 'group') ? "grid-cols-2" : "grid-cols-1")}>
                    <div className="space-y-1.5">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-2">Stage</label>
                       <select 
-                        value={manualMatchForm.stage}
+                        value={isKnockoutOnly && manualMatchForm.stage === 'group' ? 'R16' : manualMatchForm.stage}
                         onChange={(e) => setManualMatchForm({...manualMatchForm, stage: e.target.value})}
                         className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black uppercase text-slate-800 outline-none"
                       >
-                        <option value="group">Group Stage</option>
+                        {!isKnockoutOnly && <option value="group">Group Stage</option>}
                         <option value="R16">Round of 16</option>
                         <option value="QTR">Quarter Final</option>
                         <option value="SEMI">Semi Final</option>
                         <option value="FINAL">Final</option>
                       </select>
                    </div>
-                   <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-2">Group</label>
-                      <select 
-                        value={manualMatchForm.groupId}
-                        onChange={(e) => setManualMatchForm({...manualMatchForm, groupId: e.target.value})}
-                        className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black uppercase text-slate-800 outline-none"
-                      >
-                        {groups.map(g => (
-                          <option key={g} value={g}>Group {g}</option>
-                        ))}
-                      </select>
-                   </div>
+                   {!isKnockoutOnly && manualMatchForm.stage === 'group' && (
+                     <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-2">Group</label>
+                        <select 
+                          value={manualMatchForm.groupId}
+                          onChange={(e) => setManualMatchForm({...manualMatchForm, groupId: e.target.value})}
+                          className="w-full h-12 px-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black uppercase text-slate-800 outline-none"
+                        >
+                          {groups.map(g => (
+                            <option key={g} value={g}>Group {g}</option>
+                          ))}
+                        </select>
+                     </div>
+                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

@@ -8,12 +8,15 @@ interface LogoProps {
 }
 
 export const Logo: React.FC<LogoProps> = ({ className, size = 64 }) => {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const iconSrc = `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}pwa-512x512.png`;
+
   return (
-    <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    <div className={cn("relative flex items-center justify-center overflow-hidden rounded-2xl", className)} style={{ width: size, height: size }}>
       <img 
-        src="assets/aistudio/20261021_140921_56efc859.png" 
+        src={iconSrc} 
         alt="FC Arena VS" 
-        className="w-full h-full object-contain drop-shadow-xl animate-in fade-in zoom-in duration-500"
+        className="w-full h-full object-cover drop-shadow-xl animate-in fade-in zoom-in duration-500"
       />
     </div>
   );
