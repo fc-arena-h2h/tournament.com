@@ -1,13 +1,16 @@
 // FC Arena VS standalone service worker
 importScripts('/sw-push-handler.js');
 
-const CACHE_NAME = 'fc-arena-cache-v1';
+const CACHE_NAME = 'fc-arena-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/fc_arena_icon.jpg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
+  '/pwa-1024x1024.png',
+  '/pwa-maskable-512x512.png',
+  '/pwa-maskable-1024x1024.png',
   '/apple-touch-icon.png'
 ];
 

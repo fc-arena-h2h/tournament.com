@@ -9,7 +9,7 @@ interface LogoProps {
 
 export const Logo: React.FC<LogoProps> = ({ className, size = 64 }) => {
   const baseUrl = import.meta.env.BASE_URL || '/';
-  const iconSrc = `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}pwa-512x512.png`;
+  const iconSrc = `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}pwa-1024x1024.png?v=2`;
 
   return (
     <div className={cn("relative flex items-center justify-center overflow-hidden rounded-2xl", className)} style={{ width: size, height: size }}>

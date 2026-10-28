@@ -59,8 +59,8 @@ export const AdminDashboard = ({
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [settings, setSettings] = useState({ telegramLink: 'https://t.me/your_admin_telegram' });
   const [appSettings, setAppSettings] = useState({ 
-    min_version: '2.4.1', 
-    app_id: 'fc-arena-vs-2024', 
+    min_version: '2.4.4', 
+    app_id: 'fc-arena-vs-2025', 
     force_update: true,
     update_url: 'https://t.me/fcarenavsofficial'
   });
@@ -160,8 +160,8 @@ export const AdminDashboard = ({
         } else {
           // Initialize with current app defaults if missing
           setDoc(doc(db, 'settings', 'app_update'), {
-            min_version: '2.4.1',
-            app_id: 'fc-arena-vs-2024',
+            min_version: '2.4.4',
+            app_id: 'fc-arena-vs-2025',
             force_update: true,
             update_url: 'https://t.me/fcarenavsofficial'
           }).catch(console.error);
