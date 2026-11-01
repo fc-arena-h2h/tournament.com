@@ -5,7 +5,8 @@ import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, 
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   Users, CheckCircle, XCircle, Trophy, Shield, Plus, Megaphone, 
-  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon, Download, AlertCircle, Edit3, RotateCcw
+  X, LayoutDashboard, Gamepad2, Clock, Trash2, Copy as CopyIcon, Download, AlertCircle, Edit3, RotateCcw,
+  Send, MessageCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -57,7 +58,10 @@ export const AdminDashboard = ({
   const [isSavingPortalMatch, setIsSavingPortalMatch] = useState(false);
   const [licenseKeys, setLicenseKeys] = useState<any[]>([]);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
-  const [settings, setSettings] = useState({ telegramLink: 'https://t.me/your_admin_telegram' });
+  const [settings, setSettings] = useState({ 
+    telegramLink: 'https://t.me/your_admin_telegram',
+    facebookLink: ''
+  });
   const [appSettings, setAppSettings] = useState({ 
     min_version: '2.4.4', 
     app_id: 'fc-arena-vs-2025', 
@@ -483,18 +487,42 @@ export const AdminDashboard = ({
                 {/* Admin Links */}
                 <Card className="p-6 border-none mx-2 space-y-6 bg-white shadow-sm">
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2">
-                      <Megaphone size={12} /> Communication Links
-                    </label>
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Admin Telegram Link"
-                        value={settings.telegramLink}
-                        onChange={(e) => setSettings({ ...settings, telegramLink: e.target.value })}
-                        className="h-14"
-                      />
-                      <Button onClick={handleSaveSettings} className="h-14 px-8 nm-flat bg-indigo-600 text-white font-black uppercase">Update</Button>
+                    <div className="flex items-center justify-between ml-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <Megaphone size={12} className="text-indigo-500" /> Admin Contact Links
+                      </label>
+                      <span className="text-[8px] font-bold text-slate-400 uppercase">For Activation Key Inquiries</span>
                     </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-black text-slate-500 uppercase ml-2 flex items-center gap-1.5">
+                          <Send size={10} className="text-sky-500" /> Admin Telegram Link
+                        </span>
+                        <Input 
+                          placeholder="https://t.me/your_admin_telegram"
+                          value={settings.telegramLink || ''}
+                          onChange={(e) => setSettings({ ...settings, telegramLink: e.target.value })}
+                          className="h-14"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-black text-slate-500 uppercase ml-2 flex items-center gap-1.5">
+                          <MessageCircle size={10} className="text-blue-600" /> Admin Facebook / Messenger Link
+                        </span>
+                        <Input 
+                          placeholder="https://facebook.com/your_admin_page"
+                          value={settings.facebookLink || ''}
+                          onChange={(e) => setSettings({ ...settings, facebookLink: e.target.value })}
+                          className="h-14"
+                        />
+                      </div>
+                    </div>
+
+                    <Button onClick={handleSaveSettings} className="w-full h-14 nm-flat bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest shadow-md">
+                      Update Contact Links
+                    </Button>
                   </div>
 
                   <div className="h-px bg-slate-100" />

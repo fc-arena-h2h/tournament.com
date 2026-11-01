@@ -117,10 +117,11 @@ function createScoreDigitCropDataUrl(
   const h = img.naturalHeight || img.height;
   const centerX = w / 2;
 
-  // Main score digits sit between 0.042*h and 0.155*h from centerX
-  // (keeping clear of the outer penalty score parentheses at 0.16*h..0.25*h)
-  const innerOffset = Math.round(h * 0.042);
-  const outerOffset = Math.round(h * 0.155);
+  // Main score digits sit between 0.052*h and 0.152*h from centerX, and vertically at 0.110*h..0.212*h
+  // (keeping clear of the top player banner border at 0.085*h, the 90:00 timer below 0.212*h,
+  // and the outer penalty score parentheses at 0.16*h..0.25*h)
+  const innerOffset = Math.round(h * 0.052);
+  const outerOffset = Math.round(h * 0.152);
 
   const sx = side === 'left'
     ? Math.max(0, Math.round(centerX - outerOffset))
@@ -129,8 +130,8 @@ function createScoreDigitCropDataUrl(
     ? Math.max(sx + 1, Math.round(centerX - innerOffset))
     : Math.min(w, Math.round(centerX + outerOffset));
 
-  const sy = Math.max(0, Math.round(h * 0.085));
-  const ey = Math.min(h, Math.round(h * 0.215));
+  const sy = Math.max(0, Math.round(h * 0.110));
+  const ey = Math.min(h, Math.round(h * 0.212));
 
   const cropW = Math.max(1, ex - sx);
   const cropH = Math.max(1, ey - sy);
@@ -213,8 +214,8 @@ function createPenaltyDigitCropDataUrl(
     ? Math.max(sx + 1, Math.round(centerX - innerOffset))
     : Math.min(w, Math.round(centerX + outerOffset));
 
-  const sy = Math.max(0, Math.round(h * 0.095));
-  const ey = Math.min(h, Math.round(h * 0.185));
+  const sy = Math.max(0, Math.round(h * 0.108));
+  const ey = Math.min(h, Math.round(h * 0.188));
 
   const cropW = Math.max(1, ex - sx);
   const cropH = Math.max(1, ey - sy);
@@ -351,11 +352,136 @@ function parseSingleScoreBoxText(raw: string): number | null {
 }
 
 /**
+ * Creates a dedicated 3x-upscaled crop of the Left or Right player name banner at the top of the screen.
+ * Stacks three complementary strips:
+ * 1: Inverted high-contrast grayscale
+ * 2: Smooth achromatic whiteness (min(R,G,B)) grayscale — cleanly eliminates pink/magenta/purple/blue/red neon banner backgrounds
+ * 3: Crisp binary white-glyph threshold
+ */
+function createPlayerNameBannerCropDataUrl(
+  img: HTMLImageElement,
+  side: 'left' | 'right'
+): string {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const centerX = w / 2;
+
+  const innerOffset = Math.round(h * 0.135);
+  const outerOffset = Math.round(h * 0.76);
+
+  const sx = side === 'left'
+    ? Math.max(0, Math.round(centerX - outerOffset))
+    : Math.min(w - 1, Math.round(centerX + innerOffset));
+  const ex = side === 'left'
+    ? Math.max(sx + 1, Math.round(centerX - innerOffset))
+    : Math.min(w, Math.round(centerX + outerOffset));
+
+  const sy = 0;
+  const ey = Math.min(h, Math.round(h * 0.105));
+
+  const cropW = Math.max(1, ex - sx);
+  const cropH = Math.max(1, ey - sy);
+
+  const scale = 3;
+  const scaledW = cropW * scale;
+  const scaledH = cropH * scale;
+
+  // Strip 1: Inverted high-contrast grayscale (3x upscaled)
+  const strip1 = document.createElement('canvas');
+  strip1.width = scaledW;
+  strip1.height = scaledH;
+  const ctx1 = strip1.getContext('2d');
+  if (!ctx1) return '';
+  ctx1.imageSmoothingEnabled = true;
+  ctx1.drawImage(img, sx, sy, cropW, cropH, 0, 0, scaledW, scaledH);
+
+  const imgData1 = ctx1.getImageData(0, 0, scaledW, scaledH);
+  const d1 = imgData1.data;
+
+  // Strip 2: Smooth achromatic whiteness (min(R,G,B)) isolation (removes neon pink/magenta/cyan diagonal banners)
+  const strip2 = document.createElement('canvas');
+  strip2.width = scaledW;
+  strip2.height = scaledH;
+  const ctx2 = strip2.getContext('2d');
+  if (!ctx2) return '';
+  const imgData2 = ctx2.createImageData(scaledW, scaledH);
+  const d2 = imgData2.data;
+
+  // Strip 3: Binary white-text isolation
+  const strip3 = document.createElement('canvas');
+  strip3.width = scaledW;
+  strip3.height = scaledH;
+  const ctx3 = strip3.getContext('2d');
+  if (!ctx3) return '';
+  const imgData3 = ctx3.createImageData(scaledW, scaledH);
+  const d3 = imgData3.data;
+
+  for (let i = 0; i < d1.length; i += 4) {
+    const r = d1[i];
+    const g = d1[i + 1];
+    const b = d1[i + 2];
+
+    // Strip 1 calculation: inverted high-contrast grayscale
+    let invGray = 255 - (0.299 * r + 0.587 * g + 0.114 * b);
+    invGray = 1.85 * (invGray - 128) + 128;
+    const c1 = Math.max(0, Math.min(255, Math.round(invGray)));
+    d1[i] = c1;
+    d1[i + 1] = c1;
+    d1[i + 2] = c1;
+    d1[i + 3] = 255;
+
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const sat = maxC - minC;
+
+    // Strip 2 calculation: smooth min(R,G,B) whiteness mapping (145..225 -> 255..0)
+    let c2 = 255;
+    if (minC >= 145 && sat <= 90) {
+      const norm = Math.max(0, Math.min(1, (minC - 145) / (225 - 145)));
+      c2 = Math.round(255 * (1 - norm));
+    }
+    d2[i] = c2;
+    d2[i + 1] = c2;
+    d2[i + 2] = c2;
+    d2[i + 3] = 255;
+
+    // Strip 3 calculation: crisp binary white-text threshold (tolerates anti-aliased pink/magenta edge bleed)
+    const isWhiteText = minC >= 170 && sat <= 85;
+    const c3 = isWhiteText ? 0 : 255;
+    d3[i] = c3;
+    d3[i + 1] = c3;
+    d3[i + 2] = c3;
+    d3[i + 3] = 255;
+  }
+
+  ctx1.putImageData(imgData1, 0, 0);
+  ctx2.putImageData(imgData2, 0, 0);
+  ctx3.putImageData(imgData3, 0, 0);
+
+  const pad = 28;
+  const gap = 32;
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = scaledW + pad * 2;
+  outCanvas.height = scaledH * 3 + gap * 2 + pad * 2;
+  const outCtx = outCanvas.getContext('2d');
+  if (!outCtx) return '';
+
+  outCtx.fillStyle = '#ffffff';
+  outCtx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+  outCtx.drawImage(strip1, pad, pad);
+  outCtx.drawImage(strip2, pad, pad + scaledH + gap);
+  outCtx.drawImage(strip3, pad, pad + (scaledH + gap) * 2);
+
+  return outCanvas.toDataURL('image/png');
+}
+
+/**
  * Runs local OCR on the selected screenshot file in the browser.
  * Performs:
- * 1) Dedicated left & right scoreboard digit crops (eliminating the middle FC logo & bottom match stats)
- * 2) Dedicated left & right penalty score crops (stripping parentheses around '(4)' and '(3)')
- * 3) Standard full-screen pass & top-header contrast pass for player names
+ * 1) Dedicated 3x-upscaled Left & Right player name banner crops (for accurate mixed-case & stylized name detection)
+ * 2) Dedicated left & right scoreboard digit crops (eliminating the middle FC logo & bottom match stats)
+ * 3) Dedicated left & right penalty score crops (stripping parentheses around '(4)' and '(3)')
+ * 4) Standard full-screen pass & top-header contrast pass for fallback context
  */
 export async function extractTextFromMatchScreenshot(
   file: File,
@@ -372,23 +498,38 @@ export async function extractTextFromMatchScreenshot(
   });
 
   try {
-    // Pass 1: Standard full image (captures player names and layout context)
+    // Pass 1: Dedicated 3x-upscaled Left & Right Player Name Banners
+    const leftBannerUrl = createPlayerNameBannerCropDataUrl(img, 'left');
+    const rightBannerUrl = createPlayerNameBannerCropDataUrl(img, 'right');
+
+    let leftBannerText = '';
+    let rightBannerText = '';
+    if (leftBannerUrl) {
+      const lRes = await worker.recognize(leftBannerUrl);
+      leftBannerText = lRes.data.text || '';
+    }
+    if (rightBannerUrl) {
+      const rRes = await worker.recognize(rightBannerUrl);
+      rightBannerText = rRes.data.text || '';
+    }
+
+    // Pass 2: Standard full image (captures player names and layout context)
     const standardDataUrl = createFullPassCanvasDataUrl(img, 'standard');
     const firstPass = await worker.recognize(standardDataUrl);
     const firstText = firstPass.data.text || '';
 
-    // Pass 2: High-contrast top header (captures white player names on dark/colored banners)
+    // Pass 3: High-contrast top header (captures white player names on dark/colored banners)
     const headerDataUrl = createFullPassCanvasDataUrl(img, 'top-header-contrast');
     const secondPass = await worker.recognize(headerDataUrl);
     const secondText = secondPass.data.text || '';
 
-    // Pass 3: Dedicated Scoreboard Left & Right Main Digit Boxes (PSM 10 / single token mode)
+    // Pass 4: Dedicated Scoreboard Left & Right Main Digit Boxes (PSM 10 / single token mode)
     const leftCropUrl = createScoreDigitCropDataUrl(img, 'left');
     const rightCropUrl = createScoreDigitCropDataUrl(img, 'right');
 
     await worker.setParameters({
       tessedit_pageseg_mode: '10' as any,
-      tessedit_char_whitelist: '0123456789OoQD'
+      tessedit_char_whitelist: '0123456789OoQDIl|'
     });
 
     let scoreboardTag = '';
@@ -404,7 +545,7 @@ export async function extractTextFromMatchScreenshot(
       }
     }
 
-    // Pass 4: Dedicated Penalty Shootout Left & Right Digit Boxes (inside parentheses '(4)' / '(3)')
+    // Pass 5: Dedicated Penalty Shootout Left & Right Digit Boxes (inside parentheses '(4)' / '(3)')
     const leftPenUrl = createPenaltyDigitCropDataUrl(img, 'left');
     const rightPenUrl = createPenaltyDigitCropDataUrl(img, 'right');
 
@@ -412,7 +553,7 @@ export async function extractTextFromMatchScreenshot(
     if (leftPenUrl && rightPenUrl) {
       await worker.setParameters({
         tessedit_pageseg_mode: '10' as any,
-        tessedit_char_whitelist: '0123456789'
+        tessedit_char_whitelist: '0123456789Il|'
       });
 
       const leftPenRes = await worker.recognize(leftPenUrl);
@@ -427,24 +568,165 @@ export async function extractTextFromMatchScreenshot(
     }
 
     if (onProgress) onProgress(100);
-    return `${scoreboardTag}\n${penaltyTag}\n${firstText}\n${secondText}`.trim();
+    return [
+      scoreboardTag,
+      penaltyTag,
+      `[LEFT_PLAYER_BANNER]\n${leftBannerText}`,
+      `[RIGHT_PLAYER_BANNER]\n${rightBannerText}`,
+      firstText,
+      secondText
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .trim();
   } finally {
     revoke();
     await worker.terminate();
   }
 }
 
+/**
+ * Normalizes stylized / fancy Unicode fonts commonly used in gamer tags
+ * (e.g. Mathematical Bold/Italic/Sans-Serif "𝘎𝘈𝘔𝘌𝘙乂𝘚𝘏𝘜𝘝𝘖彡", Fullwidth, Small Caps,
+ * Cyrillic/Greek lookalikes) into standard ASCII characters so OCR can match them accurately.
+ */
+const FANCY_UNICODE_LOOKALIKE_MAP: Record<string, string> = {
+  // Small Caps & Latin extensions
+  'ᴀ': 'a', 'ʙ': 'b', 'ᴄ': 'c', 'ᴅ': 'd', 'ᴇ': 'e', 'ꜰ': 'f', 'ɢ': 'g', 'ʜ': 'h',
+  'ɪ': 'i', 'ᴊ': 'j', 'ᴋ': 'k', 'ʟ': 'l', 'ᴍ': 'm', 'ɴ': 'n', 'ᴏ': 'o', 'ᴘ': 'p',
+  'ǫ': 'q', 'ʀ': 'r', 'ꜱ': 's', 'ᴛ': 't', 'ᴜ': 'u', 'ᴠ': 'v', 'ᴡ': 'w', 'ʏ': 'y', 'ᴢ': 'z',
+  'ł': 'l', 'Ł': 'l', 'ø': 'o', 'Ø': 'o', 'đ': 'd', 'Đ': 'd', 'ß': 'ss', 'æ': 'ae', 'Æ': 'ae',
+  // Greek / Cyrillic / Symbol lookalikes often used in stylized gamer names
+  'α': 'a', 'а': 'a', 'А': 'a', '∆': 'a', 'Δ': 'a', 'Λ': 'a',
+  'в': 'b', 'В': 'b', 'β': 'b',
+  'с': 'c', 'С': 'c', '¢': 'c',
+  '∂': 'd', 'ԁ': 'd',
+  'є': 'e', 'е': 'e', 'Е': 'e', 'є̈': 'e', 'Σ': 'e', '£': 'e',
+  'ƒ': 'f',
+  'ǥ': 'g',
+  'н': 'h', 'Н': 'h', 'ћ': 'h',
+  'і': 'i', 'І': 'i', 'ї': 'i', 'ι': 'i',
+  'ј': 'j', 'Ј': 'j',
+  'к': 'k', 'К': 'k', 'κ': 'k',
+  'ℓ': 'l',
+  'м': 'm', 'М': 'm',
+  'и': 'n', 'й': 'n', 'η': 'n', 'П': 'n',
+  'о': 'o', 'О': 'o', 'σ': 'o', 'θ': 'o', 'Θ': 'o',
+  'р': 'p', 'Р': 'p', 'ρ': 'p',
+  'я': 'r', 'Я': 'r', 'г': 'r',
+  'ѕ': 's', 'Ѕ': 's', '$': 's',
+  'т': 't', 'Т': 't', 'τ': 't',
+  'υ': 'u', 'ц': 'u', 'µ': 'u',
+  'ν': 'v', 'ѵ': 'v',
+  'ω': 'w', 'ш': 'w', 'щ': 'w', 'Ш': 'w',
+  'х': 'x', 'Х': 'x', 'χ': 'x', '×': 'x',
+  'у': 'y', 'У': 'y', 'γ': 'y', '¥': 'y',
+  'ž': 'z', 'Ž': 'z'
+};
+
+function normalizeFancyUnicodeToAscii(value: string): string {
+  if (!value) return '';
+  // Step 1: NFKD decomposes Mathematical Alphanumeric Symbols (e.g. 𝘎𝘈𝘔𝘌𝘙 -> GAMER),
+  // fullwidth characters, superscripts, and accented Latin letters into base ASCII + combining marks.
+  const decomposed = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+
+  // Step 2: Map remaining Small Caps / Greek / Cyrillic lookalikes
+  let out = '';
+  for (const ch of decomposed) {
+    out += FANCY_UNICODE_LOOKALIKE_MAP[ch] ?? ch;
+  }
+  return out;
+}
+
 function normalizeForStrictMatch(value: string): string {
-  return value
+  return normalizeFancyUnicodeToAscii(value)
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function normalizeCompact(value: string): string {
-  return value
+  return normalizeFancyUnicodeToAscii(value)
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Normalizes mixed-case vs uppercase visual homoglyphs in EA FC Mobile / eFootball fonts:
+ * - Lowercase 'l', uppercase 'I', digit '1', and '|' are identical vertical bars in sans-serif game fonts
+ *   (e.g., in-game "AlFHA-WALID" -> app uppercase "ALFHA-WALID" -> OCR "AIFHA-WALID").
+ * - '0' and 'o'/'O'
+ * - '5' and 's'/'S'
+ * - '8' and 'b'/'B'
+ * - '2' and 'z'/'Z'
+ */
+function normalizeHomoglyphChar(ch: string): string {
+  const lower = ch.toLowerCase();
+  if (lower === 'l' || lower === 'i' || lower === '1' || lower === '|') return 'i';
+  if (lower === '0' || lower === 'o') return 'o';
+  if (lower === '5' || lower === 's') return 's';
+  if (lower === '8' || lower === 'b') return 'b';
+  if (lower === '2' || lower === 'z') return 'z';
+  return lower;
+}
+
+function normalizeHomoglyphsCompact(value: string): string {
+  const ascii = normalizeFancyUnicodeToAscii(value);
+  let out = '';
+  for (let i = 0; i < ascii.length; i++) {
+    const ch = ascii[i];
+    if (/[a-zA-Z0-9|]/.test(ch)) {
+      const mapped = normalizeHomoglyphChar(ch);
+      if (/[a-z0-9]/.test(mapped)) {
+        out += mapped;
+      }
+    }
+  }
+  return out;
+}
+
+function computeEditDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp = new Int32Array((m + 1) * (n + 1));
+  for (let i = 0; i <= m; i++) dp[i * (n + 1)] = i;
+  for (let j = 0; j <= n; j++) dp[j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const del = dp[(i - 1) * (n + 1) + j] + 1;
+      const ins = dp[i * (n + 1) + (j - 1)] + 1;
+      const sub = dp[(i - 1) * (n + 1) + (j - 1)] + cost;
+      dp[i * (n + 1) + j] = Math.min(del, ins, sub);
+    }
+  }
+  return dp[m * (n + 1) + n];
+}
+
+function findFuzzyTokenInText(
+  haystack: string,
+  token: string,
+  startFrom: number,
+  maxDist: number
+): { found: boolean; index: number; endIndex: number } {
+  const exactIdx = haystack.indexOf(token, startFrom);
+  if (exactIdx !== -1) {
+    return { found: true, index: exactIdx, endIndex: exactIdx + token.length };
+  }
+  if (maxDist <= 0 || token.length < 4 || haystack.length < token.length) {
+    return { found: false, index: -1, endIndex: -1 };
+  }
+  for (let i = startFrom; i <= haystack.length - token.length; i++) {
+    const sub = haystack.slice(i, i + token.length);
+    if (computeEditDistance(token, sub) <= maxDist) {
+      return { found: true, index: i, endIndex: i + token.length };
+    }
+  }
+  return { found: false, index: -1, endIndex: -1 };
 }
 
 function checkStrictPlayerNameMatch(
@@ -458,23 +740,88 @@ function checkStrictPlayerNameMatch(
 
   const normalizedExtracted = normalizeForStrictMatch(extractedText);
   const compactExtracted = normalizeCompact(extractedText);
+  const homoglyphExtracted = normalizeHomoglyphsCompact(extractedText);
 
   for (const candidate of candidates) {
     const normCandidate = normalizeForStrictMatch(candidate);
     if (!normCandidate) continue;
 
-    // 1. Direct exact substring match (normalized whitespace, case-insensitive)
+    // 1. Direct case-insensitive substring match
     const directIdx = normalizedExtracted.indexOf(normCandidate);
     if (directIdx !== -1) {
       return { matched: true, index: directIdx };
     }
 
-    // 2. Exact compact alphanumeric sequence match (in case OCR inserts/omits a space or underscore)
+    // 2. Compact alphanumeric case-insensitive match (ignores spaces, dots, underscores, hyphens, decorative symbols)
     const compactCandidate = normalizeCompact(candidate);
     if (compactCandidate.length >= 2) {
       const compactIdx = compactExtracted.indexOf(compactCandidate);
       if (compactIdx !== -1) {
         return { matched: true, index: compactIdx };
+      }
+    }
+
+    // 3. Homoglyph-normalized compact match (resolves mixed-case l/I/L/1, O/0, S/5, B/8, Z/2 differences)
+    const homoglyphCandidate = normalizeHomoglyphsCompact(candidate);
+    if (homoglyphCandidate.length >= 2) {
+      const homoIdx = homoglyphExtracted.indexOf(homoglyphCandidate);
+      if (homoIdx !== -1) {
+        return { matched: true, index: homoIdx };
+      }
+    }
+
+    // 4. Multi-token sequence match (handles names split by symbols/clan tags like "M.H_Bashar", "ALFHA-WALID", "𝘎𝘈𝘔𝘌𝘙乂𝘚𝘏𝘜𝘝𝘖彡")
+    // Allows up to 1-char OCR noise per token of length >= 4 (e.g. "GAMER" read as "CAMER" followed by "SHUVO")
+    const asciiCandidate = normalizeFancyUnicodeToAscii(candidate);
+    const rawTokens = asciiCandidate
+      .split(/[^a-zA-Z0-9]+/)
+      .map((t) => normalizeHomoglyphsCompact(t))
+      .filter((t) => t.length >= 2);
+
+    if (rawTokens.length >= 2) {
+      let searchStart = 0;
+      let firstTokenIdx = -1;
+      let allTokensFoundInOrder = true;
+
+      for (const token of rawTokens) {
+        const allowDist = token.length >= 4 ? 1 : 0;
+        const matchRes = findFuzzyTokenInText(homoglyphExtracted, token, searchStart, allowDist);
+        if (!matchRes.found || (firstTokenIdx !== -1 && matchRes.index - searchStart > 16)) {
+          allTokensFoundInOrder = false;
+          break;
+        }
+        if (firstTokenIdx === -1) firstTokenIdx = matchRes.index;
+        searchStart = matchRes.endIndex;
+      }
+
+      if (allTokensFoundInOrder && firstTokenIdx !== -1) {
+        return { matched: true, index: firstTokenIdx };
+      }
+    }
+
+    // 5. Bounded sliding-window Levenshtein match on homoglyph-normalized text
+    // Tolerates 1-character OCR noise on 5..8 char names, or up to 2-char noise on >= 9 char names
+    // (including when a middle decorative symbol like '乂' adds 1 extra OCR character between tokens)
+    const targetLen = homoglyphCandidate.length;
+    if (targetLen >= 5 && homoglyphExtracted.length >= targetLen - 1) {
+      const maxAllowedDist = targetLen >= 9 ? 2 : 1;
+      const minWin = Math.max(4, targetLen - 1);
+      const maxWin = Math.min(homoglyphExtracted.length, targetLen + 2);
+
+      for (let winLen = minWin; winLen <= maxWin; winLen++) {
+        for (let i = 0; i <= homoglyphExtracted.length - winLen; i++) {
+          const sub = homoglyphExtracted.slice(i, i + winLen);
+          if (
+            sub[0] !== homoglyphCandidate[0] &&
+            sub[sub.length - 1] !== homoglyphCandidate[targetLen - 1]
+          ) {
+            continue;
+          }
+          const dist = computeEditDistance(homoglyphCandidate, sub);
+          if (dist <= maxAllowedDist) {
+            return { matched: true, index: i };
+          }
+        }
       }
     }
   }
@@ -552,23 +899,29 @@ function extractCandidateScorePairs(extractedText: string): {
       if (!mainPair) mainPair = [mainL, mainR];
     }
 
-    // Compact 3-char token like "O70", "O7O", "0V0", "OV0", "070", "1 = 1", "1 - 1"
-    const fcCompactRegex = /(?:^|\s|\)|“|@)([0-9OoQD])\s*[=7VvTtYy/-]\s*([0-9OoQD])(?:\s|\(|$)/g;
+    // Compact 3-char token where the middle EA FC triangular icon is read as 7/V/v/T/Y/4/-/= between two scores:
+    // e.g. "1 7 1", "2 7 1", "O70", "O7O", "0V0", "1 = 1", "1 - 1"
+    const fcCompactRegex = /(?:^|\s|\)|“|@)([0-9OoQDIl|])\s*[=74VvTtYy/-]\s*([0-9OoQDIl|])(?:\s|\(|$)/g;
     let m: RegExpExecArray | null;
+    let matchedThreeTokenScoreLine = false;
     while ((m = fcCompactRegex.exec(lineWithoutTimer)) !== null) {
       const l = normalizeDigitChar(m[1]);
       const r = normalizeDigitChar(m[2]);
       if (!mainPair) mainPair = [l, r];
       addPair(l, r);
+      matchedThreeTokenScoreLine = true;
     }
 
     // Two standalone score characters separated by spaces on the scoreboard line: e.g. "O   O" or "0   0" or "2   1"
-    const spacedScoreRegex = /(?:^|\s|\))([0-9Oo])\s{1,8}([0-9Oo])(?:\s|\(|$)/g;
-    while ((m = spacedScoreRegex.exec(lineWithoutTimer)) !== null) {
-      const l = normalizeDigitChar(m[1]);
-      const r = normalizeDigitChar(m[2]);
-      if (!mainPair) mainPair = [l, r];
-      addPair(l, r);
+    // Only run if the line didn't already match the 3-token [LeftScore] [FC_Logo] [RightScore] pattern (preventing "1 7 1" -> "1 - 7")
+    if (!matchedThreeTokenScoreLine) {
+      const spacedScoreRegex = /(?:^|\s|\))([0-9Oo])\s{1,8}([0-9Oo])(?:\s|\(|$)/g;
+      while ((m = spacedScoreRegex.exec(lineWithoutTimer)) !== null) {
+        const l = normalizeDigitChar(m[1]);
+        const r = normalizeDigitChar(m[2]);
+        if (!mainPair) mainPair = [l, r];
+        addPair(l, r);
+      }
     }
   }
 

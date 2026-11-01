@@ -97,7 +97,7 @@ export const AuthPage = () => {
           inGameName: formData.inGameName.trim(),
           inGameUID: formData.inGameUID.trim(),
           fbUrl: formData.fbUrl.trim(),
-          messengerLink: formData.messengerLink.trim(),
+          messengerLink: formData.fbUrl.trim(),
           leagueMessengerGroupLink: formData.leagueMessengerGroupLink.trim(),
           whatsappNumber: formData.whatsappNumber.trim(),
           leagueName: formData.leagueName.trim(),
@@ -398,13 +398,8 @@ export const AuthPage = () => {
                           )}
 
                           <div className="space-y-3">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Social Profile Link (FB/Web)</label>
-                            <Input placeholder="https://..." required value={formData.fbUrl} onChange={(e) => setFormData({...formData, fbUrl: e.target.value})} className="h-16" />
-                          </div>
-
-                          <div className="space-y-3">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Messenger Contact</label>
-                            <Input placeholder="https://m.me/..." required value={formData.messengerLink} onChange={(e) => setFormData({...formData, messengerLink: e.target.value})} className="h-16" />
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Facebook/Messenger</label>
+                            <Input placeholder="https://..." required value={formData.fbUrl} onChange={(e) => setFormData({...formData, fbUrl: e.target.value, messengerLink: e.target.value})} className="h-16" />
                           </div>
                         </div>
                       </motion.div>
@@ -422,12 +417,23 @@ export const AuthPage = () => {
                   </Button>
                 </form>
 
-                <div className="text-center">
+                <div className="text-center pt-2">
                   <button 
                     onClick={() => handleToggleMode(!isSignUp)}
-                    className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors"
+                    className="text-[11px] font-bold tracking-wide transition-all hover:opacity-90 inline-block"
                   >
-                    {isSignUp ? 'Back to Login Terminal' : 'No account? Enlist Now'}
+                    {isSignUp ? (
+                      <span className="text-slate-400 uppercase tracking-[0.2em] text-[10px] font-black hover:text-indigo-600">
+                        Back to Login Terminal
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-emerald-500 font-bold">You have no account?</span>
+                        <span className="text-blue-600 font-extrabold underline underline-offset-4 decoration-blue-400 hover:text-blue-700">
+                          Sign Up here.
+                        </span>
+                      </span>
+                    )}
                   </button>
                 </div>
               </motion.div>

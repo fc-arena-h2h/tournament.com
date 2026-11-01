@@ -141,6 +141,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const [actionLoading, setActionLoading] = useState(false);
   const [localGroupSetupDone, setLocalGroupSetupDone] = useState(false);
   const [localMatchDeployDone, setLocalMatchDeployDone] = useState(false);
+  const [showAutoMatchDeployModal, setShowAutoMatchDeployModal] = useState(false);
+  const [selectedDeployLegs, setSelectedDeployLegs] = useState<1 | 2>(1);
+  const [progressionLegs, setProgressionLegs] = useState<1 | 2>(1);
   const [showManualGroupModal, setShowManualGroupModal] = useState(false);
   const [showManualMatchModal, setShowManualMatchModal] = useState(false);
   const [manualMatchForm, setManualMatchForm] = useState({
@@ -548,8 +551,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
-  // 2. Automatic Match Deploy
-  const handleAutoMatchDeploy = async () => {
+  // 2. Automatic Match Deploy — Opens the 1-Match vs 2-Match Selection Popup
+  const handleAutoMatchDeploy = () => {
     if (matches.length > 0 || localMatchDeployDone) {
       return alert('Matches already exist! Cannot redeploy automatically.');
     }
@@ -558,10 +561,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return alert('Need at least 2 approved players!');
     }
     if (!isKnockoutOnly && approved.some(p => !p.groupId)) {
-      return alert('Please run Auto Group Setup (Step 1) first!');
+      return alert('Please run Auto Group Setup (Step 2) first!');
     }
 
-    if (!confirm(`Generate and deploy all match fixtures for ${approved.length} players? This cannot be undone.`)) return;
+    setSelectedDeployLegs((currentTournament as any)?.matchLegs === 2 ? 2 : 1);
+    setShowAutoMatchDeployModal(true);
+  };
+
+  const executeAutoMatchDeploy = async (legs: 1 | 2) => {
+    const approved = participants.filter(p => p.status === 'approved');
+    if (approved.length < 2) {
+      return alert('Need at least 2 approved players!');
+    }
 
     setActionLoading(true);
     try {
@@ -581,8 +592,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           const p2 = shuffled[i + 1];
           const p1Profile = profiles[p1.userId];
           const p2Profile = profiles[p2.userId];
-          const matchId = `${stage}_M${(i / 2) + 1}`;
+          const p1Name = p1Profile?.inGameName || p1.gameName || 'Player 1';
+          const p2Name = p2Profile?.inGameName || p2.gameName || 'Player 2';
+          const matchNum = (i / 2) + 1;
+          const matchId = `${stage}_M${matchNum}`;
 
+          // Leg 1: P1 (Home) vs P2 (Away)
           newMatches.push({
             tournamentId: tournament.id,
             matchId: matchId,
@@ -590,13 +605,33 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             groupId: 'knockout',
             homePlayerId: p1.userId,
             awayPlayerId: p2.userId,
-            homePlayerName: p1Profile?.inGameName || p1.gameName || 'Player 1',
-            awayPlayerName: p2Profile?.inGameName || p2.gameName || 'Player 2',
+            homePlayerName: p1Name,
+            awayPlayerName: p2Name,
             participants: [p1.userId, p2.userId],
             status: 'scheduled',
+            publisherId: tournament.publisherId,
             scheduledTime: serverTimestamp(),
             createdAt: serverTimestamp()
           });
+
+          // Leg 2 (if 2 matches selected): P2 (Home) vs P1 (Away)
+          if (legs === 2) {
+            newMatches.push({
+              tournamentId: tournament.id,
+              matchId: `${stage}_M${matchNum}_L2`,
+              stage: stage,
+              groupId: 'knockout',
+              homePlayerId: p2.userId,
+              awayPlayerId: p1.userId,
+              homePlayerName: p2Name,
+              awayPlayerName: p1Name,
+              participants: [p2.userId, p1.userId],
+              status: 'scheduled',
+              publisherId: tournament.publisherId,
+              scheduledTime: serverTimestamp(),
+              createdAt: serverTimestamp()
+            });
+          }
         }
       } else {
         const distinctGroups = Array.from(new Set(
@@ -609,21 +644,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           const n = gPlayers.length;
           if (n < 2) return;
 
-          // Build balanced Home/Away index pairs [homeIdx, awayIdx] so no player has all Home or all Away matches
-          const indexPairs: Array<[number, number]> = [];
+          // Build balanced Home/Away index pairs [homeIdx, awayIdx]
+          const firstLegPairs: Array<[number, number]> = [];
           if (n === 4) {
-            // Canonical 4-player 3-round FIFA schedule:
-            // P0: 2H, 1A | P1: 1H, 2A | P2: 1H, 2A | P3: 2H, 1A
-            indexPairs.push(
+            // Canonical 4-player 3-round FIFA schedule (3 matches per player = 6 matches total):
+            firstLegPairs.push(
               [0, 1], [2, 3], // Round 1
               [1, 2], [3, 0], // Round 2
               [0, 2], [3, 1]  // Round 3
             );
           } else if (n === 3) {
-            // Canonical 3-player cycle: each player gets 1 Home and 1 Away match
-            indexPairs.push([0, 1], [1, 2], [2, 0]);
+            firstLegPairs.push([0, 1], [1, 2], [2, 0]);
           } else {
-            // General N-player balanced round-robin tracker
             const homeCounts = new Array(n).fill(0);
             const awayCounts = new Array(n).fill(0);
             for (let i = 0; i < n; i++) {
@@ -641,10 +673,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 }
                 homeCounts[homeIdx]++;
                 awayCounts[awayIdx]++;
-                indexPairs.push([homeIdx, awayIdx]);
+                firstLegPairs.push([homeIdx, awayIdx]);
               }
             }
           }
+
+          // If legs === 2, append reverse fixtures [awayIdx, homeIdx] so every player plays
+          // 2 matches (1 Home & 1 Away) against each group opponent (6 matches per player in a 4-player group = 12 matches)
+          const indexPairs: Array<[number, number]> = legs === 2
+            ? [...firstLegPairs, ...firstLegPairs.map(([h, a]): [number, number] => [a, h])]
+            : firstLegPairs;
 
           indexPairs.forEach(([homeIdx, awayIdx]) => {
             const p1 = gPlayers[homeIdx];
@@ -680,9 +718,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           }));
           saveDemoMatches(tournament.id, demoMatches);
           setMatches(demoMatches as any);
+          updateDemoTournament(tournament.id, { matchLegs: legs } as any);
+          setCurrentTournament((prev: any) => prev ? { ...prev, matchLegs: legs } : prev);
         } else {
           await Promise.all(newMatches.map(m => addDoc(collection(db, 'matches'), m)));
-          
+          await updateDoc(doc(db, 'tournaments', tournament.id), {
+            matchLegs: legs,
+            updatedAt: Timestamp.now()
+          }).catch(() => {});
+          setCurrentTournament((prev: any) => prev ? { ...prev, matchLegs: legs } : prev);
+
           // Notify
           newMatches.forEach(m => {
             notifyMatchParticipants({
@@ -695,9 +740,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             }).catch(() => {});
           });
         }
-        
+
         setLocalMatchDeployDone(true);
-        alert(`Match Deploy Complete! ${newMatches.length} fixtures created.`);
+        setShowAutoMatchDeployModal(false);
+        setAutoMatchToast({
+          title: 'MATCH DEPLOY COMPLETE!',
+          subtitle: `${newMatches.length} fixtures deployed (${legs === 2 ? 'Home & Away · 2 Matches' : 'Home & Away · 1 Match'}).`
+        });
       } else {
         alert('No matches were generated. Check group assignments.');
       }
@@ -825,6 +874,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return;
     }
 
+    setProgressionLegs((currentTournament as any)?.matchLegs === 2 ? 2 : 1);
+
     const koStagesWithMatches = allPossibleStages.filter(st =>
       realMatches.some(m => m.stage === st)
     );
@@ -882,7 +933,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const stageMatches = realMatches.filter(m => m.stage === latestKoStage);
     const completedCount = stageMatches.filter(m => m.status === 'completed').length;
     const totalCount = stageMatches.length;
-    const qualifiedCount = stageMatches.filter(m => m.status === 'completed' && Boolean(getWinnerId(m))).length;
+    const stageTies = getKnockoutStageTies(latestKoStage, realMatches);
+    const qualifiedCount = stageTies.filter(t => Boolean(t.winnerId)).length;
 
     setProgressionModal({
       currentStageKey: latestKoStage,
@@ -900,7 +952,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const { currentStageKey, nextStageKey, qualifiedCount } = progressionModal;
 
     if (currentStageKey !== 'group' && qualifiedCount < 2) {
-      alert(`At least 2 completed match winners are required in ${progressionModal.currentStageLabel} to advance to ${progressionModal.nextStageLabel}.`);
+      alert(`At least 2 completed tie winners are required in ${progressionModal.currentStageLabel} to advance to ${progressionModal.nextStageLabel}.`);
       return;
     }
 
@@ -908,9 +960,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setActionLoading(true);
     try {
       if (currentStageKey === 'group') {
-        await generateKnockoutMatches(matches);
+        await generateKnockoutMatches(matches, progressionLegs);
       } else {
-        await advanceStage(currentStageKey, nextStageKey, matches);
+        await advanceStage(currentStageKey, nextStageKey, matches, progressionLegs);
       }
       setProgressionModal(null);
     } catch (err) {
@@ -1295,6 +1347,177 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
+  // Helper: Group knockout stage matches by player pair (supports 1-match or 2-match Home & Away ties, both Auto and Manual)
+  const getKnockoutStageTies = (stage: string, allMatches: Match[] = matches) => {
+    const stageMatches = allMatches
+      .filter(m => {
+        if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
+        if (stage === '3RD_PLACE') {
+          return m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+        }
+        if (stage === 'FINAL') {
+          if (m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || m.matchId === 'FINAL_M2') return false;
+          return m.stage === 'FINAL';
+        }
+        return m.stage === stage;
+      })
+      .sort((a, b) => {
+        const parseOrder = (id?: string) => {
+          if (!id) return 999;
+          const mMatch = id.match(/_M(\d+)/);
+          const base = mMatch ? parseInt(mMatch[1], 10) * 10 : 500;
+          const leg = id.endsWith('_L2') ? 2 : 1;
+          return base + leg;
+        };
+        return parseOrder(a.matchId) - parseOrder(b.matchId);
+      });
+
+    const tieMap = new Map<string, Match[]>();
+    stageMatches.forEach(m => {
+      const pairKey = [m.homePlayerId, m.awayPlayerId].sort().join('__');
+      const existing = tieMap.get(pairKey) || [];
+      existing.push(m);
+      tieMap.set(pairKey, existing);
+    });
+
+    return Array.from(tieMap.values()).map((tieMatches, idx) => {
+      const firstMatch = tieMatches[0];
+      const player1Id = firstMatch.homePlayerId;
+      const player2Id = firstMatch.awayPlayerId;
+      const player1Name = firstMatch.homePlayerName || profiles[player1Id]?.inGameName || 'Player 1';
+      const player2Name = firstMatch.awayPlayerName || profiles[player2Id]?.inGameName || 'Player 2';
+
+      let player1AggScore = 0;
+      let player2AggScore = 0;
+      let completedLegs = 0;
+      let penaltyWinnerId: string | null = null;
+
+      tieMatches.forEach(m => {
+        if (m.status === 'completed') {
+          completedLegs++;
+          const hScore = m.homeScore ?? 0;
+          const aScore = m.awayScore ?? 0;
+          if (m.homePlayerId === player1Id) {
+            player1AggScore += hScore;
+            player2AggScore += aScore;
+          } else {
+            player1AggScore += aScore;
+            player2AggScore += hScore;
+          }
+          if (m.penaltyWinnerId) {
+            penaltyWinnerId = m.penaltyWinnerId;
+          }
+        }
+      });
+
+      const totalLegs = tieMatches.length;
+      const isTieCompleted = totalLegs > 0 && completedLegs === totalLegs;
+
+      let winnerId: string | null = null;
+      let loserId: string | null = null;
+
+      if (isTieCompleted) {
+        if (player1AggScore > player2AggScore) {
+          winnerId = player1Id;
+          loserId = player2Id;
+        } else if (player2AggScore > player1AggScore) {
+          winnerId = player2Id;
+          loserId = player1Id;
+        } else if (penaltyWinnerId) {
+          winnerId = penaltyWinnerId;
+          loserId = penaltyWinnerId === player1Id ? player2Id : player1Id;
+        }
+      }
+
+      const winnerName = winnerId === player1Id ? player1Name : winnerId === player2Id ? player2Name : null;
+      const loserName = loserId === player1Id ? player1Name : loserId === player2Id ? player2Name : null;
+
+      const mMatch = firstMatch.matchId?.match(/_M(\d+)/);
+      const fixtureNum = mMatch ? parseInt(mMatch[1], 10) : idx + 1;
+
+      return {
+        fixtureNum,
+        matches: tieMatches,
+        totalLegs,
+        completedLegs,
+        isTieCompleted,
+        player1Id,
+        player1Name,
+        player2Id,
+        player2Name,
+        player1AggScore,
+        player2AggScore,
+        winnerId,
+        winnerName,
+        loserId,
+        loserName,
+        penaltyWinnerId
+      };
+    });
+  };
+
+  // Helper: Get tie context for a specific match (including hypothetical scores while reporting)
+  const getKnockoutTieInfoForMatch = (
+    targetMatch: Match,
+    overrideScores?: { home: number; away: number; penaltyWinnerId?: string | null },
+    allMatches: Match[] = matches
+  ) => {
+    const isKo = targetMatch.stage !== 'group' || (tournament as any)?.format === 'knockout' || targetMatch.groupId === 'knockout';
+    if (!isKo || !targetMatch.homePlayerId || !targetMatch.awayPlayerId) return null;
+
+    const effectiveStage = (targetMatch.stage === 'FINAL' && targetMatch.matchId === 'FINAL_M2') ? '3RD_PLACE' : targetMatch.stage;
+    const simulatedMatches = allMatches.map(m => {
+      if (m.id === targetMatch.id && overrideScores) {
+        return {
+          ...m,
+          status: 'completed' as const,
+          homeScore: overrideScores.home,
+          awayScore: overrideScores.away,
+          penaltyWinnerId: overrideScores.penaltyWinnerId ?? m.penaltyWinnerId
+        };
+      }
+      return m;
+    });
+
+    const ties = getKnockoutStageTies(effectiveStage, simulatedMatches);
+    const pairKey = [targetMatch.homePlayerId, targetMatch.awayPlayerId].sort().join('__');
+    const tie = ties.find(t => [t.player1Id, t.player2Id].sort().join('__') === pairKey);
+    if (!tie) return null;
+
+    const legIndex = tie.matches.findIndex(m => m.id === targetMatch.id);
+    const legNumber = legIndex >= 0 ? legIndex + 1 : 1;
+    const otherLegs = tie.matches.filter(m => m.id !== targetMatch.id);
+    const allOtherLegsCompleted = otherLegs.every(m => m.status === 'completed');
+
+    // Calculate aggregate scores oriented to targetMatch.homePlayerId and targetMatch.awayPlayerId
+    let homePlayerAgg = 0;
+    let awayPlayerAgg = 0;
+    tie.matches.forEach(m => {
+      const isCurrent = m.id === targetMatch.id;
+      if (isCurrent || m.status === 'completed') {
+        const h = isCurrent && overrideScores ? overrideScores.home : (m.homeScore ?? 0);
+        const a = isCurrent && overrideScores ? overrideScores.away : (m.awayScore ?? 0);
+        if (m.homePlayerId === targetMatch.homePlayerId) {
+          homePlayerAgg += h;
+          awayPlayerAgg += a;
+        } else {
+          homePlayerAgg += a;
+          awayPlayerAgg += h;
+        }
+      }
+    });
+
+    return {
+      ...tie,
+      legNumber,
+      isTwoLegged: tie.totalLegs >= 2,
+      isDecidingLeg: tie.totalLegs === 1 || allOtherLegsCompleted,
+      homePlayerAgg,
+      awayPlayerAgg,
+      isAggregateDraw: homePlayerAgg === awayPlayerAgg
+    };
+  };
+
   const submitFinalReport = async () => {
     if (!reportingMatch) return;
 
@@ -1318,15 +1541,41 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       return;
     }
 
-    // Knockout Stage: Draw is strictly prohibited (must have a decisive winner)
+    // Knockout Stage Winner / Aggregate Score Validation
     const isKnockout = reportingMatch.stage !== 'group' || (tournament as any)?.format === 'knockout' || reportingMatch.groupId === 'knockout';
-    if (isKnockout && reportFormData.home === reportFormData.away && !reportFormData.penaltyWinnerId) {
-      alert('Knockout matches cannot end in a draw! Extra time or penalties must decide a winner. Draw results cannot be submitted.');
-      return;
+    const koTieInfo = isKnockout
+      ? getKnockoutTieInfoForMatch(reportingMatch, {
+          home: reportFormData.home,
+          away: reportFormData.away,
+          penaltyWinnerId: reportFormData.penaltyWinnerId
+        })
+      : null;
+
+    if (isKnockout) {
+      const requiresPenaltyWinner = koTieInfo?.isTwoLegged
+        ? (koTieInfo.isDecidingLeg && koTieInfo.isAggregateDraw)
+        : (reportFormData.home === reportFormData.away);
+
+      if (requiresPenaltyWinner && !reportFormData.penaltyWinnerId) {
+        alert(
+          koTieInfo?.isTwoLegged
+            ? `Aggregate score is tied (${koTieInfo.homePlayerAgg} - ${koTieInfo.awayPlayerAgg}) after both matches! Please select the Penalty Shootout / Tie-Breaker Winner.`
+            : 'Knockout matches cannot end in a draw! Extra time or penalties must decide a winner.'
+        );
+        return;
+      }
     }
 
     setIsSubmittingReport(true);
     try {
+      const effectivePenaltyWinnerId = (() => {
+        if (!isKnockout) return null;
+        if (koTieInfo?.isTwoLegged) {
+          return (koTieInfo.isDecidingLeg && koTieInfo.isAggregateDraw) ? (reportFormData.penaltyWinnerId || null) : null;
+        }
+        return reportFormData.home === reportFormData.away ? (reportFormData.penaltyWinnerId || null) : null;
+      })();
+
       if (isDemo) {
         setMatches(prev => {
           const updated = prev.map(m => m.id === reportingMatch.id ? { 
@@ -1334,13 +1583,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: 'completed' as const,
             homeScore: reportFormData.home,
             awayScore: reportFormData.away,
-            penaltyWinnerId: reportFormData.penaltyWinnerId || null
+            penaltyWinnerId: effectivePenaltyWinnerId
           } : m);
 
           updateDemoMatch(tournament.id, reportingMatch.id, {
             homeScore: reportFormData.home,
             awayScore: reportFormData.away,
-            penaltyWinnerId: reportFormData.penaltyWinnerId || null,
+            penaltyWinnerId: effectivePenaltyWinnerId,
             status: 'completed'
           });
 
@@ -1355,7 +1604,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       await updateDoc(doc(db, 'matches', reportingMatch.id), {
         homeScore: reportFormData.home,
         awayScore: reportFormData.away,
-        penaltyWinnerId: reportFormData.penaltyWinnerId || null,
+        penaltyWinnerId: effectivePenaltyWinnerId,
         status: isAdminUser ? 'completed' : 'reported',
         reporterId: auth.currentUser?.uid,
         updatedAt: Timestamp.now()
@@ -1381,8 +1630,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const homeName = reportingMatch.homePlayerName;
     const awayName = reportingMatch.awayPlayerName;
     const isKnockout = reportingMatch.stage !== 'group' || (tournament as any)?.format === 'knockout' || reportingMatch.groupId === 'knockout';
-    const isDraw = reportFormData.home === reportFormData.away;
-    const isDrawBlocked = isKnockout && isDraw;
+    const koTieInfo = isKnockout
+      ? getKnockoutTieInfoForMatch(reportingMatch, {
+          home: reportFormData.home,
+          away: reportFormData.away,
+          penaltyWinnerId: reportFormData.penaltyWinnerId
+        })
+      : null;
+
+    const isTwoLegged = Boolean(koTieInfo?.isTwoLegged);
+    const requiresPenaltyWinner = isKnockout && (
+      isTwoLegged
+        ? Boolean(koTieInfo?.isDecidingLeg && koTieInfo?.isAggregateDraw)
+        : (reportFormData.home === reportFormData.away)
+    );
+    const isDrawBlocked = requiresPenaltyWinner && !reportFormData.penaltyWinnerId;
     const isEditingCompleted = reportingMatch.status === 'completed';
 
     const isOcrBlocked = !isAdminUser
@@ -1392,7 +1654,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const isSubmitDisabled =
       isSubmittingReport ||
       isOcrBlocked ||
-      (isKnockout && isDraw && !reportFormData.penaltyWinnerId);
+      (requiresPenaltyWinner && !reportFormData.penaltyWinnerId);
 
     return createPortal(
       <div className="fixed inset-0 z-[8000] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -1408,7 +1670,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      {isEditingCompleted ? 'EDIT RESULT' : 'REPORT RESULT'}
                    </h3>
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                     {isKnockout ? 'Knockout Stage · Decisive Winner Required' : (isEditingCompleted ? 'Modify finalized match scoreline' : 'Submit final match scoreline')}
+                     {isTwoLegged
+                       ? `Knockout Leg ${koTieInfo?.legNumber} of ${koTieInfo?.totalLegs} · Aggregate Winner Advances`
+                       : isKnockout
+                         ? 'Knockout Stage · Decisive Winner Required'
+                         : (isEditingCompleted ? 'Modify finalized match scoreline' : 'Submit final match scoreline')}
                    </p>
                 </div>
              </div>
@@ -1421,24 +1687,45 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           </div>
 
           <div className="p-6 sm:p-8 space-y-6">
-             {/* Knockout Stage Rule Banner */}
+             {/* Knockout Stage Rule / Aggregate Score Banner */}
              {isKnockout && (
                <div className={cn(
-                 "p-3.5 rounded-2xl border text-center transition-all",
-                 isDraw 
+                 "p-3.5 rounded-2xl border text-center transition-all space-y-1.5",
+                 requiresPenaltyWinner
                    ? "bg-rose-50 border-rose-200 text-rose-800" 
-                   : "bg-amber-50 border-amber-200 text-amber-900"
+                   : isTwoLegged
+                     ? "bg-indigo-50 border-indigo-200 text-indigo-900"
+                     : "bg-amber-50 border-amber-200 text-amber-900"
                )}>
-                 <div className="flex items-center justify-center gap-2 mb-1">
-                   {isDraw ? <AlertCircle size={14} className="text-rose-600" /> : <Trophy size={14} className="text-amber-600" />}
+                 <div className="flex items-center justify-center gap-2">
+                   {requiresPenaltyWinner ? <AlertCircle size={14} className="text-rose-600" /> : <Trophy size={14} className={isTwoLegged ? "text-indigo-600" : "text-amber-600"} />}
                    <span className="text-[9.5px] font-black uppercase tracking-wider">
-                     {isDraw ? "Draw result is not permitted!" : "Knockout Stage: Winner Required"}
+                     {isTwoLegged
+                       ? (requiresPenaltyWinner
+                           ? `Aggregate Tied (${koTieInfo?.homePlayerAgg} - ${koTieInfo?.awayPlayerAgg}) · Select Winner!`
+                           : `2-Match Aggregate Tie · Leg ${koTieInfo?.legNumber} of ${koTieInfo?.totalLegs}`)
+                       : (requiresPenaltyWinner ? "Draw result requires Penalty Winner!" : "Knockout Stage: Winner Required")}
                    </span>
                  </div>
+                 {isTwoLegged && koTieInfo && (
+                   <div className="px-3 py-1.5 rounded-xl bg-white/80 border border-indigo-200/70 flex items-center justify-between text-[9px] font-black uppercase">
+                     <span className="truncate max-w-[110px] text-slate-700">{homeName}</span>
+                     <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 font-mono text-[10px]">
+                       AGG: {koTieInfo.homePlayerAgg} - {koTieInfo.awayPlayerAgg}
+                     </span>
+                     <span className="truncate max-w-[110px] text-slate-700 text-right">{awayName}</span>
+                   </div>
+                 )}
                  <p className="text-[8.5px] font-bold leading-relaxed">
-                   {isDraw 
-                     ? "Draw results cannot be submitted for knockout matches. Please record extra time or penalty shootout score in favor of the winner." 
-                     : "Matches in this knockout stage cannot end in a draw. One player must advance as the winner."}
+                   {isTwoLegged
+                     ? (koTieInfo?.isDecidingLeg
+                         ? (requiresPenaltyWinner
+                             ? "Both matches combined are tied on aggregate. Please select the penalty shootout winner below."
+                             : "Combined aggregate score of both Home & Away matches determines the winner.")
+                         : "Leg 1 score will be combined with Leg 2 score to determine the aggregate winner.")
+                     : (requiresPenaltyWinner 
+                         ? "Draw results in single-leg knockout require selecting the penalty shootout winner below." 
+                         : "Matches in this knockout stage cannot end in a draw. One player must advance as the winner.")}
                  </p>
                </div>
              )}
@@ -1474,15 +1761,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
              </div>
 
-             {/* Penalty Winner Selection for Knockout Draws */}
-             {isKnockout && isDraw && (
+             {/* Penalty Winner Selection for Knockout Draws / Aggregate Ties */}
+             {requiresPenaltyWinner && (
                <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
                  <div className="flex flex-col items-center gap-2">
                    <div className="h-px w-full bg-slate-200" />
-                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-4 bg-white -mt-3 relative z-10">Penalty Shootout Winner</span>
+                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-4 bg-white -mt-3 relative z-10">
+                     {isTwoLegged ? 'Aggregate Tie-Breaker / Penalty Winner' : 'Penalty Shootout Winner'}
+                   </span>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                    <button 
+                     type="button"
                      onClick={() => setReportFormData({...reportFormData, penaltyWinnerId: reportingMatch.homePlayerId})}
                      className={cn(
                        "h-12 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
@@ -1495,6 +1785,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      {homeName}
                    </button>
                    <button 
+                     type="button"
                      onClick={() => setReportFormData({...reportFormData, penaltyWinnerId: reportingMatch.awayPlayerId})}
                      className={cn(
                        "h-12 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
@@ -1695,7 +1986,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       ? 'UPLOAD SCREENSHOT TO UNLOCK'
                       : isOcrBlocked
                         ? 'AI VERIFICATION REQUIRED'
-                        : (isKnockout && isDraw && !reportFormData.penaltyWinnerId)
+                        : (requiresPenaltyWinner && !reportFormData.penaltyWinnerId)
                           ? 'Select Penalty Winner' 
                           : 'DEPLOY FINAL RESULT'}
              </button>
@@ -1864,29 +2155,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (targetStage === 'group') return null;
 
     if (targetStage === '3RD_PLACE') {
-      const semiMatches = matches.filter(m => m.stage === 'SEMI');
+      const semiTies = getKnockoutStageTies('SEMI', matches);
       const finalists = matches.filter(m => m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId))
         .flatMap(m => [m.homePlayerId, m.awayPlayerId])
         .filter(Boolean);
       
-      const semiParticipants = semiMatches.flatMap(m => [m.homePlayerId, m.awayPlayerId]).filter(Boolean);
-      
-      // If semi matches are completed, we know exactly who the losers are
-      const completedSemis = semiMatches.filter(m => m.status === 'completed');
-      if (completedSemis.length > 0) {
-        const losers = completedSemis.map(m => getLoserId(m)).filter(Boolean) as string[];
-        // Filter out anyone who somehow made it to the final (safety check)
-        const actualLosers = losers.filter(id => !finalists.includes(id));
-        
-        // Also include semi participants who are NOT finalists (for flexibility if result is pending)
+      const semiParticipants = semiTies.flatMap(t => [t.player1Id, t.player2Id]).filter(Boolean);
+      const completedSemiLosers = semiTies.map(t => t.loserId).filter(Boolean) as string[];
+
+      if (completedSemiLosers.length > 0) {
+        const actualLosers = completedSemiLosers.filter(id => !finalists.includes(id));
         const potentialLosers = semiParticipants.filter(id => !finalists.includes(id));
-        
-        // Combine and unique
         const combined = Array.from(new Set([...actualLosers, ...potentialLosers]));
         return combined.length > 0 ? combined : null;
       }
       
-      // If semis are not completed, show all semi participants who are NOT in the grand final
       const potentialLosers = semiParticipants.filter(id => !finalists.includes(id));
       return potentialLosers.length > 0 ? potentialLosers : null;
     }
@@ -1910,13 +2193,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       }
     }
 
-    // Subsequent stages: winners of previous stage
+    // Subsequent stages: winners of previous stage ties (handles both 1-leg and 2-leg aggregate winners)
     const prevStage = knockoutStages[stageIdx - 1];
-    const prevMatches = matches.filter(m => m.stage === prevStage);
+    const prevTies = getKnockoutStageTies(prevStage, matches);
     const winners: string[] = [];
-    prevMatches.forEach(m => {
-      const wId = getWinnerId(m);
-      if (wId) winners.push(wId);
+    prevTies.forEach(t => {
+      if (t.winnerId) winners.push(t.winnerId);
     });
     return winners;
   };
@@ -1986,8 +2268,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
-  // World Cup Style Group -> Knockout Bracket Generator
-  const generateKnockoutMatches = async (currentMatchList?: Match[]) => {
+  // World Cup Style Group -> Knockout Bracket Generator (supports 1-match or 2-match Home & Away ties)
+  const generateKnockoutMatches = async (currentMatchList?: Match[], legs: 1 | 2 = 1) => {
     if (deploying) return;
     setDeploying(true);
     try {
@@ -2079,13 +2361,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         }
       }
 
-      await Promise.all(pairings.map(p => upsertStageMatch(allActiveMatches, p.matchId, targetStage, p.home, p.away)));
+      const expandedPairings: { matchId: string; home: { userId: string, name: string }; away: { userId: string, name: string } }[] = [];
+      pairings.forEach(p => {
+        expandedPairings.push(p);
+        if (legs === 2) {
+          expandedPairings.push({
+            matchId: `${p.matchId}_L2`,
+            home: p.away,
+            away: p.home
+          });
+        }
+      });
+
+      await Promise.all(expandedPairings.map(p => upsertStageMatch(allActiveMatches, p.matchId, targetStage, p.home, p.away)));
 
       setActiveTab('knockout');
       setActiveKnockoutStage(targetStage as any);
       setAutoMatchToast({
         title: 'KNOCKOUT BRACKET UPDATED',
-        subtitle: `Group stage standings processed! Top players advanced to ${targetStage}.`
+        subtitle: `Top group players advanced to ${targetStage} (${legs === 2 ? 'Home & Away 2 Matches' : '1 Match'} format).`
       });
     } catch (err: any) {
       console.error('Error generating knockout matches:', err);
@@ -2096,50 +2390,50 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
 
-  const advanceStage = async (currentStage: string, nextStage: string, allMatches: Match[]) => {
-    const currentStageMatches = allMatches
-      .filter(m => m.stage === currentStage && m.status !== 'draft' && m.homePlayerId && m.awayPlayerId)
-      .sort((a, b) => {
-        const aNum = parseInt(a.matchId?.split('_M')[1] || '0');
-        const bNum = parseInt(b.matchId?.split('_M')[1] || '0');
-        return aNum - bNum;
-      });
-
-    if (currentStageMatches.length === 0) return;
+  const advanceStage = async (currentStage: string, nextStage: string, allMatches: Match[], legs: 1 | 2 = 1) => {
+    const currentStageTies = getKnockoutStageTies(currentStage, allMatches);
+    if (currentStageTies.length === 0) return;
 
     const winners: { userId: string, name: string }[] = [];
     const losers: { userId: string, name: string }[] = [];
 
-    currentStageMatches.forEach(m => {
-      if (m.status !== 'completed') return;
-      const wId = getWinnerId(m);
-      const lId = getLoserId(m);
-      if (wId) {
+    currentStageTies.forEach(t => {
+      if (!t.isTieCompleted) return;
+      if (t.winnerId) {
         winners.push({
-          userId: wId,
-          name: (wId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[wId]?.inGameName || 'Player'
+          userId: t.winnerId,
+          name: t.winnerName || profiles[t.winnerId]?.inGameName || 'Player'
         });
       }
-      if (lId) {
+      if (t.loserId) {
         losers.push({
-          userId: lId,
-          name: (lId === m.homePlayerId ? m.homePlayerName : m.awayPlayerName) || profiles[lId]?.inGameName || 'Player'
+          userId: t.loserId,
+          name: t.loserName || profiles[t.loserId]?.inGameName || 'Player'
         });
       }
     });
 
     if (winners.length < 2) return;
 
-    const updates = [];
+    const updates: Promise<void>[] = [];
     if (nextStage === 'FINAL' && winners.length >= 2) {
       updates.push(upsertStageMatch(allMatches, 'FINAL_M1', 'FINAL', winners[0], winners[1]));
+      if (legs === 2) {
+        updates.push(upsertStageMatch(allMatches, 'FINAL_M1_L2', 'FINAL', winners[1], winners[0]));
+      }
       if (losers.length >= 2) {
         updates.push(upsertStageMatch(allMatches, '3RD_PLACE_M1', '3RD_PLACE', losers[0], losers[1]));
+        if (legs === 2) {
+          updates.push(upsertStageMatch(allMatches, '3RD_PLACE_M1_L2', '3RD_PLACE', losers[1], losers[0]));
+        }
       }
     } else {
       for (let i = 0; i < winners.length - 1; i += 2) {
         const matchNum = (i / 2) + 1;
         updates.push(upsertStageMatch(allMatches, `${nextStage}_M${matchNum}`, nextStage, winners[i], winners[i + 1]));
+        if (legs === 2) {
+          updates.push(upsertStageMatch(allMatches, `${nextStage}_M${matchNum}_L2`, nextStage, winners[i + 1], winners[i]));
+        }
       }
     }
 
@@ -2149,7 +2443,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       setActiveKnockoutStage(nextStage as any);
       setAutoMatchToast({
         title: `${nextStage} UNLOCKED`,
-        subtitle: `Qualified players from ${currentStage} have advanced to ${nextStage}!`
+        subtitle: `Qualified players from ${currentStage} advanced to ${nextStage} (${legs === 2 ? '2 Matches Home & Away' : '1 Match'})!`
       });
     }
   };
@@ -2159,8 +2453,26 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const homeScore = match.homeScore || 0;
     const awayScore = match.awayScore || 0;
 
-    if (isKnockout && homeScore === awayScore && !match.penaltyWinnerId) {
-      alert('Knockout matches cannot end in a draw without a penalty winner! Please ensure a winner is selected before confirming.');
+    const koTieInfo = isKnockout
+      ? getKnockoutTieInfoForMatch(match, {
+          home: homeScore,
+          away: awayScore,
+          penaltyWinnerId: match.penaltyWinnerId
+        })
+      : null;
+
+    const requiresPenaltyWinner = isKnockout && (
+      koTieInfo?.isTwoLegged
+        ? (koTieInfo.isDecidingLeg && koTieInfo.isAggregateDraw)
+        : (homeScore === awayScore)
+    );
+
+    if (requiresPenaltyWinner && !match.penaltyWinnerId) {
+      alert(
+        koTieInfo?.isTwoLegged
+          ? `Both matches are tied on aggregate (${koTieInfo.homePlayerAgg} - ${koTieInfo.awayPlayerAgg})! Please edit the result to select the Penalty Shootout Winner before confirming.`
+          : 'Knockout matches cannot end in a draw without a penalty winner! Please ensure a winner is selected before confirming.'
+      );
       return;
     }
 
@@ -2188,13 +2500,17 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         ? match.homePlayerName 
         : awayScore > homeScore 
           ? match.awayPlayerName 
-          : match.penaltyWinnerId === match.homePlayerId ? match.homePlayerName : match.awayPlayerName;
+          : match.penaltyWinnerId === match.homePlayerId
+            ? match.homePlayerName
+            : match.penaltyWinnerId === match.awayPlayerId
+              ? match.awayPlayerName
+              : 'Draw (Leg 1)';
 
       notifyMatchParticipants({
         homePlayerId: match.homePlayerId,
         awayPlayerId: match.awayPlayerId,
         title: '🏆 Match Result Confirmed!',
-        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}. Winner: ${winnerName}!`,
+        message: `${match.homePlayerName} (${homeScore}) - (${awayScore}) ${match.awayPlayerName}. Result: ${winnerName}!`,
         type: 'match_result',
         tournamentId: tournament.id,
         matchId: match.id
@@ -2540,29 +2856,61 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const hasMatches = matches.length > 0;
     
     // Status helpers
-    const isAutoProgressionActive = currentTournament?.autoKnockout ?? tournament.autoKnockout;
     const isStep1Done = (approved.length > 0 && approved.every(p => !!p.groupId)) || localGroupSetupDone;
     const isStep2Done = matches.length > 0 || localMatchDeployDone;
     const currentUploadType = currentTournament?.resultUploadType || tournament.resultUploadType || 'players';
+    const isStep3Locked = !isKnockoutOnly && !isStep1Done;
 
     return (
-      <div className="space-y-10 pb-20">
-        {/* Header Summary */}
-        <div className="flex flex-col items-center text-center space-y-3">
-           <div className="w-16 h-16 rounded-[2rem] nm-flat flex items-center justify-center text-indigo-500 border border-white/50 mb-2">
-             <Settings size={32} />
-           </div>
-           <h3 className="text-xl font-black text-fc-dark uppercase italic leading-none">Tournament Command</h3>
-           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-loose">
-             Control the arena, manage players, <br /> and deploy match fixtures
-           </p>
+      <div className="space-y-8 pb-20">
+        {/* Upgraded Command Center Hero Card */}
+        <div className="mx-2 relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-6 sm:p-8 text-white shadow-2xl border-2 border-white/20">
+          <div className="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-44 h-44 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-5 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 border border-white/20 shrink-0">
+                <Settings size={30} className="animate-[spin_18s_linear_infinite]" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[8px] font-black uppercase tracking-[0.25em] text-indigo-300">
+                    HOST CONTROL TERMINAL
+                  </span>
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
+                  Tournament Command
+                </h3>
+                <p className="text-[9.5px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">
+                  Control the arena, manage players, and deploy 1-Leg or 2-Leg match fixtures
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 w-full sm:w-auto shrink-0 bg-white/5 border border-white/10 rounded-2xl p-2.5">
+              <div className="px-3 py-1.5 rounded-xl bg-white/5 text-center">
+                <span className="text-sm font-black text-white block">{approved.length}</span>
+                <span className="text-[7px] font-black uppercase tracking-widest text-slate-400">Players</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-white/5 text-center">
+                <span className="text-sm font-black text-emerald-400 block">{matches.length}</span>
+                <span className="text-[7px] font-black uppercase tracking-widest text-slate-400">Fixtures</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-white/5 text-center">
+                <span className="text-sm font-black text-amber-400 block">{pending.length}</span>
+                <span className="text-[7px] font-black uppercase tracking-widest text-slate-400">Pending</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Action Center - 6 Deployment & Control Sections */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="px-4 flex items-center gap-3">
              <div className="h-px flex-1 bg-slate-200" />
-             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deployment Control</span>
+             <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.25em]">Deployment & Matchmaking Control</span>
              <div className="h-px flex-1 bg-slate-200" />
           </div>
 
@@ -2570,16 +2918,28 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             {/* 1. Auto-Progression (Manual Round Advancement) */}
             <div 
               onClick={handleOpenProgressionModal}
-              className="p-6 nm-flat rounded-[2rem] space-y-4 cursor-pointer hover:border-indigo-200 transition-all active:scale-[0.99]"
+              className="group relative overflow-hidden p-6 rounded-[2rem] bg-white border-2 border-indigo-100 hover:border-indigo-400 shadow-lg hover:shadow-xl transition-all cursor-pointer active:scale-[0.99] flex flex-col justify-between gap-4"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <Trophy size={20} />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/25 shrink-0">
+                    <Trophy size={22} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">1. AUTO-PROGRESSION</span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">Advance Qualified Players</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 text-[7.5px] font-black uppercase tracking-widest border border-indigo-100">
+                        STEP 01
+                      </span>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400">
+                        ROUND ENGINE
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                      1. AUTO-PROGRESSION
+                    </h4>
+                    <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-wider block">
+                      Advance Qualified Players
+                    </span>
                   </div>
                 </div>
                 <button 
@@ -2589,140 +2949,265 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     handleOpenProgressionModal();
                   }}
                   disabled={actionLoading}
-                  className="h-8 px-4 rounded-full font-black text-[9px] uppercase tracking-widest transition-all border shadow-sm bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 active:scale-95"
+                  className="h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shrink-0"
                 >
                   ADVANCE
                 </button>
               </div>
-              <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed italic">
-                Click to detect the current active round (Group Stage or Knockout) and advance qualified players to the next round.
+              <p className="text-[9px] font-semibold text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100">
+                Detects the active round (Group Stage or Knockout, 1-Match or 2-Match Aggregate) and advances winners to the next stage.
               </p>
             </div>
 
             {/* 2. Auto Group Setup */}
             <button 
+              type="button"
               onClick={handleAutoGroupSetup}
-              disabled={actionLoading || isStep1Done || isStep2Done}
+              disabled={actionLoading || isStep1Done || isStep2Done || isKnockoutOnly}
               className={cn(
-                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left",
-                (isStep1Done || isStep2Done) ? "opacity-60" : "hover:border-indigo-200"
+                "group relative overflow-hidden p-6 rounded-[2rem] bg-white border-2 transition-all flex flex-col justify-between gap-4 text-left shadow-lg",
+                (isStep1Done || isStep2Done || isKnockoutOnly)
+                  ? "border-emerald-200/80 bg-emerald-50/20 opacity-85"
+                  : "border-slate-100 hover:border-indigo-400 hover:shadow-xl active:scale-[0.99]"
               )}
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", isStep1Done ? "bg-emerald-100 text-emerald-600" : "bg-indigo-100 text-indigo-600")}>
-                    {isStep1Done ? <CheckCircle size={20} /> : <Users size={20} />}
+              <div className="flex items-start justify-between w-full gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md",
+                    isStep1Done
+                      ? "bg-emerald-500 text-white shadow-emerald-500/25"
+                      : "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                  )}>
+                    {isStep1Done ? <CheckCircle size={22} /> : <Users size={22} />}
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">2. AUTO GROUP SETUP</span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">Auto Group Setup</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[7.5px] font-black uppercase tracking-widest">
+                        STEP 02
+                      </span>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400">
+                        GROUP DRAW
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                      2. AUTO GROUP SETUP
+                    </h4>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Automatic Group Distribution
+                    </span>
                   </div>
                 </div>
-                {isStep1Done && <span className="text-[9px] font-black text-emerald-600 uppercase italic">Done</span>}
+                {isStep1Done ? (
+                  <span className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 text-[8.5px] font-black uppercase tracking-widest shrink-0">
+                    DONE
+                  </span>
+                ) : isKnockoutOnly ? (
+                  <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-[8px] font-black uppercase tracking-widest shrink-0">
+                    KO ONLY
+                  </span>
+                ) : (
+                  <span className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-[8.5px] font-black uppercase tracking-widest shadow-sm shrink-0">
+                    SETUP
+                  </span>
+                )}
               </div>
-              <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                Automatically distribute players from the list into groups. (4 players per group)
+              <p className="text-[9px] font-semibold text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 w-full">
+                Automatically shuffle and distribute approved players into balanced groups (4 players per group).
               </p>
             </button>
 
             {/* 3. Auto Match Deploy */}
             <button 
+              type="button"
               onClick={handleAutoMatchDeploy}
-              disabled={actionLoading || isStep2Done || (!isKnockoutOnly && !isStep1Done)}
+              disabled={actionLoading || isStep2Done || isStep3Locked}
               className={cn(
-                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left",
-                isStep2Done ? "opacity-60" : (!isKnockoutOnly && !isStep1Done) ? "opacity-40 grayscale" : "hover:border-emerald-200"
+                "group relative overflow-hidden p-6 rounded-[2rem] bg-white border-2 transition-all flex flex-col justify-between gap-4 text-left shadow-lg",
+                isStep2Done
+                  ? "border-emerald-200/80 bg-emerald-50/20 opacity-85"
+                  : isStep3Locked
+                    ? "border-slate-200 opacity-50 grayscale cursor-not-allowed"
+                    : "border-emerald-200 hover:border-emerald-500 hover:shadow-xl active:scale-[0.99]"
               )}
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", isStep2Done ? "bg-emerald-100 text-emerald-600" : "bg-emerald-100 text-emerald-600")}>
-                    {isStep2Done ? <CheckCircle size={20} /> : <Zap size={20} />}
+              <div className="flex items-start justify-between w-full gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md",
+                    isStep2Done
+                      ? "bg-emerald-500 text-white shadow-emerald-500/25"
+                      : "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/25"
+                  )}>
+                    {isStep2Done ? <CheckCircle size={22} /> : <Zap size={22} />}
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-fc-dark uppercase block">3. AUTO MATCH DEPLOY</span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">Auto Match Deploy</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[7.5px] font-black uppercase tracking-widest">
+                        STEP 03
+                      </span>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-emerald-600">
+                        1 OR 2 MATCHES
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                      3. AUTO MATCH DEPLOY
+                    </h4>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Deploy Home & Away Fixtures
+                    </span>
                   </div>
                 </div>
-                {isStep2Done && <span className="text-[9px] font-black text-emerald-600 uppercase italic">Done</span>}
+                {isStep2Done ? (
+                  <span className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 text-[8.5px] font-black uppercase tracking-widest shrink-0">
+                    DONE
+                  </span>
+                ) : (
+                  <span className="px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-[8.5px] font-black uppercase tracking-widest shadow-md shadow-emerald-600/20 shrink-0">
+                    DEPLOY
+                  </span>
+                )}
               </div>
-              <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                Generate all group and knockout stage matches automatically based on assignments.
+              <p className="text-[9px] font-semibold text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 w-full">
+                Click to choose <strong className="text-slate-700">1 Match</strong> (3 matches/player) or <strong className="text-slate-700">2 Matches Home & Away</strong> (6 matches/player in groups, or 2-leg aggregate in knockout).
               </p>
             </button>
 
             {/* 4. Manual Group Setup */}
             <button 
+              type="button"
               onClick={() => setShowManualGroupModal(true)}
-              disabled={actionLoading || isStep2Done}
+              disabled={actionLoading || isStep2Done || isKnockoutOnly}
               className={cn(
-                "p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left bg-white",
-                isStep2Done && "opacity-60"
+                "group relative overflow-hidden p-6 rounded-[2rem] bg-white border-2 transition-all flex flex-col justify-between gap-4 text-left shadow-lg",
+                (isStep2Done || isKnockoutOnly)
+                  ? "border-slate-200 opacity-60"
+                  : "border-slate-100 hover:border-indigo-400 hover:shadow-xl active:scale-[0.99]"
               )}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                  <Edit3 size={20} />
+              <div className="flex items-start justify-between w-full gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
+                    <Edit3 size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[7.5px] font-black uppercase tracking-widest">
+                        STEP 04
+                      </span>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400">
+                        CUSTOM SEEDING
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                      4. MANUAL GROUP SETUP
+                    </h4>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Custom Group Assignment
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-black text-fc-dark uppercase block">4. MANUAL GROUP SETUP</span>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase">Manual Group Setup</span>
-                </div>
+                <span className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 text-[8.5px] font-black uppercase tracking-widest shrink-0">
+                  ASSIGN
+                </span>
               </div>
-              <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                Host can manually select and assign a group for every registered player.
+              <p className="text-[9px] font-semibold text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 w-full">
+                Manually assign or change the group letter (Group A, B, C...) for each approved tournament player.
               </p>
             </button>
 
             {/* 5. Manual Match Deploy */}
             <button 
+              type="button"
               onClick={() => setShowManualMatchModal(true)}
               disabled={actionLoading}
-              className="p-6 rounded-[2rem] nm-flat transition-all flex flex-col items-start gap-4 text-left bg-white"
+              className="group relative overflow-hidden p-6 rounded-[2rem] bg-white border-2 border-slate-100 hover:border-indigo-400 hover:shadow-xl transition-all flex flex-col justify-between gap-4 text-left shadow-lg active:scale-[0.99]"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                  <Plus size={20} />
+              <div className="flex items-start justify-between w-full gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center shrink-0">
+                    <Plus size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[7.5px] font-black uppercase tracking-widest">
+                        STEP 05
+                      </span>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400">
+                        CUSTOM FIXTURE
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                      5. MANUAL MATCH DEPLOY
+                    </h4>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Manual Match Creation
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-black text-fc-dark uppercase block">5. MANUAL MATCH DEPLOY</span>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase">Manual Match Creation</span>
-                </div>
+                <span className="px-3.5 py-2 rounded-xl bg-sky-600 text-white text-[8.5px] font-black uppercase tracking-widest shadow-sm shrink-0">
+                  + CREATE
+                </span>
               </div>
-              <p className="text-[8.5px] font-medium text-slate-500 leading-relaxed">
-                Host can manually create custom matches between any two specific players.
+              <p className="text-[9px] font-semibold text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 w-full">
+                Create custom Home vs Away fixtures between any two players for Group or Knockout stages.
               </p>
             </button>
 
             {/* 6. Match Result Upload Type */}
-            <div className="p-6 nm-flat rounded-[2rem] space-y-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-indigo-900 uppercase">6. RESULT UPLOAD TYPE</span>
-                <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest">Result Upload Authority</span>
+            <div className="p-6 rounded-[2rem] bg-white border-2 border-indigo-100 shadow-lg flex flex-col justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
+                  <Shield size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[7.5px] font-black uppercase tracking-widest">
+                      STEP 06
+                    </span>
+                    <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400">
+                      SCORE AUTHORITY
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                    6. RESULT UPLOAD TYPE
+                  </h4>
+                  <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-wider block">
+                    Result Upload Authority
+                  </span>
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200/80">
                 <button 
+                  type="button"
                   onClick={() => currentUploadType !== 'players' && handleToggleResultUploadType()}
                   className={cn(
-                    "py-3 rounded-xl text-[8px] font-black uppercase tracking-tighter transition-all border",
-                    currentUploadType === 'players' ? "bg-white border-indigo-200 text-indigo-600 shadow-sm" : "bg-transparent border-transparent text-slate-400"
+                    "py-3 rounded-xl text-[8.5px] font-black uppercase tracking-wider transition-all",
+                    currentUploadType === 'players'
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "bg-transparent text-slate-500 hover:text-slate-800"
                   )}
                 >
                   PLAYER UPLOAD
                 </button>
                 <button 
+                  type="button"
                   onClick={() => currentUploadType !== 'publisher' && handleToggleResultUploadType()}
                   className={cn(
-                    "py-3 rounded-xl text-[8px] font-black uppercase tracking-tighter transition-all border",
-                    currentUploadType === 'publisher' ? "bg-white border-indigo-200 text-indigo-600 shadow-sm" : "bg-transparent border-transparent text-slate-400"
+                    "py-3 rounded-xl text-[8.5px] font-black uppercase tracking-wider transition-all",
+                    currentUploadType === 'publisher'
+                      ? "bg-indigo-600 text-white shadow-md"
+                      : "bg-transparent text-slate-500 hover:text-slate-800"
                   )}
                 >
                   ONLY PUBLISHER
                 </button>
               </div>
-              <p className="text-[8px] font-bold text-indigo-400/80 uppercase text-center">
-                {currentUploadType === 'players' ? "Players are allowed to report their own match scores directly." : "Only the tournament host has authority to record match results."}
+              <p className="text-[8.5px] font-bold text-slate-500 uppercase text-center tracking-wider">
+                {currentUploadType === 'players'
+                  ? "Players can upload & verify their own match scores."
+                  : "Only the tournament host has authority to record match results."}
               </p>
             </div>
           </div>
@@ -3074,6 +3559,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const homeWin = (match.homeScore || 0) > (match.awayScore || 0);
     const awayWin = (match.awayScore || 0) > (match.homeScore || 0);
     const isCompleted = match.status === 'completed';
+    const isKnockout = match.stage !== 'group' || (tournament as any)?.format === 'knockout' || match.groupId === 'knockout';
+    const koTieInfo = isKnockout ? getKnockoutTieInfoForMatch(match) : null;
 
     const getStageLabel = () => {
       if (match.stage === 'group') return `Group Stage · Group ${match.groupId}`;
@@ -3093,12 +3580,17 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
            <Trophy size={120} />
         </div>
 
-        <div className="p-4 sm:p-8 space-y-4 sm:space-y-8 relative z-10">
+        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 relative z-10">
           <div className="flex items-center justify-between relative z-10">
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 ")} />
                   <span className="text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
+                  {koTieInfo?.isTwoLegged && (
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest">
+                      LEG {koTieInfo.legNumber} OF {koTieInfo.totalLegs}
+                    </span>
+                  )}
                 </div>
                 {match.matchId && (
                   <div className="flex items-center gap-2 mt-1">
@@ -3143,7 +3635,29 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
           </div>
 
-
+          {/* 2-Match Aggregate Scoreboard Banner in Knockout Ties */}
+          {koTieInfo?.isTwoLegged && (
+            <div className="px-3.5 py-2.5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-center justify-between gap-2 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <Trophy size={13} className="text-amber-400 shrink-0" />
+                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-300 truncate">
+                  2-Match Aggregate:
+                </span>
+                <span className="text-[9.5px] sm:text-[10.5px] font-black font-mono text-amber-400">
+                  {koTieInfo.homePlayerAgg} - {koTieInfo.awayPlayerAgg}
+                </span>
+              </div>
+              {koTieInfo.isTieCompleted && koTieInfo.winnerName ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                  <Trophy size={9} fill="currentColor" /> AGG WINNER: {koTieInfo.winnerName}
+                </span>
+              ) : (
+                <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-widest text-slate-400 shrink-0">
+                  {koTieInfo.completedLegs}/{koTieInfo.totalLegs} Legs Played
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between px-0 relative z-10 gap-1.5 sm:gap-2">
             {/* Home Player */}
@@ -3153,6 +3667,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             )}>
               <div className="flex flex-col items-center gap-1 min-h-[26px] sm:min-h-[32px]">
                 <span className={cn("text-[8.5px] sm:text-[10px] font-black uppercase tracking-[0.2em]", homeWin ? "text-amber-500 font-black" : "text-slate-400")}>HOME</span>
+                {isCompleted && homeWin && (
+                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
+                    <Trophy size={9} fill="currentColor" />
+                    <span className="text-[6.5px] sm:text-[7.5px] uppercase tracking-wider">Winner</span>
+                  </div>
+                )}
               </div>
               <div className={cn(
                 "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
@@ -3360,6 +3880,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
   const renderBracketSide = (side: 'left' | 'right', count: number) => {
     const stageMatches = matches.filter(m => m.stage === activeKnockoutStage);
+    const stageTies = getKnockoutStageTies(activeKnockoutStage, matches);
     
     return (
       <div className="flex flex-col gap-2 xs:gap-2.5 sm:gap-4 justify-center w-[126px] xs:w-[145px] sm:w-[195px] md:w-[210px] shrink-0">
@@ -3370,18 +3891,47 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           const match = stageMatches.find(m => m.matchId === matchSlotId) || 
             stageMatches.find(m => !m.matchId && stageMatches.indexOf(m) === actualIdx);
 
+          const tieInfo = match?.homePlayerId && match?.awayPlayerId
+            ? stageTies.find(t => [t.player1Id, t.player2Id].sort().join('__') === [match.homePlayerId, match.awayPlayerId].sort().join('__'))
+            : null;
+
           const homeProfile = match?.homePlayerId ? profiles[match.homePlayerId] : null;
           const awayProfile = match?.awayPlayerId ? profiles[match.awayPlayerId] : null;
           const homePlayerName = homeProfile?.inGameName || match?.homePlayerName || '';
           const awayPlayerName = awayProfile?.inGameName || match?.awayPlayerName || '';
-          const isCompleted = match?.status === 'completed';
-          const homeScore = match?.homeScore ?? 0;
-          const awayScore = match?.awayScore ?? 0;
-          const isHomeWinner = isCompleted && homeScore > awayScore;
-          const isAwayWinner = isCompleted && awayScore > homeScore;
+
+          const isTwoLegged = Boolean(tieInfo && tieInfo.totalLegs >= 2);
+          const isCompleted = isTwoLegged ? Boolean(tieInfo?.isTieCompleted) : (match?.status === 'completed');
+
+          const homeDisplayScore = isTwoLegged && tieInfo
+            ? (tieInfo.completedLegs > 0
+                ? (tieInfo.player1Id === match?.homePlayerId ? tieInfo.player1AggScore : tieInfo.player2AggScore)
+                : undefined)
+            : match?.homeScore;
+
+          const awayDisplayScore = isTwoLegged && tieInfo
+            ? (tieInfo.completedLegs > 0
+                ? (tieInfo.player1Id === match?.awayPlayerId ? tieInfo.player1AggScore : tieInfo.player2AggScore)
+                : undefined)
+            : match?.awayScore;
+
+          const isHomeWinner = isTwoLegged
+            ? Boolean(tieInfo?.isTieCompleted && tieInfo?.winnerId === match?.homePlayerId)
+            : (isCompleted && ((match?.homeScore ?? 0) > (match?.awayScore ?? 0) || match?.penaltyWinnerId === match?.homePlayerId));
+
+          const isAwayWinner = isTwoLegged
+            ? Boolean(tieInfo?.isTieCompleted && tieInfo?.winnerId === match?.awayPlayerId)
+            : (isCompleted && ((match?.awayScore ?? 0) > (match?.homeScore ?? 0) || match?.penaltyWinnerId === match?.awayPlayerId));
 
           return (
             <div key={matchIdx} className="space-y-0.5 group/fixture relative">
+              {isTwoLegged && (
+                <div className={cn("flex items-center mb-0.5", side === 'left' ? "justify-start pl-2" : "justify-end pr-2")}>
+                  <span className="text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-widest px-1.5 py-0.2 rounded-full bg-indigo-600 text-white shadow-xs">
+                    2 LEGS · AGG ({tieInfo?.completedLegs}/{tieInfo?.totalLegs})
+                  </span>
+                </div>
+              )}
               {/* Home Player Box */}
               <div 
                 onClick={() => handleSlotClick(matchSlotId, 'home', matchNumber, match)}
@@ -3450,8 +4000,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
                     )}>
-                      {isCompleted || match?.homeScore !== undefined 
-                        ? (match?.homeScore ?? '-') 
+                      {isCompleted || homeDisplayScore !== undefined 
+                        ? (homeDisplayScore ?? '-') 
                         : (isAdminUser && !match?.homePlayerId ? <Plus size={10} className="text-emerald-600" /> : '-')}
                     </div>
                   </>
@@ -3467,8 +4017,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
                     )}>
-                      {isCompleted || match?.homeScore !== undefined 
-                        ? (match?.homeScore ?? '-') 
+                      {isCompleted || homeDisplayScore !== undefined 
+                        ? (homeDisplayScore ?? '-') 
                         : (isAdminUser && !match?.homePlayerId ? <Plus size={10} className="text-emerald-600" /> : '-')}
                     </div>
                     <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0 justify-end">
@@ -3580,8 +4130,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
                     )}>
-                      {isCompleted || match?.awayScore !== undefined 
-                        ? (match?.awayScore ?? '-') 
+                      {isCompleted || awayDisplayScore !== undefined 
+                        ? (awayDisplayScore ?? '-') 
                         : (isAdminUser && !match?.awayPlayerId ? <Plus size={10} className="text-amber-600" /> : '-')}
                     </div>
                   </>
@@ -3597,8 +4147,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                             ? "bg-slate-800 text-amber-400" 
                             : "bg-slate-100 text-slate-400"
                     )}>
-                      {isCompleted || match?.awayScore !== undefined 
-                        ? (match?.awayScore ?? '-') 
+                      {isCompleted || awayDisplayScore !== undefined 
+                        ? (awayDisplayScore ?? '-') 
                         : (isAdminUser && !match?.awayPlayerId ? <Plus size={10} className="text-amber-600" /> : '-')}
                     </div>
                     <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0 justify-end">
@@ -4136,12 +4686,141 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     );
   };
 
+  const renderAutoMatchDeployModal = () => {
+    if (!showAutoMatchDeployModal) return null;
+
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] p-7 space-y-6 shadow-2xl border-2 border-white/60 overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-600/30">
+                <Play size={24} className="fill-current ml-0.5" />
+              </div>
+              <div>
+                <span className="text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider bg-emerald-100 text-emerald-700">
+                  MATCHMAKING ENGINE
+                </span>
+                <h3 className="text-base font-black text-slate-900 uppercase italic tracking-tight mt-1">
+                  Auto Match Deploy
+                </h3>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAutoMatchDeployModal(false)}
+              disabled={actionLoading}
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+            Select how many fixtures should be generated between each opponent pairing:
+          </p>
+
+          <div className="space-y-3">
+            {/* Option 1: 1 Match */}
+            <button
+              type="button"
+              onClick={() => setSelectedDeployLegs(1)}
+              className={cn(
+                "w-full text-left p-4 rounded-2xl border-2 transition-all flex items-start gap-3.5",
+                selectedDeployLegs === 1
+                  ? "bg-emerald-50/70 border-emerald-500 shadow-md shadow-emerald-500/10"
+                  : "bg-slate-50 border-slate-200 hover:border-slate-300"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 mt-0.5",
+                selectedDeployLegs === 1 ? "bg-emerald-600 text-white" : "bg-white text-slate-500 border border-slate-200"
+              )}>
+                1
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-slate-900 uppercase italic tracking-tight">
+                    1. Deploy Home & Away 1 Match
+                  </span>
+                  {selectedDeployLegs === 1 && <CheckCircle size={16} className="text-emerald-600 shrink-0" />}
+                </div>
+                <p className="text-[10px] font-semibold text-slate-500 mt-1 leading-relaxed">
+                  {isKnockoutOnly
+                    ? "Each knockout pairing plays a single decisive fixture (1 match per tie)."
+                    : "Single round-robin: Each player plays 1 match against every group opponent (3 matches per player, 6 matches per group)."}
+                </p>
+              </div>
+            </button>
+
+            {/* Option 2: 2 Matches */}
+            <button
+              type="button"
+              onClick={() => setSelectedDeployLegs(2)}
+              className={cn(
+                "w-full text-left p-4 rounded-2xl border-2 transition-all flex items-start gap-3.5",
+                selectedDeployLegs === 2
+                  ? "bg-indigo-50/70 border-indigo-600 shadow-md shadow-indigo-600/10"
+                  : "bg-slate-50 border-slate-200 hover:border-slate-300"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 mt-0.5",
+                selectedDeployLegs === 2 ? "bg-indigo-600 text-white" : "bg-white text-slate-500 border border-slate-200"
+              )}>
+                2
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-slate-900 uppercase italic tracking-tight">
+                    2. Deploy Home & Away 2 Matches
+                  </span>
+                  {selectedDeployLegs === 2 && <CheckCircle size={16} className="text-indigo-600 shrink-0" />}
+                </div>
+                <p className="text-[10px] font-semibold text-slate-500 mt-1 leading-relaxed">
+                  {isKnockoutOnly
+                    ? "Two-legged Home & Away tie: Each pairing plays 2 matches (1 Home & 1 Away). Winner is decided by combined Aggregate Score."
+                    : "Double round-robin: Each player plays 2 matches against every group opponent (1 Home & 1 Away = 6 matches per player, 12 matches per group)."}
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAutoMatchDeployModal(false)}
+              disabled={actionLoading}
+              className="flex-1 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => executeAutoMatchDeploy(selectedDeployLegs)}
+              disabled={actionLoading}
+              className={cn(
+                "flex-1 py-3.5 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50",
+                selectedDeployLegs === 2
+                  ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30"
+                  : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30"
+              )}
+            >
+              {actionLoading ? 'Deploying...' : `Deploy (${selectedDeployLegs === 2 ? '2 Matches' : '1 Match'})`}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   const renderProgressionConfirmModal = () => {
     if (!progressionModal) return null;
 
     return createPortal(
       <div className="fixed inset-0 z-[9999] bg-slate-900/60 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="w-full max-w-md bg-white rounded-[2.5rem] p-7 space-y-6 shadow-2xl border-2 border-white/40 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] p-7 space-y-5 shadow-2xl border-2 border-white/40 overflow-hidden animate-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/30">
@@ -4176,14 +4855,60 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               <span className="text-emerald-600">{progressionModal.nextStageLabel}</span>
             </div>
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              <span>Matches Completed: {progressionModal.completedCount}/{progressionModal.totalCount}</span>
+              <span>Completed: {progressionModal.completedCount}/{progressionModal.totalCount}</span>
               <span>Qualified Players: {progressionModal.qualifiedCount}</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center">
-            <p className="text-xs font-bold text-slate-800 leading-relaxed">
-              Do you want to advance the qualified players of this round ({progressionModal.currentStageLabel}) in your tournament to the next round ({progressionModal.nextStageLabel})?
+          {/* Match Format Selector for Next Knockout Round */}
+          <div className="space-y-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">
+              Next Round Fixture Format ({progressionModal.nextStageLabel})
+            </span>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setProgressionLegs(1)}
+                className={cn(
+                  "p-3 rounded-2xl border-2 text-left transition-all",
+                  progressionLegs === 1
+                    ? "bg-emerald-50/70 border-emerald-500 text-emerald-900 shadow-xs"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase italic">1. Home & Away 1 Match</span>
+                  {progressionLegs === 1 && <CheckCircle size={13} className="text-emerald-600 shrink-0" />}
+                </div>
+                <span className="text-[8px] font-bold text-slate-400 uppercase block mt-1">
+                  Single Match Tie
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setProgressionLegs(2)}
+                className={cn(
+                  "p-3 rounded-2xl border-2 text-left transition-all",
+                  progressionLegs === 2
+                    ? "bg-indigo-50/70 border-indigo-600 text-indigo-900 shadow-xs"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase italic">2. Home & Away 2 Matches</span>
+                  {progressionLegs === 2 && <CheckCircle size={13} className="text-indigo-600 shrink-0" />}
+                </div>
+                <span className="text-[8px] font-bold text-slate-400 uppercase block mt-1">
+                  2-Legged Aggregate Score
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center">
+            <p className="text-[11px] font-bold text-slate-800 leading-relaxed">
+              Advance qualified players from {progressionModal.currentStageLabel} to {progressionModal.nextStageLabel} with {progressionLegs === 2 ? '2 Home & Away Matches (Aggregate Score)' : '1 Match per pairing'}?
             </p>
           </div>
 
@@ -4212,7 +4937,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const renderThirdPlaceMatch = () => {
-    const match = matches.find(m => m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1') || 
+    const match = matches.find(m => m.stage === '3RD_PLACE' && m.matchId === '3RD_PLACE_M1') ||
+                  matches.find(m => m.stage === '3RD_PLACE') ||
                   matches.find(m => m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
     
     // Fallback match object for UI purposes if not found in DB
@@ -4228,15 +4954,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       awayScore: 0
     };
 
+    const tieInfo = match ? getKnockoutTieInfoForMatch(match) : null;
+    const isTwoLegTie = Boolean(tieInfo && tieInfo.totalLegs > 1);
     const homeProfile = displayMatch.homePlayerId ? profiles[displayMatch.homePlayerId] : null;
     const awayProfile = displayMatch.awayPlayerId ? profiles[displayMatch.awayPlayerId] : null;
     const homePlayerName = homeProfile?.inGameName || displayMatch.homePlayerName || 'TBD';
     const awayPlayerName = awayProfile?.inGameName || displayMatch.awayPlayerName || 'TBD';
-    const isCompleted = displayMatch.status === 'completed';
-    const homeScore = displayMatch.homeScore ?? 0;
-    const awayScore = displayMatch.awayScore ?? 0;
-    const isHomeWinner = isCompleted && homeScore > awayScore;
-    const isAwayWinner = isCompleted && awayScore > homeScore;
+    const isCompleted = isTwoLegTie ? Boolean(tieInfo?.allCompleted) : displayMatch.status === 'completed';
+    const homeScore = isTwoLegTie
+      ? (displayMatch.homePlayerId === tieInfo?.player1Id ? tieInfo.player1AggScore : tieInfo?.player2AggScore) ?? 0
+      : (displayMatch.homeScore ?? 0);
+    const awayScore = isTwoLegTie
+      ? (displayMatch.awayPlayerId === tieInfo?.player2Id ? tieInfo.player2AggScore : tieInfo?.player1AggScore) ?? 0
+      : (displayMatch.awayScore ?? 0);
+    const isHomeWinner = isTwoLegTie
+      ? Boolean(tieInfo?.winnerId && tieInfo.winnerId === displayMatch.homePlayerId)
+      : (isCompleted && (homeScore > awayScore || displayMatch.penaltyWinnerId === displayMatch.homePlayerId));
+    const isAwayWinner = isTwoLegTie
+      ? Boolean(tieInfo?.winnerId && tieInfo.winnerId === displayMatch.awayPlayerId)
+      : (isCompleted && (awayScore > homeScore || displayMatch.penaltyWinnerId === displayMatch.awayPlayerId));
 
     return (
       <div className="pt-16 border-t border-slate-100 mt-16 space-y-10 flex flex-col items-center">
@@ -4246,7 +4982,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              <h4 className="text-[12px] font-black text-slate-500 uppercase tracking-[0.3em] italic">3rd Place Match</h4>
              <div className="h-px w-10 bg-slate-200" />
           </div>
-          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Bronze Medal Battle</span>
+          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+            {isTwoLegTie ? 'Bronze Medal Battle (2-Leg Aggregate)' : 'Bronze Medal Battle'}
+          </span>
         </div>
         
         <div className="w-[280px] xs:w-[320px] sm:w-[380px] nm-flat bg-white/50 p-6 rounded-[2.5rem] border-2 border-white/40 shadow-sm relative overflow-hidden">
@@ -4287,14 +5025,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 "w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-sm font-black italic",
                 isHomeWinner ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-400"
               )}>
-                {displayMatch.homeScore ?? '-'}
+                {isTwoLegTie ? (tieInfo && tieInfo.completedLegs > 0 ? homeScore : '-') : (displayMatch.homeScore ?? '-')}
               </div>
             </div>
 
             {/* VS Divider */}
             <div className="flex items-center justify-center gap-2 py-1">
               <div className="h-px flex-1 bg-slate-100" />
-              <span className="text-[8px] font-black text-slate-300 italic uppercase">VS</span>
+              <span className="text-[8px] font-black text-slate-300 italic uppercase">
+                {isTwoLegTie ? 'AGGREGATE VS' : 'VS'}
+              </span>
               <div className="h-px flex-1 bg-slate-100" />
             </div>
 
@@ -4330,7 +5070,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 "w-10 h-10 rounded-xl nm-inset flex items-center justify-center text-sm font-black italic",
                 isAwayWinner ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-400"
               )}>
-                {displayMatch.awayScore ?? '-'}
+                {isTwoLegTie ? (tieInfo && tieInfo.completedLegs > 0 ? awayScore : '-') : (displayMatch.awayScore ?? '-')}
               </div>
             </div>
           </div>
@@ -4720,8 +5460,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     {matches.filter(m => {
                       if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                       if (activeKnockoutStage === 'FINAL') {
-                        const isGrandFinal = m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
-                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1' || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+                        const isGrandFinal = m.stage === 'FINAL' && m.matchId !== 'FINAL_M2';
+                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
                         if (!isGrandFinal && !isThirdPlace) return false;
                       } else if (m.stage !== activeKnockoutStage) {
                         return false;
@@ -4736,8 +5476,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     matches.filter(m => {
                       if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
                       if (activeKnockoutStage === 'FINAL') {
-                        const isGrandFinal = m.stage === 'FINAL' && (m.matchId === 'FINAL_M1' || !m.matchId);
-                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId === '3RD_PLACE_M1' || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+                        const isGrandFinal = m.stage === 'FINAL' && m.matchId !== 'FINAL_M2';
+                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
                         if (!isGrandFinal && !isThirdPlace) return false;
                       } else if (m.stage !== activeKnockoutStage) {
                         return false;
@@ -4993,6 +5733,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       {renderSlotAssignModal()}
       {renderAutoMatchToast()}
       {renderDangerConfirmModal()}
+      {renderAutoMatchDeployModal()}
       {renderProgressionConfirmModal()}
       
       {/* Professional Gaming Header */}
