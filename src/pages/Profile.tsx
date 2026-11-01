@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   User, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, 
   Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck, 
@@ -25,6 +26,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [editData, setEditData] = useState({
     inGameName: '',
@@ -65,12 +67,15 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
   const handleSave = async () => {
     if (!user) return;
+    setIsSaving(true);
     try {
       await setDoc(doc(db, 'users', user.uid), editData, { merge: true });
       setIsEditing(false);
     } catch (err) {
       console.error('Error updating profile:', err);
       alert('Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -275,106 +280,230 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         </div>
       </motion.div>
 
-      {/* Edit Overlay */}
-      <AnimatePresence>
-        {isEditing && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4"
+      {/* Redesigned Modify Profile Modal */}
+      {isEditing && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-950/65 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="w-full max-w-md bg-white rounded-[2.5rem] border-2 border-white shadow-[0_25px_70px_-15px_rgba(15,23,42,0.4)] overflow-hidden flex flex-col max-h-[90vh] my-auto"
           >
-            <motion.div 
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="nm-flat rounded-[3rem] w-full max-w-lg overflow-hidden bg-[#f0f1f5]"
-            >
-              <div className="p-8 border-b border-white/20 flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-black text-fc-green uppercase tracking-[0.3em] mb-1">Identity Management</p>
-                  <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Modify Profile</h2>
+            {/* Top Modal Header */}
+            <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
+                  <Edit3 size={20} />
                 </div>
-                <button onClick={() => setIsEditing(false)} className="w-12 h-12 rounded-2xl nm-flat flex items-center justify-center text-slate-400 active:nm-pressed">
-                  <X size={24} />
-                </button>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
+                    <ShieldCheck size={10} /> Identity Management
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mt-0.5">
+                    Modify Profile
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isSaving}
+                className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center active:scale-95 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+              {/* Live Identity Preview Banner */}
+              <div className="p-3.5 rounded-2xl bg-slate-900 text-white flex items-center gap-3.5 shadow-md border border-slate-800">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 p-0.5 shrink-0">
+                  <div className="w-full h-full rounded-[0.9rem] bg-slate-950 flex items-center justify-center text-white font-black text-base uppercase italic">
+                    {(editData.inGameName || profile?.inGameName || 'P').charAt(0)}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-black uppercase italic tracking-tight text-white truncate">
+                      {editData.inGameName || 'Your Handle'}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[7px] font-black uppercase tracking-wider shrink-0">
+                      {profile?.role || 'Player'}
+                    </span>
+                  </div>
+                  <p className="text-[9px] font-bold text-slate-400 truncate mt-0.5">
+                    {profile?.role === 'player'
+                      ? `UID: ${editData.inGameUID || 'Not set'}`
+                      : `League: ${editData.leagueName || 'Official Host'}`}
+                  </p>
+                </div>
               </div>
 
-              <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Full Handle</label>
-                  <input 
-                    value={editData.inGameName} 
-                    onChange={(e) => setEditData({...editData, inGameName: e.target.value})}
-                    className="w-full h-14 px-6 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                  />
+              {/* Section 1: Core Identity */}
+              <div className="space-y-3.5">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    Core Identity
+                  </span>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                {/* Full Handle */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                    Full Handle (In-Game Name)
+                  </label>
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <User size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Enter your in-game name..."
+                      value={editData.inGameName}
+                      onChange={(e) => setEditData({ ...editData, inGameName: e.target.value })}
+                      className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* In-Game UID / League Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
                     {profile?.role === 'player' ? 'In-Game UID' : 'League Name'}
                   </label>
-                  <input 
-                    value={profile?.role === 'player' ? editData.inGameUID : editData.leagueName}
-                    onChange={(e) => {
-                      if (profile?.role === 'player') setEditData({...editData, inGameUID: e.target.value});
-                      else setEditData({...editData, leagueName: e.target.value});
-                    }}
-                    className="w-full h-14 px-6 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                  />
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      {profile?.role === 'player' ? <Hash size={16} /> : <Award size={16} />}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={profile?.role === 'player' ? 'Enter your FC Mobile UID...' : 'Enter your League / Org name...'}
+                      value={profile?.role === 'player' ? editData.inGameUID : editData.leagueName}
+                      onChange={(e) => {
+                        if (profile?.role === 'player') setEditData({ ...editData, inGameUID: e.target.value });
+                        else setEditData({ ...editData, leagueName: e.target.value });
+                      }}
+                      className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Social & Match Coordination Channels */}
+              <div className="space-y-3.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    Digital Contact Channels
+                  </span>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook URL</label>
-                  <input 
-                    value={editData.fbUrl} 
-                    onChange={(e) => setEditData({...editData, fbUrl: e.target.value})}
-                    className="w-full h-14 px-6 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                  />
+                {/* Facebook URL */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                    Facebook Profile URL
+                  </label>
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Facebook size={16} />
+                    </div>
+                    <input
+                      type="url"
+                      placeholder="https://facebook.com/your.profile"
+                      value={editData.fbUrl}
+                      onChange={(e) => setEditData({ ...editData, fbUrl: e.target.value })}
+                      className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-blue-600 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Messenger</label>
-                     <input 
-                       value={editData.messengerLink} 
-                       onChange={(e) => setEditData({...editData, messengerLink: e.target.value})}
-                       className="w-full h-14 px-4 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                     />
-                   </div>
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">WhatsApp</label>
-                     <input 
-                       value={editData.whatsappNumber} 
-                       onChange={(e) => setEditData({...editData, whatsappNumber: e.target.value})}
-                       className="w-full h-14 px-4 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                     />
-                   </div>
+                {/* Messenger & WhatsApp */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                      Messenger Link
+                    </label>
+                    <div className="relative">
+                      <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <MessageCircle size={16} />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="https://m.me/username"
+                        value={editData.messengerLink}
+                        onChange={(e) => setEditData({ ...editData, messengerLink: e.target.value })}
+                        className="w-full h-13 pl-14 pr-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-sky-500 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                      WhatsApp Number
+                    </label>
+                    <div className="relative">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Phone size={16} />
+                      </div>
+                      <input
+                        type="tel"
+                        placeholder="+8801XXXXXXXXX"
+                        value={editData.whatsappNumber}
+                        onChange={(e) => setEditData({ ...editData, whatsappNumber: e.target.value })}
+                        className="w-full h-13 pl-14 pr-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-emerald-600 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {profile?.role === 'publisher' && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-fc-green uppercase tracking-widest ml-4">League Group Link</label>
-                    <input 
-                      value={editData.leagueMessengerGroupLink} 
-                      onChange={(e) => setEditData({...editData, leagueMessengerGroupLink: e.target.value})}
-                      className="w-full h-14 px-6 nm-inset rounded-2xl text-slate-700 font-bold focus:outline-none" 
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-1 block">
+                      League Messenger Group Link
+                    </label>
+                    <div className="relative">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <MessageSquare size={16} />
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="https://m.me/j/..."
+                        value={editData.leagueMessengerGroupLink}
+                        onChange={(e) => setEditData({ ...editData, leagueMessengerGroupLink: e.target.value })}
+                        className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              <div className="p-8 bg-white/10 border-t border-white/20">
-                <button 
-                  onClick={handleSave} 
-                  className="w-full h-16 nm-flat bg-fc-green rounded-[1.5rem] text-white font-black uppercase tracking-[0.2em] italic active:nm-pressed"
-                >
-                  Confirm Changes
-                </button>
-              </div>
-            </motion.div>
+            {/* Footer Actions */}
+            <div className="p-5 bg-slate-50 border-t border-slate-100 flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isSaving}
+                className="flex-1 h-13 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex-[1.6] h-13 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 hover:from-indigo-700 hover:to-slate-950 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] italic shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+              >
+                <CheckCircle size={15} className="text-emerald-400 shrink-0" />
+                <span>{isSaving ? 'Saving...' : 'Confirm Changes'}</span>
+              </button>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

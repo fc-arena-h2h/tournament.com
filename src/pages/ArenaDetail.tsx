@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
-import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle, Phone, CircleHelp } from 'lucide-react';
+import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Search, User as UserIcon, MessageSquare, Clock, Facebook, MessageCircle, Upload, CheckCircle, XCircle, X, Users, Settings, Zap, Edit3, Trash2, Save, Plus, Send, Lock, Camera, ArrowLeftRight, Shield, RotateCcw, AlertTriangle, AlertCircle, Phone, CircleHelp, Play } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
@@ -254,6 +254,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         const newAwayName = role === 'away' ? playerName : (existingMatch.awayPlayerName || '');
 
         const hasBothPlayers = Boolean(newHomeId && newAwayId);
+        const leg2MatchId = `${matchSlotId}_L2`;
+        const existingLeg2 = matches.find(m => m.matchId === leg2MatchId);
 
         if (isDemo) {
           updateDemoMatch(tournament.id, existingMatch.id, {
@@ -266,16 +268,45 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             awayPlayerName: newAwayName,
             status: hasBothPlayers ? 'scheduled' : 'draft',
           });
-          setMatches(prev => prev.map(m => (m.id === existingMatch.id) ? {
-            ...m,
-            matchId: matchSlotId,
-            stage: stage,
-            homePlayerId: newHomeId,
-            homePlayerName: newHomeName,
-            awayPlayerId: newAwayId,
-            awayPlayerName: newAwayName,
-            status: hasBothPlayers ? 'scheduled' : 'draft' as any
-          } : m));
+          if (existingLeg2 && hasBothPlayers) {
+            updateDemoMatch(tournament.id, existingLeg2.id, {
+              matchId: leg2MatchId,
+              stage: stage,
+              groupId: 'knockout',
+              homePlayerId: newAwayId,
+              homePlayerName: newAwayName,
+              awayPlayerId: newHomeId,
+              awayPlayerName: newHomeName,
+              status: 'scheduled',
+            });
+          }
+          setMatches(prev => prev.map(m => {
+            if (m.id === existingMatch.id) {
+              return {
+                ...m,
+                matchId: matchSlotId,
+                stage: stage,
+                homePlayerId: newHomeId,
+                homePlayerName: newHomeName,
+                awayPlayerId: newAwayId,
+                awayPlayerName: newAwayName,
+                status: hasBothPlayers ? 'scheduled' : 'draft' as any
+              };
+            }
+            if (existingLeg2 && m.id === existingLeg2.id && hasBothPlayers) {
+              return {
+                ...m,
+                matchId: leg2MatchId,
+                stage: stage,
+                homePlayerId: newAwayId,
+                homePlayerName: newAwayName,
+                awayPlayerId: newHomeId,
+                awayPlayerName: newHomeName,
+                status: 'scheduled' as any
+              };
+            }
+            return m;
+          }));
         } else {
           await updateDoc(doc(db, 'matches', existingMatch.id), {
             matchId: matchSlotId,
@@ -289,6 +320,20 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: hasBothPlayers ? 'scheduled' : 'draft',
             updatedAt: Timestamp.now()
           });
+          if (existingLeg2 && hasBothPlayers) {
+            await updateDoc(doc(db, 'matches', existingLeg2.id), {
+              matchId: leg2MatchId,
+              stage: stage,
+              groupId: 'knockout',
+              homePlayerId: newAwayId,
+              homePlayerName: newAwayName,
+              awayPlayerId: newHomeId,
+              awayPlayerName: newHomeName,
+              participants: [newAwayId, newHomeId].filter(Boolean),
+              status: 'scheduled',
+              updatedAt: Timestamp.now()
+            });
+          }
         }
 
         if (hasBothPlayers) {
@@ -398,13 +443,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setActionLoading(true);
     try {
+      const leg2Doc = matches.find(m => m.matchId === `${matchSlotId}_L2`);
       const remainingId = role === 'home' ? currentMatchDoc.awayPlayerId : currentMatchDoc.homePlayerId;
       if (!remainingId) {
         if (isDemo) {
           deleteDemoMatch(tournament.id, currentMatchDoc.id);
-          setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id));
+          if (leg2Doc) deleteDemoMatch(tournament.id, leg2Doc.id);
+          setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id && m.id !== leg2Doc?.id));
         } else {
           await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+          if (leg2Doc) await deleteDoc(doc(db, 'matches', leg2Doc.id));
         }
       } else {
         if (isDemo) {
@@ -414,7 +462,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: 'draft'
           };
           updateDemoMatch(tournament.id, currentMatchDoc.id, updates as any);
-          setMatches(prev => prev.map(m => m.id === currentMatchDoc.id ? { ...m, ...updates as any } : m));
+          if (leg2Doc) deleteDemoMatch(tournament.id, leg2Doc.id);
+          setMatches(prev => prev
+            .filter(m => m.id !== leg2Doc?.id)
+            .map(m => m.id === currentMatchDoc.id ? { ...m, ...updates as any } : m));
         } else {
           await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
             [role === 'home' ? 'homePlayerId' : 'awayPlayerId']: '',
@@ -423,6 +474,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             status: 'draft',
             updatedAt: Timestamp.now()
           });
+          if (leg2Doc) await deleteDoc(doc(db, 'matches', leg2Doc.id));
         }
       }
       setSlotAssignModal(null);
@@ -442,6 +494,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setActionLoading(true);
     try {
+      const leg2Doc = matches.find(m => m.matchId === `${matchSlotId}_L2`);
       if (isDemo) {
         const updates = {
           homePlayerId: currentMatchDoc.awayPlayerId || '',
@@ -450,7 +503,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           awayPlayerName: currentMatchDoc.homePlayerName || '',
         };
         updateDemoMatch(tournament.id, currentMatchDoc.id, updates);
-        setMatches(prev => prev.map(m => m.id === currentMatchDoc.id ? { ...m, ...updates } : m));
+        if (leg2Doc) {
+          updateDemoMatch(tournament.id, leg2Doc.id, {
+            homePlayerId: currentMatchDoc.homePlayerId || '',
+            homePlayerName: currentMatchDoc.homePlayerName || '',
+            awayPlayerId: currentMatchDoc.awayPlayerId || '',
+            awayPlayerName: currentMatchDoc.awayPlayerName || '',
+          });
+        }
+        setMatches(prev => prev.map(m => {
+          if (m.id === currentMatchDoc.id) return { ...m, ...updates };
+          if (leg2Doc && m.id === leg2Doc.id) {
+            return {
+              ...m,
+              homePlayerId: currentMatchDoc.homePlayerId || '',
+              homePlayerName: currentMatchDoc.homePlayerName || '',
+              awayPlayerId: currentMatchDoc.awayPlayerId || '',
+              awayPlayerName: currentMatchDoc.awayPlayerName || '',
+            };
+          }
+          return m;
+        }));
       } else {
         await updateDoc(doc(db, 'matches', currentMatchDoc.id), {
           homePlayerId: currentMatchDoc.awayPlayerId || '',
@@ -459,6 +532,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           awayPlayerName: currentMatchDoc.homePlayerName || '',
           updatedAt: Timestamp.now()
         });
+        if (leg2Doc) {
+          await updateDoc(doc(db, 'matches', leg2Doc.id), {
+            homePlayerId: currentMatchDoc.homePlayerId || '',
+            homePlayerName: currentMatchDoc.homePlayerName || '',
+            awayPlayerId: currentMatchDoc.awayPlayerId || '',
+            awayPlayerName: currentMatchDoc.awayPlayerName || '',
+            updatedAt: Timestamp.now()
+          });
+        }
       }
       setSlotAssignModal(null);
     } catch (err) {
@@ -480,15 +562,154 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     setActionLoading(true);
     try {
+      const leg2Doc = matches.find(m => m.matchId === `${matchSlotId}_L2`);
       if (isDemo) {
         deleteDemoMatch(tournament.id, currentMatchDoc.id);
-        setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id));
+        if (leg2Doc) deleteDemoMatch(tournament.id, leg2Doc.id);
+        setMatches(prev => prev.filter(m => m.id !== currentMatchDoc.id && m.id !== leg2Doc?.id));
       } else {
         await deleteDoc(doc(db, 'matches', currentMatchDoc.id));
+        if (leg2Doc) await deleteDoc(doc(db, 'matches', leg2Doc.id));
       }
       setSlotAssignModal(null);
     } catch (err) {
       console.error('Error deleting fixture:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Deploy Home & Away 2 Matches for Selected Players in Current Knockout Stage
+  const handleDeployKnockoutStageTwoMatches = async () => {
+    if (!isAdminUser) return;
+
+    // Collect all matches in the currently active knockout stage (plus 3RD_PLACE if on FINAL tab)
+    const stageFixtures = matches.filter(m => {
+      if (!m.homePlayerId || !m.awayPlayerId) return false;
+      if (activeKnockoutStage === 'FINAL') {
+        return m.stage === 'FINAL' || m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE');
+      }
+      return m.stage === activeKnockoutStage;
+    });
+
+    if (stageFixtures.length === 0) {
+      alert(`Please select Home and Away players in the ${activeKnockoutStage} bracket slots first, then click "Deploy Home & Away 2 Matches"!`);
+      return;
+    }
+
+    // Group by canonical player pair within each sub-stage (e.g., FINAL vs 3RD_PLACE)
+    const pairGroups = new Map<string, Match[]>();
+    stageFixtures.forEach(m => {
+      const subStage = (m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || m.matchId === 'FINAL_M2')
+        ? '3RD_PLACE'
+        : m.stage;
+      const pairKey = `${subStage}::${[m.homePlayerId, m.awayPlayerId].sort().join('__')}`;
+      const existing = pairGroups.get(pairKey) || [];
+      existing.push(m);
+      pairGroups.set(pairKey, existing);
+    });
+
+    setActionLoading(true);
+    try {
+      let createdCount = 0;
+      let activatedCount = 0;
+      const createdDemoMatches: any[] = [];
+      const updatedDraftIds: string[] = [];
+
+      for (const [, pairMatches] of Array.from(pairGroups.entries())) {
+        // Leg 1 is the primary match
+        const leg1 = pairMatches.find(m => !m.matchId?.endsWith('_L2')) || pairMatches[0];
+
+        // If Leg 1 was in draft state, activate it to scheduled
+        if (leg1.status === 'draft') {
+          updatedDraftIds.push(leg1.id);
+          if (isDemo) {
+            updateDemoMatch(tournament.id, leg1.id, { status: 'scheduled' });
+          } else {
+            await updateDoc(doc(db, 'matches', leg1.id), {
+              status: 'scheduled',
+              updatedAt: Timestamp.now()
+            });
+          }
+          activatedCount++;
+        }
+
+        // If this player pair only has 1 match, create the 2nd match (Away vs Home)
+        if (pairMatches.length < 2) {
+          const baseMatchId = leg1.matchId
+            ? leg1.matchId.replace(/_L2$/, '')
+            : `${leg1.stage}_M1`;
+          const leg2MatchId = `${baseMatchId}_L2`;
+          const homeProfile = profiles[leg1.awayPlayerId];
+          const awayProfile = profiles[leg1.homePlayerId];
+          const leg2HomeName = homeProfile?.inGameName || leg1.awayPlayerName || 'Player 2';
+          const leg2AwayName = awayProfile?.inGameName || leg1.homePlayerName || 'Player 1';
+
+          if (isDemo) {
+            const newM = addDemoMatch(tournament.id, {
+              tournamentId: tournament.id,
+              matchId: leg2MatchId,
+              stage: leg1.stage,
+              groupId: 'knockout',
+              homePlayerId: leg1.awayPlayerId,
+              homePlayerName: leg2HomeName,
+              awayPlayerId: leg1.homePlayerId,
+              awayPlayerName: leg2AwayName,
+              status: 'scheduled',
+              scheduledTime: { toMillis: () => Date.now() }
+            });
+            createdDemoMatches.push(newM);
+          } else {
+            await addDoc(collection(db, 'matches'), {
+              tournamentId: tournament.id,
+              matchId: leg2MatchId,
+              stage: leg1.stage,
+              groupId: 'knockout',
+              homePlayerId: leg1.awayPlayerId,
+              homePlayerName: leg2HomeName,
+              awayPlayerId: leg1.homePlayerId,
+              awayPlayerName: leg2AwayName,
+              participants: [leg1.awayPlayerId, leg1.homePlayerId],
+              status: 'scheduled',
+              publisherId: tournament.publisherId,
+              scheduledTime: serverTimestamp(),
+              createdAt: serverTimestamp()
+            });
+
+            notifyMatchParticipants({
+              homePlayerId: leg1.awayPlayerId,
+              awayPlayerId: leg1.homePlayerId,
+              title: '⚽ Leg 2 Knockout Match Scheduled!',
+              message: `${leg2HomeName} (Home) vs ${leg2AwayName} (Away) is live in ${leg1.stage}!`,
+              type: 'match_scheduled',
+              tournamentId: tournament.id
+            }).catch(() => {});
+          }
+          createdCount++;
+        }
+      }
+
+      if (isDemo && (createdDemoMatches.length > 0 || updatedDraftIds.length > 0)) {
+        setMatches(prev => [
+          ...prev.map(m => updatedDraftIds.includes(m.id) ? { ...m, status: 'scheduled' as const } : m),
+          ...(createdDemoMatches as any)
+        ]);
+      }
+
+      if (createdCount > 0 || activatedCount > 0) {
+        setAutoMatchToast({
+          title: 'HOME & AWAY 2 MATCHES DEPLOYED!',
+          subtitle: `${pairGroups.size} pairing(s) now have 2 Home & Away matches in ${activeKnockoutStage}!`
+        });
+      } else {
+        setAutoMatchToast({
+          title: '2 MATCHES ALREADY DEPLOYED',
+          subtitle: `All selected player pairings in ${activeKnockoutStage} already have Home & Away 2 matches.`
+        });
+      }
+    } catch (err) {
+      console.error('Error deploying 2 matches in knockout stage:', err);
+      alert('Failed to deploy Home & Away 2 matches.');
     } finally {
       setActionLoading(false);
     }
@@ -678,10 +899,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             }
           }
 
-          // If legs === 2, append reverse fixtures [awayIdx, homeIdx] so every player plays
-          // 2 matches (1 Home & 1 Away) against each group opponent (6 matches per player in a 4-player group = 12 matches)
+          // When legs === 2, place the 2 matches of each player pairing right next to each other (Leg 1: Home vs Away, Leg 2: Away vs Home)
           const indexPairs: Array<[number, number]> = legs === 2
-            ? [...firstLegPairs, ...firstLegPairs.map(([h, a]): [number, number] => [a, h])]
+            ? firstLegPairs.flatMap(([h, a]): Array<[number, number]> => [[h, a], [a, h]])
             : firstLegPairs;
 
           indexPairs.forEach(([homeIdx, awayIdx]) => {
@@ -3547,13 +3767,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
 
 
-  const renderMatchCard = (match: Match) => {
+  const renderMatchCard = (match: Match, isSideBySide: boolean = false, pairLegNumber?: number, pairTotalLegs?: number) => {
     const homeProfile = profiles[match.homePlayerId];
     const awayProfile = profiles[match.awayPlayerId];
     const isHome = auth.currentUser?.uid === match.homePlayerId;
     const isAway = auth.currentUser?.uid === match.awayPlayerId;
     const isParticipant = isHome || isAway;
-    const canAccessMatchChat = isHome || isAway || isAdminUser || isPublisher;
     const currentUploadType = currentTournament?.resultUploadType || tournament.resultUploadType || 'players';
 
     const homeWin = (match.homeScore || 0) > (match.awayScore || 0);
@@ -3562,7 +3781,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const isKnockout = match.stage !== 'group' || (tournament as any)?.format === 'knockout' || match.groupId === 'knockout';
     const koTieInfo = isKnockout ? getKnockoutTieInfoForMatch(match) : null;
 
+    const effectiveLegNum = pairLegNumber || koTieInfo?.legNumber;
+    const effectiveTotalLegs = pairTotalLegs || koTieInfo?.totalLegs;
+
     const getStageLabel = () => {
+      if (isSideBySide) {
+        if (match.stage === 'group') return `Group ${match.groupId}`;
+        if (match.stage === '3RD_PLACE') return '3rd Place';
+        return match.stage;
+      }
       if (match.stage === 'group') return `Group Stage · Group ${match.groupId}`;
       if (match.stage === 'R32') return 'Knockout · Round of 32';
       if (match.stage === 'R16') return 'Knockout · Round of 16';
@@ -3574,41 +3801,64 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     };
 
     return (
-      <div key={match.id} className="nm-flat rounded-[2.5rem] p-0 border-2 border-white bg-white text-fc-dark space-y-0 relative overflow-hidden group transition-all hover:scale-[1.01] shadow-xl">
+      <div
+        key={match.id}
+        className={cn(
+          "nm-flat p-0 border-2 border-white bg-white text-fc-dark space-y-0 relative overflow-hidden group transition-all hover:scale-[1.01] shadow-xl flex flex-col justify-between h-full",
+          isSideBySide ? "rounded-[1.5rem] sm:rounded-[2.2rem]" : "rounded-[2.5rem]"
+        )}
+      >
         {/* Background faint logo */}
         <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] grayscale pointer-events-none -mr-16 -mt-16">
            <Trophy size={120} />
         </div>
 
-        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 relative z-10">
-          <div className="flex items-center justify-between relative z-10">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <div className={cn("w-2 h-2 rounded-full", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 ")} />
-                  <span className="text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{getStageLabel()}</span>
-                  {koTieInfo?.isTwoLegged && (
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest">
-                      LEG {koTieInfo.legNumber} OF {koTieInfo.totalLegs}
+        <div className={cn(
+          " relative z-10 flex flex-col justify-between h-full",
+          isSideBySide ? "p-2.5 xs:p-3 sm:p-5 space-y-2.5 sm:space-y-4" : "p-4 sm:p-8 space-y-4 sm:space-y-6"
+        )}>
+          {/* Top Header */}
+          <div className="flex items-start justify-between gap-1.5 relative z-10">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                  <div className={cn("w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0", isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500")} />
+                  <span className={cn(
+                    "font-black text-slate-400 uppercase tracking-wider truncate",
+                    isSideBySide ? "text-[7px] sm:text-[9px]" : "text-[8.5px] sm:text-[10px] tracking-widest"
+                  )}>
+                    {getStageLabel()}
+                  </span>
+                  {(effectiveTotalLegs && effectiveTotalLegs >= 2) && (
+                    <span className={cn(
+                      "rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 font-black uppercase tracking-wider shrink-0",
+                      isSideBySide ? "px-1.5 py-0.2 text-[6.5px] sm:text-[7.5px]" : "px-2 py-0.5 text-[7.5px] sm:text-[8.5px] tracking-widest"
+                    )}>
+                      MATCH {effectiveLegNum} ({effectiveLegNum === 1 ? 'LEG 1' : `LEG ${effectiveLegNum}`})
                     </span>
                   )}
                 </div>
                 {match.matchId && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[9px] font-bold text-slate-400">ID: {match.matchId}</span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className={cn(
+                      "font-bold text-slate-400 truncate",
+                      isSideBySide ? "text-[7px] sm:text-[8.5px] max-w-[85px] sm:max-w-none" : "text-[9px]"
+                    )}>
+                      ID: {match.matchId}
+                    </span>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         navigator.clipboard.writeText(match.matchId || '');
                         alert('Match ID copied to clipboard!');
                       }}
-                      className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-indigo-500"
+                      className="p-0.5 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-indigo-500 shrink-0"
                     >
-                      <Copy size={10} />
+                      <Copy size={isSideBySide ? 9 : 10} />
                     </button>
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0 flex-wrap justify-end">
                 {isAdminUser && (
                   <button
                     type="button"
@@ -3616,27 +3866,45 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       e.stopPropagation();
                       handleUploadResult(match);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 text-[8px] sm:text-[9px] font-black uppercase tracking-widest shadow-xs active:scale-95 transition-all"
+                    className={cn(
+                      "flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 font-black uppercase tracking-wider shadow-xs active:scale-95 transition-all",
+                      isSideBySide ? "px-1.5 py-1 text-[6.5px] sm:text-[8px]" : "px-3 py-1.5 sm:px-3.5 sm:py-2 text-[8px] sm:text-[9px] tracking-widest"
+                    )}
                     title="Edit Match Result"
                   >
-                    <Edit3 size={12} />
+                    <Edit3 size={isSideBySide ? 10 : 12} />
                     <span>EDIT</span>
                   </button>
                 )}
                 {isCompleted && (
-                  <span className="text-[8px] sm:text-[9px] font-black text-white uppercase tracking-[0.2em] bg-fc-dark px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg shadow-md">RESULT FINAL</span>
+                  <span className={cn(
+                    "font-black text-white uppercase bg-fc-dark rounded-lg shadow-md",
+                    isSideBySide ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 sm:px-2.5 py-1" : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
+                  )}>
+                    {isSideBySide ? 'FINAL' : 'RESULT FINAL'}
+                  </span>
                 )}
                 {match.status === 'reported' && (
-                  <span className="text-[8px] sm:text-[9px] font-black text-amber-600 uppercase tracking-[0.2em] bg-amber-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-amber-200">PENDING VERIFICATION</span>
+                  <span className={cn(
+                    "font-black text-amber-600 uppercase bg-amber-50 rounded-lg border border-amber-200",
+                    isSideBySide ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 py-1" : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
+                  )}>
+                    {isSideBySide ? 'PENDING' : 'PENDING VERIFICATION'}
+                  </span>
                 )}
                 {match.status === 'disputed' && (
-                  <span className="text-[8px] sm:text-[9px] font-black text-red-500 uppercase tracking-[0.2em] bg-red-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg border border-red-200 ">DISPUTED</span>
+                  <span className={cn(
+                    "font-black text-red-500 uppercase bg-red-50 rounded-lg border border-red-200",
+                    isSideBySide ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 py-1" : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
+                  )}>
+                    DISPUTED
+                  </span>
                 )}
               </div>
           </div>
 
-          {/* 2-Match Aggregate Scoreboard Banner in Knockout Ties */}
-          {koTieInfo?.isTwoLegged && (
+          {/* 2-Match Aggregate Scoreboard Banner (shown inside standalone card when not already in pair container) */}
+          {!isSideBySide && koTieInfo?.isTwoLegged && (
             <div className="px-3.5 py-2.5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-center justify-between gap-2 shadow-sm">
               <div className="flex items-center gap-2 min-w-0">
                 <Trophy size={13} className="text-amber-400 shrink-0" />
@@ -3659,31 +3927,50 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
           )}
 
-          <div className="flex items-center justify-between px-0 relative z-10 gap-1.5 sm:gap-2">
+          {/* Players & Scoreline */}
+          <div className={cn(
+            "flex items-center justify-between px-0 relative z-10",
+            isSideBySide ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-2"
+          )}>
             {/* Home Player */}
             <div className={cn(
-              "flex flex-col items-center gap-2.5 sm:gap-4 flex-1 transition-all",
+              "flex flex-col items-center flex-1 min-w-0 transition-all",
+              isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
               isCompleted && awayWin ? "opacity-60 scale-95" : ""
             )}>
-              <div className="flex flex-col items-center gap-1 min-h-[26px] sm:min-h-[32px]">
-                <span className={cn("text-[8.5px] sm:text-[10px] font-black uppercase tracking-[0.2em]", homeWin ? "text-amber-500 font-black" : "text-slate-400")}>HOME</span>
+              <div className={cn(
+                "flex flex-col items-center gap-0.5",
+                isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
+              )}>
+                <span className={cn(
+                  "font-black uppercase",
+                  isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
+                  homeWin ? "text-amber-500 font-black" : "text-slate-400"
+                )}>
+                  HOME
+                </span>
                 {isCompleted && homeWin && (
-                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
-                    <Trophy size={9} fill="currentColor" />
-                    <span className="text-[6.5px] sm:text-[7.5px] uppercase tracking-wider">Winner</span>
+                  <div className="flex items-center gap-0.5 px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
+                    <Trophy size={isSideBySide ? 7 : 9} fill="currentColor" />
+                    <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5.5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
+                      Win
+                    </span>
                   </div>
                 )}
               </div>
               <div className={cn(
-                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
-                isCompleted && homeWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
+                "bg-slate-900 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                isSideBySide
+                  ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
+                  : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
+                isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
               )}>
-                 <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
-                 <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
+                 <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 sm:w-7 sm:h-7" />
               </div>
-              <div className="text-center">
+              <div className="text-center w-full px-0.5">
                 <h5 className={cn(
-                  "text-xs sm:text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[85px] sm:max-w-[130px]",
+                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                  isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
                   homeWin && isCompleted ? "text-amber-600 font-black" : homeWin ? "text-fc-dark" : "text-slate-500"
                 )}>
                   {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
@@ -3692,21 +3979,26 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
 
             {/* Score Box */}
-            <div className="flex flex-col items-center gap-2 sm:gap-4 px-1 sm:px-2">
+            <div className={cn(
+              "flex flex-col items-center shrink-0",
+              isSideBySide ? "gap-1 sm:gap-2 px-0.5" : "gap-2 sm:gap-4 px-1 sm:px-2"
+            )}>
                {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
-                 <div className="flex items-center gap-2 sm:gap-4">
+                 <div className={cn("flex items-center", isSideBySide ? "gap-1 sm:gap-2" : "gap-2 sm:gap-4")}>
                      <span 
                        className={cn(
-                         "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
+                         "font-black italic tracking-tighter",
+                         isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
                          homeWin && isCompleted ? "text-amber-500 drop-shadow-xs" : homeWin ? "text-fc-dark" : "text-slate-300"
                        )}
                      >
                        {match.homeScore || 0}
                      </span>
-                     <div className="w-2.5 sm:w-4 h-0.5 sm:h-1 bg-slate-200 rounded-full" />
+                     <div className={cn("bg-slate-200 rounded-full", isSideBySide ? "w-1.5 sm:w-2.5 h-0.5" : "w-2.5 sm:w-4 h-0.5 sm:h-1")} />
                      <span 
                        className={cn(
-                         "text-3xl xs:text-4xl sm:text-5xl font-black italic tracking-tighter",
+                         "font-black italic tracking-tighter",
+                         isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
                          awayWin && isCompleted ? "text-amber-500 drop-shadow-xs" : awayWin ? "text-fc-dark" : "text-slate-300"
                        )}
                      >
@@ -3714,43 +4006,69 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                      </span>
                  </div>
                ) : (
-                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-fc-dark border-2 border-white flex items-center justify-center shadow-md">
-                   <span className="text-sm sm:text-lg font-black text-white italic">VS</span>
+                 <div className={cn(
+                   "bg-fc-dark border-2 border-white flex items-center justify-center shadow-md",
+                   isSideBySide ? "w-7 h-7 xs:w-8 xs:h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl" : "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl"
+                 )}>
+                   <span className={cn("font-black text-white italic", isSideBySide ? "text-[10px] sm:text-sm" : "text-sm sm:text-lg")}>VS</span>
                  </div>
                )}
-               <div className="bg-slate-50 px-2.5 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl border border-slate-100">
-                  {match.status === 'scheduled' && match.scheduledTime ? (
+               <div className={cn(
+                 "bg-slate-50 rounded-lg border border-slate-100",
+                 isSideBySide ? "px-1.5 py-0.5" : "px-2.5 sm:px-4 py-1 sm:py-2 sm:rounded-xl"
+               )}>
+                  {match.status === 'scheduled' && match.scheduledTime && !isSideBySide ? (
                     <CountdownTimer targetTime={match.scheduledTime} />
                   ) : (
-                    <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest italic">{match.status === 'reported' ? 'VERIFYING' : 'ARCHIVED'}</span>
+                    <span className={cn(
+                      "font-black text-slate-400 uppercase tracking-widest italic block",
+                      isSideBySide ? "text-[6px] sm:text-[7px]" : "text-[7px] sm:text-[8px]"
+                    )}>
+                      {match.status === 'scheduled' ? 'LIVE' : match.status === 'reported' ? 'VERIFYING' : 'ARCHIVED'}
+                    </span>
                   )}
                </div>
             </div>
 
             {/* Away Player */}
             <div className={cn(
-              "flex flex-col items-center gap-2.5 sm:gap-4 flex-1 transition-all",
+              "flex flex-col items-center flex-1 min-w-0 transition-all",
+              isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
               isCompleted && homeWin ? "opacity-60 scale-95" : ""
             )}>
-              <div className="flex flex-col items-center gap-1 min-h-[26px] sm:min-h-[32px]">
-                <span className={cn("text-[8.5px] sm:text-[10px] font-black uppercase tracking-[0.2em]", awayWin ? "text-amber-500 font-black" : "text-slate-400")}>AWAY</span>
+              <div className={cn(
+                "flex flex-col items-center gap-0.5",
+                isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
+              )}>
+                <span className={cn(
+                  "font-black uppercase",
+                  isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
+                  awayWin ? "text-amber-500 font-black" : "text-slate-400"
+                )}>
+                  AWAY
+                </span>
                 {isCompleted && awayWin && (
-                  <div className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
-                    <Trophy size={9} fill="currentColor" />
-                    <span className="text-[6.5px] sm:text-[7.5px] uppercase tracking-wider">Winner</span>
+                  <div className="flex items-center gap-0.5 px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
+                    <Trophy size={isSideBySide ? 7 : 9} fill="currentColor" />
+                    <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5.5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
+                      Win
+                    </span>
                   </div>
                 )}
               </div>
               <div className={cn(
-                "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] bg-slate-900 border-2 sm:border-4 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-xl relative",
-                isCompleted && awayWin ? "border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
+                "bg-slate-900 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                isSideBySide
+                  ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
+                  : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
+                isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
               )}>
-                 <UserIcon size={24} className="text-slate-700 sm:w-8 sm:h-8" />
-                 <div className="absolute inset-0 border border-white/10 rounded-[1.4rem] sm:rounded-[2.3rem] pointer-events-none" />
+                 <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 sm:w-7 sm:h-7" />
               </div>
-              <div className="text-center">
+              <div className="text-center w-full px-0.5">
                 <h5 className={cn(
-                  "text-xs sm:text-sm font-black uppercase italic tracking-tight transition-colors truncate max-w-[85px] sm:max-w-[130px]",
+                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                  isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
                   awayWin && isCompleted ? "text-amber-600 font-black" : awayWin ? "text-fc-dark" : "text-slate-500"
                 )}>
                   {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
@@ -3760,7 +4078,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           </div>
 
           {/* Action Buttons & Two-Step Verification */}
-          <div className="flex flex-wrap gap-3 pt-4 relative z-10 border-t border-slate-50">
+          <div className={cn(
+            "flex flex-wrap relative z-10 border-t border-slate-50",
+            isSideBySide ? "gap-1.5 pt-2.5" : "gap-3 pt-4"
+          )}>
             {/* Opponent Messenger Quick Contact */}
             {isParticipant && !isAdminUser && (
               <button 
@@ -3773,10 +4094,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     alert('This opponent hasn\'t linked their Messenger profile yet.');
                   }
                 }}
-                className="w-12 h-12 rounded-xl nm-flat bg-white flex items-center justify-center text-sky-500 border border-slate-100 hover:bg-sky-50 transition-colors shadow-sm shrink-0"
+                className={cn(
+                  "nm-flat bg-white flex items-center justify-center text-sky-500 border border-slate-100 hover:bg-sky-50 transition-colors shadow-sm shrink-0",
+                  isSideBySide ? "w-9 h-9 rounded-lg" : "w-12 h-12 rounded-xl"
+                )}
                 title="Contact Opponent"
               >
-                <MessageCircle size={20} fill="currentColor" className="opacity-80" />
+                <MessageCircle size={isSideBySide ? 15 : 20} fill="currentColor" className="opacity-80" />
               </button>
             )}
 
@@ -3787,18 +4111,25 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   <button 
                     onClick={() => handleUploadResult(match)}
                     className={cn(
-                      "flex-1 min-w-[140px] h-12 rounded-xl text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform",
+                      "flex-1 rounded-xl text-white font-black uppercase flex items-center justify-center shadow-lg active:scale-95 transition-transform",
+                      isSideBySide
+                        ? "min-w-0 h-9 text-[7.5px] sm:text-[8.5px] tracking-wider gap-1 px-2"
+                        : "min-w-[140px] h-12 text-[9px] tracking-widest gap-2",
                       isAdminUser && !isHome ? "bg-fc-dark shadow-fc-dark/20" : "bg-fc-green shadow-fc-green/20"
                     )}
                   >
-                    <Upload size={14} /> {isHome ? 'Upload Match Result' : 'Admin: Upload Result'}
+                    <Upload size={isSideBySide ? 11 : 14} />
+                    <span className="truncate">{isHome ? 'Upload Result' : (isSideBySide ? 'Upload Score' : 'Admin: Upload Result')}</span>
                   </button>
                 )}
 
                 {isAway && !isAdminUser && currentUploadType === 'players' && (
-                  <div className="flex-1 min-w-[160px] h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 px-4 text-center">
-                    <Clock size={14} className="text-amber-600 shrink-0 animate-pulse" />
-                    <span>Waiting for opponent's update</span>
+                  <div className={cn(
+                    "flex-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-black uppercase flex items-center justify-center text-center",
+                    isSideBySide ? "min-w-0 h-9 text-[7px] sm:text-[8px] tracking-wider gap-1 px-1.5" : "min-w-[160px] h-12 text-[9px] tracking-widest gap-2 px-4"
+                  )}>
+                    <Clock size={isSideBySide ? 11 : 14} className="text-amber-600 shrink-0 animate-pulse" />
+                    <span className="truncate">{isSideBySide ? 'Waiting Opponent' : 'Waiting for opponent\'s update'}</span>
                   </div>
                 )}
               </>
@@ -3808,9 +4139,12 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             {match.status === 'reported' && !isAdminUser && (
               <>
                 {isHome && (
-                  <div className="flex-1 min-w-[160px] h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 px-4 text-center">
-                    <Clock size={14} className="text-amber-600 shrink-0 animate-pulse" />
-                    <span>Pending Opponent Confirmation</span>
+                  <div className={cn(
+                    "flex-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-black uppercase flex items-center justify-center text-center",
+                    isSideBySide ? "min-w-0 h-9 text-[7px] tracking-wider gap-1 px-1.5" : "min-w-[160px] h-12 text-[9px] tracking-widest gap-2 px-4"
+                  )}>
+                    <Clock size={isSideBySide ? 11 : 14} className="text-amber-600 shrink-0 animate-pulse" />
+                    <span className="truncate">{isSideBySide ? 'Pending Confirm' : 'Pending Opponent Confirmation'}</span>
                   </div>
                 )}
 
@@ -3818,15 +4152,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   <>
                     <button 
                       onClick={() => handleConfirmResult(match)}
-                      className="flex-1 min-w-[120px] h-12 rounded-xl bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+                      className={cn(
+                        "flex-1 rounded-xl bg-emerald-600 text-white font-black uppercase flex items-center justify-center shadow-xl active:scale-95 transition-transform",
+                        isSideBySide ? "min-w-0 h-9 text-[7px] tracking-wider gap-1 px-1.5" : "min-w-[120px] h-12 text-[9px] tracking-widest gap-2"
+                      )}
                     >
-                      <CheckCircle size={14} /> Confirm Result
+                      <CheckCircle size={isSideBySide ? 11 : 14} /> <span>{isSideBySide ? 'Confirm' : 'Confirm Result'}</span>
                     </button>
                     <button 
                       onClick={() => handleDisputeResult(match)}
-                      className="flex-1 min-w-[110px] h-12 rounded-xl bg-rose-600 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+                      className={cn(
+                        "flex-1 rounded-xl bg-rose-600 text-white font-black uppercase flex items-center justify-center shadow-xl active:scale-95 transition-transform",
+                        isSideBySide ? "min-w-0 h-9 text-[7px] tracking-wider gap-1 px-1.5" : "min-w-[110px] h-12 text-[9px] tracking-widest gap-2"
+                      )}
                     >
-                      <AlertCircle size={14} /> Report Result
+                      <AlertCircle size={isSideBySide ? 11 : 14} /> <span>{isSideBySide ? 'Report' : 'Report Result'}</span>
                     </button>
                   </>
                 )}
@@ -3835,39 +4175,45 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
             {/* Step 2b: Disputed Status Banner for Players */}
             {match.status === 'disputed' && isParticipant && !isAdminUser && (
-              <div className="flex-1 min-w-[160px] h-12 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 px-4 text-center">
-                <AlertCircle size={14} className="text-rose-600 shrink-0" />
-                <span>Reported to Admin & Publisher for Review</span>
+              <div className={cn(
+                "flex-1 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-black uppercase flex items-center justify-center text-center",
+                isSideBySide ? "min-w-0 h-9 text-[7px] tracking-wider gap-1 px-1.5" : "min-w-[160px] h-12 text-[9px] tracking-widest gap-2 px-4"
+              )}>
+                <AlertCircle size={isSideBySide ? 11 : 14} className="text-rose-600 shrink-0" />
+                <span className="truncate">{isSideBySide ? 'Under Review' : 'Reported to Admin & Publisher for Review'}</span>
               </div>
             )}
 
             {/* Step 3: Admin & Publisher Resolution Portal (Confirm Result, Edit Result, Reset Match) */}
             {isAdminUser && (match.status === 'reported' || match.status === 'disputed') && (
-              <div className="w-full flex flex-col gap-2.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest text-center">
-                  {match.status === 'disputed' ? 'Reported Match · Admin & Publisher Action' : 'Pending Match · Admin & Publisher Action'}
+              <div className={cn(
+                "w-full flex flex-col rounded-2xl bg-slate-50 border border-slate-200",
+                isSideBySide ? "gap-1.5 p-2" : "gap-2.5 p-3.5"
+              )}>
+                <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest text-center truncate">
+                  {match.status === 'disputed' ? 'Reported Match' : 'Pending Match'}
                 </span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={cn("grid gap-1.5", isSideBySide ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-3 gap-2")}>
                   <button 
                     type="button"
                     onClick={() => handleAdminResolve(match, 'approve')}
-                    className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
+                    className="h-8 sm:h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
                   >
-                    <CheckCircle size={12} /> Confirm Result
+                    <CheckCircle size={11} /> Confirm
                   </button>
                   <button 
                     type="button"
                     onClick={() => handleUploadResult(match)}
-                    className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
+                    className="h-8 sm:h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
                   >
-                    <Edit3 size={12} /> Edit Result
+                    <Edit3 size={11} /> Edit
                   </button>
                   <button 
                     type="button"
                     onClick={() => handleAdminResolve(match, 'reset')}
-                    className="h-10 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
+                    className="h-8 sm:h-10 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all"
                   >
-                    <RotateCcw size={12} /> Reset Match
+                    <RotateCcw size={11} /> Reset
                   </button>
                 </div>
               </div>
@@ -3878,12 +4224,120 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     );
   };
 
+  // Group fixtures by canonical player pair so 2-match Home & Away pairs are rendered side-by-side
+  const renderPairedFixturesList = (fixtureList: Match[]) => {
+    const pairMap = new Map<string, Match[]>();
+
+    // Sort fixtures deterministically before grouping so pair order and leg order are stable
+    const sortedFixtures = [...fixtureList].sort((a, b) => {
+      const getStageRank = (m: Match) => {
+        if (m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || m.matchId === 'FINAL_M2') return 2;
+        return 1;
+      };
+      const rankDiff = getStageRank(a) - getStageRank(b);
+      if (rankDiff !== 0) return rankDiff;
+
+      const parseOrder = (id?: string) => {
+        if (!id) return 999;
+        const mMatch = id.match(/_M(\d+)/);
+        const base = mMatch ? parseInt(mMatch[1], 10) * 10 : 500;
+        const leg = id.endsWith('_L2') ? 2 : 1;
+        return base + leg;
+      };
+      return parseOrder(a.matchId) - parseOrder(b.matchId);
+    });
+
+    sortedFixtures.forEach(m => {
+      const subStage = (m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || m.matchId === 'FINAL_M2')
+        ? '3RD_PLACE'
+        : m.stage;
+      const pairKey = (m.homePlayerId && m.awayPlayerId)
+        ? `${subStage}::${[m.homePlayerId, m.awayPlayerId].sort().join('__')}`
+        : `single::${m.id}`;
+      const existing = pairMap.get(pairKey) || [];
+      existing.push(m);
+      pairMap.set(pairKey, existing);
+    });
+
+    return Array.from(pairMap.entries()).map(([pairKey, pairMatches], pairIdx) => {
+      if (pairMatches.length >= 2) {
+        const leg1 = pairMatches[0];
+        const p1Name = profiles[leg1.homePlayerId]?.inGameName || leg1.homePlayerName || 'Player 1';
+        const p2Name = profiles[leg1.awayPlayerId]?.inGameName || leg1.awayPlayerName || 'Player 2';
+        const isKo = leg1.stage !== 'group' || (tournament as any)?.format === 'knockout' || leg1.groupId === 'knockout';
+        const koTieInfo = isKo ? getKnockoutTieInfoForMatch(leg1) : null;
+
+        return (
+          <div
+            key={pairKey}
+            className="p-2.5 xs:p-3 sm:p-4 rounded-[2rem] sm:rounded-[2.6rem] bg-slate-100/90 border-2 border-indigo-100/80 space-y-2.5 sm:space-y-3.5 shadow-sm"
+          >
+            {/* Pair Header Banner */}
+            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-slate-900 text-white shadow-xs flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="px-2 py-0.5 rounded-md bg-indigo-500 text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest shrink-0">
+                  PAIR #{pairIdx + 1} · 2 MATCHES
+                </span>
+                <span className="text-[8.5px] sm:text-[10px] font-black uppercase italic text-white truncate">
+                  {p1Name} <span className="text-indigo-400 not-italic px-0.5">⇄</span> {p2Name}
+                </span>
+              </div>
+
+              {koTieInfo?.isTwoLegged ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[8px] sm:text-[9px] font-black font-mono text-amber-400">
+                    AGG: {koTieInfo.homePlayerAgg} - {koTieInfo.awayPlayerAgg}
+                  </span>
+                  {koTieInfo.isTieCompleted && koTieInfo.winnerName && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[7px] sm:text-[8px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <Trophy size={8} fill="currentColor" /> {koTieInfo.winnerName}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest text-emerald-400 shrink-0">
+                  HOME & AWAY
+                </span>
+              )}
+            </div>
+
+            {/* Side-by-Side (পাশাপাশি) Match Cards Grid */}
+            <div className="grid grid-cols-2 gap-2 xs:gap-2.5 sm:gap-4 items-stretch">
+              {pairMatches.map((m, idx) => renderMatchCard(m, true, idx + 1, pairMatches.length))}
+            </div>
+          </div>
+        );
+      }
+
+      return renderMatchCard(pairMatches[0], false);
+    });
+  };
+
   const renderBracketSide = (side: 'left' | 'right', count: number) => {
     const stageMatches = matches.filter(m => m.stage === activeKnockoutStage);
     const stageTies = getKnockoutStageTies(activeKnockoutStage, matches);
+    const isFinalStage = activeKnockoutStage === 'FINAL';
     
     return (
-      <div className="flex flex-col gap-2 xs:gap-2.5 sm:gap-4 justify-center w-[126px] xs:w-[145px] sm:w-[195px] md:w-[210px] shrink-0">
+      <div className={cn(
+        "flex flex-col gap-3 xs:gap-3.5 sm:gap-4 justify-center w-full",
+        isFinalStage ? "max-w-md mx-auto" : ""
+      )}>
+        {!isFinalStage && (
+          <div className={cn(
+            "flex items-center gap-1.5 px-1",
+            side === 'left' ? "justify-start" : "justify-end"
+          )}>
+            <span className={cn(
+              "w-2 h-2 rounded-full",
+              side === 'left' ? "bg-indigo-500" : "bg-emerald-500"
+            )} />
+            <span className="text-[8px] xs:text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 italic">
+              {side === 'left' ? 'Left Bracket' : 'Right Bracket'}
+            </span>
+          </div>
+        )}
+
         {[...Array(count)].map((_, matchIdx) => {
           const actualIdx = side === 'left' ? matchIdx : (matchIdx + count);
           const matchNumber = actualIdx + 1;
@@ -3902,6 +4356,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
           const isTwoLegged = Boolean(tieInfo && tieInfo.totalLegs >= 2);
           const isCompleted = isTwoLegged ? Boolean(tieInfo?.isTieCompleted) : (match?.status === 'completed');
+          const hasBothPlayers = Boolean(match?.homePlayerId && match?.awayPlayerId);
 
           const homeDisplayScore = isTwoLegged && tieInfo
             ? (tieInfo.completedLegs > 0
@@ -3924,272 +4379,240 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             : (isCompleted && ((match?.awayScore ?? 0) > (match?.homeScore ?? 0) || match?.penaltyWinnerId === match?.awayPlayerId));
 
           return (
-            <div key={matchIdx} className="space-y-0.5 group/fixture relative">
-              {isTwoLegged && (
-                <div className={cn("flex items-center mb-0.5", side === 'left' ? "justify-start pl-2" : "justify-end pr-2")}>
-                  <span className="text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-widest px-1.5 py-0.2 rounded-full bg-indigo-600 text-white shadow-xs">
-                    2 LEGS · AGG ({tieInfo?.completedLegs}/{tieInfo?.totalLegs})
-                  </span>
+            <div
+              key={matchIdx}
+              className={cn(
+                "relative rounded-2xl bg-white/95 border-2 p-2 xs:p-2.5 sm:p-3.5 shadow-sm transition-all group/fixture",
+                isCompleted
+                  ? "border-amber-300/90 bg-gradient-to-b from-white to-amber-50/20 shadow-amber-500/5"
+                  : hasBothPlayers
+                    ? "border-indigo-200/90 bg-gradient-to-b from-white to-indigo-50/15 shadow-indigo-500/5"
+                    : "border-slate-200/90 hover:border-indigo-200"
+              )}
+            >
+              {/* Bracket Connector Arm pointing to center line */}
+              {!isFinalStage && (
+                <div
+                  className={cn(
+                    "hidden xs:flex items-center absolute top-1/2 -translate-y-1/2 pointer-events-none z-10",
+                    side === 'left' ? "-right-2.5 sm:-right-3.5" : "-left-2.5 sm:-left-3.5"
+                  )}
+                >
+                  <div className={cn(
+                    "w-2.5 sm:w-3.5 h-0.5",
+                    isCompleted ? "bg-amber-400" : hasBothPlayers ? "bg-indigo-400" : "bg-slate-300"
+                  )} />
                 </div>
               )}
-              {/* Home Player Box */}
-              <div 
-                onClick={() => handleSlotClick(matchSlotId, 'home', matchNumber, match)}
-                title={isAdminUser ? "Click to assign or change Home Player" : undefined}
-                className={cn(
-                  "w-full h-7 xs:h-8 sm:h-9 md:h-10 flex items-center justify-between border transition-all shadow-xs select-none",
-                  isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
-                  match?.homePlayerId 
-                    ? (isHomeWinner
-                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-md ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
-                        : isAwayWinner
-                          ? "bg-slate-950/75 border-slate-800/80 text-slate-500 opacity-55"
-                          : "bg-slate-900 border-slate-800 text-white")
-                    : (isAdminUser 
-                        ? "bg-emerald-50/70 border-dashed border-emerald-400 hover:border-emerald-600 hover:bg-emerald-100/70" 
-                        : "bg-slate-50 border-slate-200"),
-                  side === 'left' ? "rounded-l-full rounded-r-md sm:rounded-r-xl pr-0.5 sm:pr-1 pl-1 xs:pl-1.5 sm:pl-3" : "rounded-r-full rounded-l-md sm:rounded-l-xl pl-0.5 sm:pl-1 pr-1 xs:pr-1.5 sm:pr-3"
-                )}
-              >
-                {side === 'left' ? (
-                  <>
-                    <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0">
-                      <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-black uppercase tracking-wider px-0.5 xs:px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-                        HOME
-                      </span>
-                      {match?.homePlayerId ? (
-                        <>
-                          <div className={cn(
-                            "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
-                            isHomeWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
-                          )}>
-                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-0.5 xs:gap-1 min-w-0">
-                              <span className={cn(
-                                "text-[7.5px] xs:text-[8.5px] sm:text-[10px] font-black uppercase tracking-tight italic truncate",
-                                isHomeWinner ? "text-amber-300 drop-shadow-xs font-black" : isAwayWinner ? "text-slate-400" : "text-white"
-                              )}>
-                                {homePlayerName}
-                              </span>
-                              {isHomeWinner && (
-                                <span className="px-1 py-0.2 rounded bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 text-[5px] xs:text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-xs">
-                                  <Trophy size={6} fill="currentColor" /> WIN
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <span className={cn(
-                          "text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
-                          isAdminUser ? "text-emerald-700 font-bold" : "text-slate-400"
-                        )}>
-                          {isAdminUser ? "+ Home" : "TBD"}
-                        </span>
-                      )}
-                    </div>
-                    <div className={cn(
-                      "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
-                      isHomeWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
-                        : isAwayWinner 
-                          ? "bg-slate-900/60 text-slate-500 font-bold"
-                          : match?.homePlayerId 
-                            ? "bg-slate-800 text-amber-400" 
-                            : "bg-slate-100 text-slate-400"
-                    )}>
-                      {isCompleted || homeDisplayScore !== undefined 
-                        ? (homeDisplayScore ?? '-') 
-                        : (isAdminUser && !match?.homePlayerId ? <Plus size={10} className="text-emerald-600" /> : '-')}
-                    </div>
-                  </>
+
+              {/* Bracket Card Top Header: Match Number + Leg/Status Info */}
+              <div className="flex items-center justify-between gap-1 mb-2 pb-1.5 border-b border-slate-100">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={cn(
+                    "px-1.5 xs:px-2 py-0.5 rounded-md text-[7.5px] xs:text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider shrink-0",
+                    isCompleted
+                      ? "bg-amber-100 text-amber-800 border border-amber-200"
+                      : hasBothPlayers
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-600"
+                  )}>
+                    {isFinalStage ? 'GRAND FINAL' : `MATCH #${matchNumber}`}
+                  </span>
+                </div>
+
+                {isTwoLegged ? (
+                  <span className="text-[6.5px] xs:text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                    2 LEGS · AGG ({tieInfo?.completedLegs}/{tieInfo?.totalLegs})
+                  </span>
+                ) : isCompleted ? (
+                  <span className="text-[6.5px] xs:text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    COMPLETED
+                  </span>
+                ) : hasBothPlayers ? (
+                  <span className="text-[6.5px] xs:text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0">
+                    READY
+                  </span>
                 ) : (
-                  <>
-                    <div className={cn(
-                      "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
-                      isHomeWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
-                        : isAwayWinner 
-                          ? "bg-slate-900/60 text-slate-500 font-bold"
-                          : match?.homePlayerId 
-                            ? "bg-slate-800 text-amber-400" 
-                            : "bg-slate-100 text-slate-400"
-                    )}>
-                      {isCompleted || homeDisplayScore !== undefined 
-                        ? (homeDisplayScore ?? '-') 
-                        : (isAdminUser && !match?.homePlayerId ? <Plus size={10} className="text-emerald-600" /> : '-')}
-                    </div>
-                    <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0 justify-end">
-                      {match?.homePlayerId ? (
-                        <>
-                          <div className="flex flex-col min-w-0 text-right">
-                            <div className="flex items-center gap-0.5 xs:gap-1 justify-end min-w-0">
-                              {isHomeWinner && (
-                                <span className="px-1 py-0.2 rounded bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 text-[5px] xs:text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-xs">
-                                  <Trophy size={6} fill="currentColor" /> WIN
-                                </span>
-                              )}
-                              <span className={cn(
-                                "text-[7.5px] xs:text-[8.5px] sm:text-[10px] font-black uppercase tracking-tight italic truncate",
-                                isHomeWinner ? "text-amber-300 drop-shadow-xs font-black" : isAwayWinner ? "text-slate-400" : "text-white"
-                              )}>
-                                {homePlayerName}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={cn(
-                            "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
-                            isHomeWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
-                          )}>
-                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{homePlayerName.charAt(0) || 'H'}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <span className={cn(
-                          "text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
-                          isAdminUser ? "text-emerald-700 font-bold" : "text-slate-400"
-                        )}>
-                          {isAdminUser ? "+ Home" : "TBD"}
-                        </span>
-                      )}
-                      <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-black uppercase tracking-wider px-0.5 xs:px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-                        HOME
-                      </span>
-                    </div>
-                  </>
+                  <span className="text-[6.5px] xs:text-[7px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
+                    {isAdminUser ? 'TAP TO SELECT' : 'PENDING'}
+                  </span>
                 )}
               </div>
 
-              {/* Away Player Box */}
-              <div 
-                onClick={() => handleSlotClick(matchSlotId, 'away', matchNumber, match)}
-                title={isAdminUser ? "Click to assign or change Away Player" : undefined}
-                className={cn(
-                  "w-full h-7 xs:h-8 sm:h-9 md:h-10 flex items-center justify-between border transition-all shadow-xs select-none",
-                  isAdminUser ? "cursor-pointer active:scale-[0.98] transition-transform" : "",
-                  match?.awayPlayerId 
-                    ? (isAwayWinner
-                        ? "bg-gradient-to-r from-slate-900 via-amber-950/70 to-slate-900 border-amber-400 shadow-md ring-1 sm:ring-1.5 ring-amber-400 text-white font-black"
-                        : isHomeWinner
-                          ? "bg-slate-950/75 border-slate-800/80 text-slate-500 opacity-55"
-                          : "bg-slate-900 border-slate-800 text-white")
-                    : (isAdminUser 
-                        ? "bg-amber-50/70 border-dashed border-amber-400 hover:border-amber-600 hover:bg-amber-100/70" 
-                        : "bg-slate-50 border-slate-200"),
-                  side === 'left' ? "rounded-l-full rounded-r-md sm:rounded-r-xl pr-0.5 sm:pr-1 pl-1 xs:pl-1.5 sm:pl-3" : "rounded-r-full rounded-l-md sm:rounded-l-xl pl-0.5 sm:pl-1 pr-1 xs:pr-1.5 sm:pr-3"
-                )}
-              >
-                {side === 'left' ? (
-                  <>
-                    <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0">
-                      <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-black uppercase tracking-wider px-0.5 xs:px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                        AWAY
-                      </span>
-                      {match?.awayPlayerId ? (
-                        <>
-                          <div className={cn(
-                            "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
-                            isAwayWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
-                          )}>
-                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-0.5 xs:gap-1 min-w-0">
-                              <span className={cn(
-                                "text-[7.5px] xs:text-[8.5px] sm:text-[10px] font-black uppercase tracking-tight italic truncate",
-                                isAwayWinner ? "text-amber-300 drop-shadow-xs font-black" : isHomeWinner ? "text-slate-400" : "text-white"
-                              )}>
-                                {awayPlayerName}
-                              </span>
-                              {isAwayWinner && (
-                                <span className="px-1 py-0.2 rounded bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 text-[5px] xs:text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-xs">
-                                  <Trophy size={6} fill="currentColor" /> WIN
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <span className={cn(
-                          "text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
-                          isAdminUser ? "text-amber-700 font-bold" : "text-slate-400"
-                        )}>
-                          {isAdminUser ? "+ Away" : "TBD"}
-                        </span>
-                      )}
-                    </div>
-                    <div className={cn(
-                      "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
-                      isAwayWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
-                        : isHomeWinner 
-                          ? "bg-slate-900/60 text-slate-500 font-bold"
-                          : match?.awayPlayerId 
-                            ? "bg-slate-800 text-amber-400" 
-                            : "bg-slate-100 text-slate-400"
+              {/* Player Slots Container with Left Bracket Pipe */}
+              <div className="relative pl-2 xs:pl-2.5 space-y-1.5">
+                {/* Vertical Bracket Connector Bar on the left of the two slots */}
+                <div className={cn(
+                  "absolute left-0 top-3 bottom-3 w-1 rounded-r-full border-y-2 border-l-2",
+                  isCompleted
+                    ? "border-amber-400 bg-amber-400/20"
+                    : hasBothPlayers
+                      ? "border-indigo-500 bg-indigo-500/20"
+                      : "border-slate-300 bg-slate-200/30"
+                )} />
+
+                {/* HOME PLAYER SLOT */}
+                <div
+                  onClick={() => handleSlotClick(matchSlotId, 'home', matchNumber, match)}
+                  title={isAdminUser ? "Click to assign or change Home Player" : undefined}
+                  className={cn(
+                    "w-full h-9 xs:h-10 sm:h-11 rounded-xl px-2 xs:px-2.5 sm:px-3 flex items-center justify-between gap-1.5 border transition-all select-none",
+                    isAdminUser ? "cursor-pointer active:scale-[0.98]" : "",
+                    match?.homePlayerId
+                      ? (isHomeWinner
+                          ? "bg-gradient-to-r from-slate-900 via-amber-950/85 to-slate-900 border-amber-400 shadow-sm ring-1 ring-amber-400 text-white"
+                          : isAwayWinner
+                            ? "bg-slate-900/75 border-slate-800 text-slate-400 opacity-65"
+                            : "bg-slate-900 border-slate-800 text-white hover:border-indigo-400")
+                      : (isAdminUser
+                          ? "bg-emerald-50/75 hover:bg-emerald-100/80 border-dashed border-emerald-400 text-emerald-800"
+                          : "bg-slate-50 border-slate-200 text-slate-400")
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 xs:gap-2 min-w-0 flex-1">
+                    <span className={cn(
+                      "text-[6.5px] xs:text-[7px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0",
+                      match?.homePlayerId
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : "bg-emerald-500 text-white shadow-2xs"
                     )}>
-                      {isCompleted || awayDisplayScore !== undefined 
-                        ? (awayDisplayScore ?? '-') 
-                        : (isAdminUser && !match?.awayPlayerId ? <Plus size={10} className="text-amber-600" /> : '-')}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className={cn(
-                      "w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 rounded-md sm:rounded-lg flex items-center justify-center text-[9px] xs:text-[10px] sm:text-xs font-black italic shrink-0 transition-colors",
-                      isAwayWinner 
-                        ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 font-black shadow-md ring-1 ring-amber-300"
-                        : isHomeWinner 
-                          ? "bg-slate-900/60 text-slate-500 font-bold"
-                          : match?.awayPlayerId 
-                            ? "bg-slate-800 text-amber-400" 
-                            : "bg-slate-100 text-slate-400"
-                    )}>
-                      {isCompleted || awayDisplayScore !== undefined 
-                        ? (awayDisplayScore ?? '-') 
-                        : (isAdminUser && !match?.awayPlayerId ? <Plus size={10} className="text-amber-600" /> : '-')}
-                    </div>
-                    <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 overflow-hidden flex-1 min-w-0 justify-end">
-                      {match?.awayPlayerId ? (
-                        <>
-                          <div className="flex flex-col min-w-0 text-right">
-                            <div className="flex items-center gap-0.5 xs:gap-1 justify-end min-w-0">
-                              {isAwayWinner && (
-                                <span className="px-1 py-0.2 rounded bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 text-[5px] xs:text-[5.5px] sm:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-xs">
-                                  <Trophy size={6} fill="currentColor" /> WIN
-                                </span>
-                              )}
-                              <span className={cn(
-                                "text-[7.5px] xs:text-[8.5px] sm:text-[10px] font-black uppercase tracking-tight italic truncate",
-                                isAwayWinner ? "text-amber-300 drop-shadow-xs font-black" : isHomeWinner ? "text-slate-400" : "text-white"
-                              )}>
-                                {awayPlayerName}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={cn(
-                            "w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden bg-slate-800 border shrink-0 flex items-center justify-center",
-                            isAwayWinner ? "border-amber-400 ring-1 sm:ring-2 ring-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "border-white/20"
-                          )}>
-                            <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] font-black text-white">{awayPlayerName.charAt(0) || 'A'}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <span className={cn(
-                          "text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider italic truncate flex items-center gap-1",
-                          isAdminUser ? "text-amber-700 font-bold" : "text-slate-400"
+                      HOME
+                    </span>
+
+                    {match?.homePlayerId ? (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div className={cn(
+                          "hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border shrink-0 items-center justify-center",
+                          isHomeWinner ? "border-amber-400 text-amber-300" : "border-white/20 text-white"
                         )}>
-                          {isAdminUser ? "+ Away" : "TBD"}
+                          <span className="text-[8px] font-black">{homePlayerName.charAt(0) || 'H'}</span>
+                        </div>
+                        <span className={cn(
+                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate",
+                          isHomeWinner ? "text-amber-300" : isAwayWinner ? "text-slate-400" : "text-white"
+                        )}>
+                          {homePlayerName}
                         </span>
-                      )}
-                      <span className="text-[5.5px] xs:text-[6px] sm:text-[7px] font-black uppercase tracking-wider px-0.5 xs:px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                        AWAY
+                        {isHomeWinner && (
+                          <span className="px-1 py-0.5 rounded bg-amber-400 text-slate-950 text-[6px] xs:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5">
+                            <Trophy size={7} fill="currentColor" /> WIN
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={cn(
+                        "text-[8px] xs:text-[9px] sm:text-[10px] font-black uppercase italic tracking-wider truncate",
+                        isAdminUser ? "text-emerald-800" : "text-slate-400"
+                      )}>
+                        {isAdminUser ? "+ Select Home" : "TBD"}
                       </span>
-                    </div>
-                  </>
-                )}
+                    )}
+                  </div>
+
+                  {/* Score / Action Icon Box */}
+                  <div className={cn(
+                    "w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-[10px] xs:text-xs font-black italic shrink-0 transition-colors",
+                    isHomeWinner
+                      ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 shadow-xs"
+                      : isAwayWinner
+                        ? "bg-slate-800/80 text-slate-500"
+                        : match?.homePlayerId
+                          ? "bg-slate-800 text-amber-400 border border-white/10"
+                          : isAdminUser
+                            ? "bg-white text-emerald-600 border border-emerald-200 shadow-2xs"
+                            : "bg-slate-100 text-slate-400"
+                  )}>
+                    {isCompleted || homeDisplayScore !== undefined
+                      ? (homeDisplayScore ?? '-')
+                      : (isAdminUser && !match?.homePlayerId ? <Plus size={12} strokeWidth={3} /> : '-')}
+                  </div>
+                </div>
+
+                {/* VS DIVIDER */}
+                <div className="flex items-center gap-1.5 px-1">
+                  <div className="h-px flex-1 bg-slate-100" />
+                  <span className="text-[6.5px] xs:text-[7px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-1.5 py-0.2 rounded border border-slate-200/70">
+                    VS
+                  </span>
+                  <div className="h-px flex-1 bg-slate-100" />
+                </div>
+
+                {/* AWAY PLAYER SLOT */}
+                <div
+                  onClick={() => handleSlotClick(matchSlotId, 'away', matchNumber, match)}
+                  title={isAdminUser ? "Click to assign or change Away Player" : undefined}
+                  className={cn(
+                    "w-full h-9 xs:h-10 sm:h-11 rounded-xl px-2 xs:px-2.5 sm:px-3 flex items-center justify-between gap-1.5 border transition-all select-none",
+                    isAdminUser ? "cursor-pointer active:scale-[0.98]" : "",
+                    match?.awayPlayerId
+                      ? (isAwayWinner
+                          ? "bg-gradient-to-r from-slate-900 via-amber-950/85 to-slate-900 border-amber-400 shadow-sm ring-1 ring-amber-400 text-white"
+                          : isHomeWinner
+                            ? "bg-slate-900/75 border-slate-800 text-slate-400 opacity-65"
+                            : "bg-slate-900 border-slate-800 text-white hover:border-indigo-400")
+                      : (isAdminUser
+                          ? "bg-amber-50/75 hover:bg-amber-100/80 border-dashed border-amber-400 text-amber-800"
+                          : "bg-slate-50 border-slate-200 text-slate-400")
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 xs:gap-2 min-w-0 flex-1">
+                    <span className={cn(
+                      "text-[6.5px] xs:text-[7px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0",
+                      match?.awayPlayerId
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-amber-500 text-white shadow-2xs"
+                    )}>
+                      AWAY
+                    </span>
+
+                    {match?.awayPlayerId ? (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div className={cn(
+                          "hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border shrink-0 items-center justify-center",
+                          isAwayWinner ? "border-amber-400 text-amber-300" : "border-white/20 text-white"
+                        )}>
+                          <span className="text-[8px] font-black">{awayPlayerName.charAt(0) || 'A'}</span>
+                        </div>
+                        <span className={cn(
+                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate",
+                          isAwayWinner ? "text-amber-300" : isHomeWinner ? "text-slate-400" : "text-white"
+                        )}>
+                          {awayPlayerName}
+                        </span>
+                        {isAwayWinner && (
+                          <span className="px-1 py-0.5 rounded bg-amber-400 text-slate-950 text-[6px] xs:text-[6.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-0.5">
+                            <Trophy size={7} fill="currentColor" /> WIN
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={cn(
+                        "text-[8px] xs:text-[9px] sm:text-[10px] font-black uppercase italic tracking-wider truncate",
+                        isAdminUser ? "text-amber-800" : "text-slate-400"
+                      )}>
+                        {isAdminUser ? "+ Select Away" : "TBD"}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Score / Action Icon Box */}
+                  <div className={cn(
+                    "w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-[10px] xs:text-xs font-black italic shrink-0 transition-colors",
+                    isAwayWinner
+                      ? "bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-950 shadow-xs"
+                      : isHomeWinner
+                        ? "bg-slate-800/80 text-slate-500"
+                        : match?.awayPlayerId
+                          ? "bg-slate-800 text-amber-400 border border-white/10"
+                          : isAdminUser
+                            ? "bg-white text-amber-600 border border-amber-200 shadow-2xs"
+                            : "bg-slate-100 text-slate-400"
+                  )}>
+                    {isCompleted || awayDisplayScore !== undefined
+                      ? (awayDisplayScore ?? '-')
+                      : (isAdminUser && !match?.awayPlayerId ? <Plus size={12} strokeWidth={3} /> : '-')}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -5334,10 +5757,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="px-2 pt-4">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] italic">GROUP FIXTURES</h4>
               <div className="space-y-4 pt-6">
-                 {matches
-                   .filter(m => m.stage === 'group' && m.groupId === activeGroup)
-                   .filter(m => !matchSearchQuery || (m.matchId && m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase())))
-                   .map(renderMatchCard)}
+                 {renderPairedFixturesList(
+                   matches
+                     .filter(m => m.stage === 'group' && m.groupId === activeGroup)
+                     .filter(m => !matchSearchQuery || (m.matchId && m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase())))
+                 )}
               </div>
             </div>
           </div>
@@ -5388,64 +5812,62 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               <div className="w-12 h-1 bg-indigo-500 rounded-full mt-1 opacity-20" />
             </div>
 
-            <div className="overflow-x-auto no-scrollbar pb-3">
-              <div className={cn(
-                "relative min-w-[320px] xs:min-w-[360px] sm:min-w-[500px] flex items-center min-h-[400px] sm:min-h-[500px] pt-2 sm:pt-6 px-0.5 sm:px-1",
-                activeKnockoutStage === 'FINAL' ? "justify-center gap-6 sm:gap-12" : "justify-between"
-              )}>
-                {/* Left Bracket */}
-                {renderBracketSide('left', 
-                  activeKnockoutStage === 'R32' ? 8 :
-                  activeKnockoutStage === 'R16' ? 4 : 
-                  activeKnockoutStage === 'QTR' ? 2 : 1
-                )}
+            {/* Admin & Publisher Button: Deploy Home & Away 2 Matches for Selected Players in Current Knockout Stage */}
+            {isAdminUser && (
+              <div className="flex flex-col items-center justify-center px-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDeployKnockoutStageTwoMatches}
+                  disabled={actionLoading}
+                  className="w-full max-w-sm py-3.5 px-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 hover:from-indigo-700 hover:to-slate-950 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/25 border border-indigo-400/30 flex items-center justify-center gap-2.5 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <ArrowLeftRight size={15} className="text-amber-400 shrink-0" />
+                  <span>{actionLoading ? 'Deploying Matches...' : 'Deploy Home & Away 2 Matches'}</span>
+                </button>
+                <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 text-center">
+                  Generates 2 matches (Home & Away) between selected bracket players
+                </span>
+              </div>
+            )}
 
-                {/* Center Trophy / Final Placeholder */}
-                <div className="flex-shrink-0 flex flex-col items-center justify-center py-2 sm:py-4 px-1 sm:px-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-indigo-500/20 blur-xl sm:blur-2xl rounded-full " />
-                    <div className="w-20 xs:w-24 sm:w-34 md:w-36 h-36 xs:h-44 sm:h-56 md:h-60 nm-flat rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4 border-white/50 flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 relative z-10 bg-white/70  p-1.5 sm:p-3 shadow-xs">
-                      <div className={cn(
-                        "transition-all duration-1000",
-                        activeKnockoutStage === 'FINAL' || tournament.status === 'finished' ? "scale-110 rotate-[360deg]" : ""
-                      )}>
-                        <Trophy strokeWidth={1.2} className={cn(
-                          "transition-all duration-700 w-7 h-7 xs:w-9 xs:h-9 sm:w-11 sm:h-11",
-                          tournament.status === 'finished' ? "text-amber-500" : "text-slate-300"
-                        )} />
-                      </div>
-                      <div className="text-center px-0.5 sm:px-1 space-y-1 sm:space-y-1.5">
-                        <span className="text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] sm:tracking-[0.25em] text-slate-400 block">
-                          {tournament.status === 'finished' ? 'CHAMPION' : (activeKnockoutStage === 'FINAL' ? 'FINAL BATTLE' : 'GLORY')}
+            <div className="pt-2 pb-3 px-0.5 sm:px-1">
+              {activeKnockoutStage === 'FINAL' ? (
+                <div className="max-w-md mx-auto space-y-4">
+                  {tournament.status === 'finished' && tournament.winnerText && (
+                    <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-400/20 to-amber-500/10 border border-amber-300/80 p-3.5 flex items-center justify-center gap-3 text-center shadow-xs">
+                      <Trophy size={20} className="text-amber-500 shrink-0" />
+                      <div>
+                        <span className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-700 block">
+                          Tournament Champion
                         </span>
-                        <div className="h-px w-6 sm:w-8 bg-slate-200 mx-auto" />
-                        {tournament.status === 'finished' && (
-                          <div className="pt-0.5 sm:pt-1">
-                             <span className="text-[8.5px] xs:text-[10px] sm:text-xs font-black text-indigo-600 uppercase italic tracking-tight block truncate max-w-[70px] xs:max-w-[85px] sm:max-w-[120px]">
-                               {tournament.winnerText || 'ELITE PLAYER'}
-                             </span>
-                             <div className="mt-1 sm:mt-1.5 w-8 h-8 xs:w-10 xs:h-10 sm:w-13 sm:h-13 rounded-lg sm:rounded-xl nm-inset mx-auto overflow-hidden border border-white/50 shadow-xs flex items-center justify-center">
-                                <UserIcon size={16} className="text-slate-300 sm:w-5 sm:h-5" />
-                             </div>
-                          </div>
-                        )}
-                        {activeKnockoutStage === 'FINAL' && tournament.status !== 'finished' && (
-                          <div className="pt-0.5 sm:pt-1 ">
-                             <span className="text-[6.5px] sm:text-[7px] font-black text-indigo-500 uppercase tracking-widest">LIVE SOON</span>
-                          </div>
-                        )}
+                        <span className="text-sm font-black uppercase italic text-slate-900 tracking-tight">
+                          {tournament.winnerText}
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  )}
+                  {renderBracketSide('left', 1)}
                 </div>
+              ) : (
+                <div className="relative grid grid-cols-2 gap-2.5 xs:gap-3.5 sm:gap-6 items-start">
+                  {/* Subtle Center Bracket Tree Line */}
+                  <div className="hidden xs:block absolute left-1/2 top-7 bottom-4 -translate-x-1/2 w-px bg-gradient-to-b from-indigo-200/80 via-slate-300/80 to-emerald-200/80 pointer-events-none" />
 
-                {/* Right Bracket */}
-                {activeKnockoutStage !== 'FINAL' && renderBracketSide('right', 
-                  activeKnockoutStage === 'R32' ? 8 :
-                  activeKnockoutStage === 'R16' ? 4 : 
-                  activeKnockoutStage === 'QTR' ? 2 : 1
-                )}
-              </div>
+                  {/* Left Bracket */}
+                  {renderBracketSide('left', 
+                    activeKnockoutStage === 'R32' ? 8 :
+                    activeKnockoutStage === 'R16' ? 4 : 
+                    activeKnockoutStage === 'QTR' ? 2 : 1
+                  )}
+
+                  {/* Right Bracket */}
+                  {renderBracketSide('right', 
+                    activeKnockoutStage === 'R32' ? 8 :
+                    activeKnockoutStage === 'R16' ? 4 : 
+                    activeKnockoutStage === 'QTR' ? 2 : 1
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Third Place Match Section */}
@@ -5473,18 +5895,20 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">No matches scheduled for this stage</p>
                     </div>
                   ) : (
-                    matches.filter(m => {
-                      if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
-                      if (activeKnockoutStage === 'FINAL') {
-                        const isGrandFinal = m.stage === 'FINAL' && m.matchId !== 'FINAL_M2';
-                        const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
-                        if (!isGrandFinal && !isThirdPlace) return false;
-                      } else if (m.stage !== activeKnockoutStage) {
-                        return false;
-                      }
-                      if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
-                      return true;
-                    }).map(m => renderMatchCard(m))
+                    renderPairedFixturesList(
+                      matches.filter(m => {
+                        if (m.status === 'draft' || !m.homePlayerId || !m.awayPlayerId) return false;
+                        if (activeKnockoutStage === 'FINAL') {
+                          const isGrandFinal = m.stage === 'FINAL' && m.matchId !== 'FINAL_M2';
+                          const isThirdPlace = m.stage === '3RD_PLACE' || m.matchId?.startsWith('3RD_PLACE') || (m.stage === 'FINAL' && m.matchId === 'FINAL_M2');
+                          if (!isGrandFinal && !isThirdPlace) return false;
+                        } else if (m.stage !== activeKnockoutStage) {
+                          return false;
+                        }
+                        if (matchSearchQuery && (!m.matchId || !m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase()))) return false;
+                        return true;
+                      })
+                    )
                   )}
                </div>
             </div>

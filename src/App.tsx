@@ -298,7 +298,7 @@ export default function App() {
     }
     switch (activeTab) {
       case 'arena': return 'DASHBOARD';
-      case 'matches': return 'My Matches';
+      case 'matches': return 'MY MATCH';
 
       case 'tournament': return 'ARENA';
       case 'profile': return 'SETTINGS';

@@ -7,7 +7,7 @@ export const translations = {
     // Navigation & Shell
     nav_dashboard: 'DASHBOARD',
     nav_arena: 'ARENA',
-    nav_field: 'FIELD',
+    nav_field: 'MY MATCH',
     nav_elite: 'ELITE',
     nav_me: 'PROFILE',
     app_title: 'FC Arena VS',

@@ -40,12 +40,12 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 transition-all h-20 w-16 rounded-[2rem] relative',
+                'flex flex-col items-center justify-center gap-1 transition-all h-20 min-w-[4.2rem] px-2 rounded-[2rem] relative',
                 isActive ? 'nm-inset text-indigo-500 bg-[#e6e6e9]' : 'text-slate-400'
               )}
             >
               <Icon size={24} strokeWidth={isActive ? 3 : 2} className={cn(isActive && 'scale-110')} />
-              <span className="text-[8px] font-black tracking-widest uppercase mt-1">
+              <span className="text-[8px] font-black tracking-widest uppercase mt-1 whitespace-nowrap">
                 {tab.label}
               </span>
               {isActive && (
