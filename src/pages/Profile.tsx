@@ -4,7 +4,7 @@ import {
   User, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, 
   Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck, 
   Languages, Bell, BellRing, Settings, ExternalLink, MessageCircle,
-  Camera, ChevronRight, Mail, Hash, MessageSquare, Award
+  Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -12,6 +12,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/src/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
+import { useTheme } from '@/src/lib/theme';
 import { requestPushNotificationToken } from '@/src/lib/fcm';
 import { sendTestPhoneNotification } from '@/src/lib/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,6 +25,7 @@ interface ProfileProps {
 
 export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => {
   const { t } = useI18n();
+  const { theme, isDark, setTheme } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +82,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   };
 
   return (
-    <div className="min-h-screen bg-[#f0f1f5] pb-32 pt-6 px-4">
+    <div className="min-h-screen bg-[#f0f1f5] dark:bg-transparent pb-32 pt-6 px-4 transition-colors duration-300">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -88,8 +90,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
       >
         {/* Header Section */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">
-            Profile <span className="text-fc-green">Identity</span>
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white uppercase italic tracking-tighter">
+            Profile <span className="text-fc-green dark:text-[#ff7a45]">Identity</span>
           </h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">
             Professional Arena Profile
@@ -98,19 +100,20 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
         {/* Main Identity Card */}
         <div className="nm-flat rounded-[3rem] p-10 space-y-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-fc-green/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-36 h-36 bg-fc-green/5 dark:bg-gradient-to-bl dark:from-[#ff7a45]/20 dark:via-[#a855f7]/15 dark:to-transparent rounded-bl-full -mr-12 -mt-12 pointer-events-none blur-xl" />
+          <div className="hidden dark:block absolute -bottom-16 -left-16 w-44 h-44 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
           
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center relative z-10">
             {/* Avatar Section */}
             <div className="relative mb-6">
-              <div className="w-40 h-40 rounded-[3.5rem] nm-flat p-2 flex items-center justify-center bg-white/50">
-                <div className="w-full h-full rounded-[3rem] nm-inset flex items-center justify-center text-slate-300">
+              <div className="w-40 h-40 rounded-[3.5rem] nm-flat p-2 flex items-center justify-center bg-white/50 dark:bg-[#232642]/80">
+                <div className="w-full h-full rounded-[3rem] nm-inset flex items-center justify-center text-slate-300 dark:text-slate-400">
                   <User size={64} />
                 </div>
               </div>
               <button 
                 onClick={handleEditClick}
-                className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl nm-flat bg-white flex items-center justify-center text-fc-green shadow-xl active:nm-pressed"
+                className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl nm-flat bg-white dark:bg-[#2a2e4d] flex items-center justify-center text-fc-green dark:text-[#ff7a45] shadow-xl active:nm-pressed"
               >
                 <Camera size={20} />
               </button>
@@ -119,13 +122,13 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             {/* Profile Info */}
             <div className="text-center space-y-3 w-full">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl nm-inset bg-white/30 mb-2">
-                <ShieldCheck size={12} className="text-fc-green" />
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                <ShieldCheck size={12} className="text-fc-green dark:text-emerald-400" />
+                <span className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">
                   Verified {profile?.role || 'Player'}
                 </span>
               </div>
               
-              <h2 className="text-4xl font-black text-slate-900 uppercase italic leading-none tracking-tighter drop-shadow-sm">
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white uppercase italic leading-none tracking-tighter drop-shadow-sm">
                 {profile?.inGameName || 'Recruit'}
               </h2>
               
@@ -135,7 +138,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                   <span className="text-[11px] font-bold uppercase tracking-wider">{profile?.email}</span>
                 </div>
                 {profile?.leagueName && (
-                  <div className="flex items-center gap-2 text-fc-green">
+                  <div className="flex items-center gap-2 text-fc-green dark:text-[#ff7a45]">
                     <Award size={12} />
                     <span className="text-[10px] font-black uppercase tracking-widest italic">{profile.leagueName}</span>
                   </div>
@@ -145,19 +148,19 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
           </div>
 
           {/* Quick Stats/Actions */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 relative z-10">
             <button 
               onClick={handleEditClick}
-              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-slate-600 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
+              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-slate-600 dark:text-slate-200 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
             >
-              <Edit3 size={16} /> MODIFY PROFILE
+              <Edit3 size={16} className="dark:text-[#38bdf8]" /> MODIFY PROFILE
             </button>
             <button 
               onClick={async () => {
                 await signOut(auth);
                 window.location.reload();
               }}
-              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-rose-500 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
+              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-rose-500 dark:text-rose-400 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
             >
               <LogOut size={16} /> Sign Out
             </button>
@@ -167,35 +170,35 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         {/* Detailed Info Sections */}
         <div className="space-y-6">
           <div className="flex items-center justify-between px-4">
-            <h3 className="text-xs font-black text-slate-900 uppercase italic tracking-widest">DIGITAL CHANNELS</h3>
-            <div className="w-12 h-1 bg-fc-green/20 rounded-full" />
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">DIGITAL CHANNELS</h3>
+            <div className="w-12 h-1 bg-fc-green/20 dark:bg-[#a855f7]/40 rounded-full" />
           </div>
 
           <div className="nm-flat rounded-[2.5rem] overflow-hidden">
-            <div className="divide-y divide-white/20">
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 transition-colors">
+            <div className="divide-y divide-white/20 dark:divide-white/10">
+              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-blue-600">
+                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <Facebook size={20} />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Facebook</span>
-                    <span className="text-sm font-bold text-slate-700">{profile?.fbUrl ? 'Connected' : 'Not Linked'}</span>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.fbUrl ? 'Connected' : 'Not Linked'}</span>
                   </div>
                 </div>
                 {profile?.fbUrl && (
-                  <button onClick={() => window.open(profile.fbUrl)} className="text-fc-green p-2"><ExternalLink size={18} /></button>
+                  <button onClick={() => window.open(profile.fbUrl)} className="text-fc-green dark:text-[#38bdf8] p-2"><ExternalLink size={18} /></button>
                 )}
               </div>
 
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 transition-colors">
+              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-emerald-500">
+                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-emerald-500 dark:text-emerald-400">
                     <MessageSquare size={20} />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</span>
-                    <span className="text-sm font-bold text-slate-700">{profile?.whatsappNumber || 'Not Linked'}</span>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.whatsappNumber || 'Not Linked'}</span>
                   </div>
                 </div>
                 {profile?.whatsappNumber && (
@@ -203,14 +206,14 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 )}
               </div>
 
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 transition-colors">
+              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-sky-500">
+                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-sky-500 dark:text-sky-400">
                     <MessageCircle size={20} />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Messenger</span>
-                    <span className="text-sm font-bold text-slate-700">{profile?.messengerLink ? 'Connected' : 'Not Linked'}</span>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.messengerLink ? 'Connected' : 'Not Linked'}</span>
                   </div>
                 </div>
                 {profile?.messengerLink && (
@@ -218,14 +221,14 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 )}
               </div>
 
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 transition-colors">
+              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-500">
+                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-500 dark:text-purple-400">
                     <Hash size={20} />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{profile?.role === 'player' ? 'In Game UID' : 'League Code'}</span>
-                    <span className="text-sm font-mono font-bold text-slate-700">{profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Verified')}</span>
+                    <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200">{profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Verified')}</span>
                   </div>
                 </div>
               </div>
@@ -236,7 +239,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         {/* Alerts Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-4">
-            <h3 className="text-xs font-black text-slate-900 uppercase italic tracking-widest">GLOBAL ALERTS</h3>
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">GLOBAL ALERTS</h3>
           </div>
           
           <div className="nm-flat rounded-[2rem] p-6 flex items-center justify-between">
@@ -246,7 +249,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               </div>
               <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Notifications</span>
-                <span className="text-sm font-bold text-slate-700">{profile?.pushEnabled ? 'Active' : 'Disabled'}</span>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.pushEnabled ? 'Active' : 'Disabled'}</span>
               </div>
             </div>
             
@@ -266,7 +269,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               disabled={pushLoading}
               className={cn(
                 "px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                profile?.pushEnabled ? "nm-inset text-slate-400" : "nm-flat text-fc-green active:nm-pressed"
+                profile?.pushEnabled ? "nm-inset text-slate-400" : "nm-flat text-fc-green dark:text-[#ff7a45] active:nm-pressed"
               )}
             >
               {pushLoading ? '...' : (profile?.pushEnabled ? 'Test' : 'Enable')}
@@ -274,9 +277,72 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
           </div>
         </div>
 
+        {/* Appearance & Theme Switcher Section (Bottom of Profile) */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-4">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">
+              APPEARANCE & THEME
+            </h3>
+            <span className="px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-[#a855f7]/20 dark:text-purple-300 dark:border-purple-400/30">
+              {isDark ? 'Dark Glass Active' : 'Light Mode Active'}
+            </span>
+          </div>
+
+          <div className="nm-flat rounded-[2.2rem] p-5 sm:p-6 space-y-5 relative overflow-hidden">
+            {/* Subtle Ambient Glow inside Theme Card */}
+            <div className="hidden dark:block absolute -top-12 -right-12 w-36 h-36 rounded-full bg-gradient-to-br from-[#ff7a45]/25 via-[#a855f7]/20 to-transparent blur-2xl pointer-events-none" />
+            <div className="hidden dark:block absolute -bottom-12 -left-12 w-36 h-36 rounded-full bg-gradient-to-tr from-[#38bdf8]/20 to-transparent blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-600 dark:text-[#ff7a45]">
+                  {isDark ? <Sparkles size={20} className="text-[#ff7a45]" /> : <Palette size={20} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interface Mode</span>
+                  <span className="text-sm font-black text-slate-800 dark:text-white uppercase italic tracking-tight">
+                    {isDark ? 'Dark Glassmorphic UI' : 'Soft Neumorphic Light'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dual Segmented Theme Switch Button */}
+            <div className="grid grid-cols-2 gap-3 p-1.5 rounded-[1.6rem] nm-inset relative z-10">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={cn(
+                  "h-13 rounded-[1.25rem] flex items-center justify-center gap-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300",
+                  theme === 'light'
+                    ? "bg-white text-slate-900 shadow-md border border-white scale-[1.01]"
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <Sun size={16} className={cn(theme === 'light' ? "text-amber-500 fill-amber-500/20" : "text-slate-400")} />
+                <span>Light Mode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  "h-13 rounded-[1.25rem] flex items-center justify-center gap-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 relative overflow-hidden",
+                  theme === 'dark'
+                    ? "bg-gradient-to-r from-[#ff7a45] via-[#ec4899] to-[#8b5cf6] text-white shadow-[0_8px_25px_-4px_rgba(255,122,69,0.5)] border border-white/25 scale-[1.01]"
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                <Moon size={16} className={cn(theme === 'dark' ? "text-white fill-white/20" : "text-indigo-500")} />
+                <span>Dark Glass</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Version Info */}
         <div className="text-center pt-4">
-          <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.5em]">FC Arena Protocol v{APP_VERSION}</p>
+          <p className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-[0.5em]">FC Arena Protocol v{APP_VERSION}</p>
         </div>
       </motion.div>
 
@@ -287,19 +353,19 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full max-w-md bg-white rounded-[2.5rem] border-2 border-white shadow-[0_25px_70px_-15px_rgba(15,23,42,0.4)] overflow-hidden flex flex-col max-h-[90vh] my-auto"
+            className="w-full max-w-md bg-white dark:bg-[#1e213a]/90 dark:backdrop-blur-2xl rounded-[2.5rem] border-2 border-white dark:border-white/15 shadow-[0_25px_70px_-15px_rgba(15,23,42,0.4)] overflow-hidden flex flex-col max-h-[90vh] my-auto"
           >
             {/* Top Modal Header */}
-            <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-slate-50 to-white dark:from-[#262a48]/80 dark:to-[#1e213a]/80 border-b border-slate-100 dark:border-white/10 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-[#ff7a45] dark:to-[#8b5cf6] text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
                   <Edit3 size={20} />
                 </div>
                 <div>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
                     <ShieldCheck size={10} /> Identity Management
                   </span>
-                  <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mt-0.5">
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight mt-0.5">
                     Modify Profile
                   </h2>
                 </div>
@@ -317,8 +383,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             {/* Scrollable Form Body */}
             <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
               {/* Live Identity Preview Banner */}
-              <div className="p-3.5 rounded-2xl bg-slate-900 text-white flex items-center gap-3.5 shadow-md border border-slate-800">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 p-0.5 shrink-0">
+              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-[#15172b] text-white flex items-center gap-3.5 shadow-md border border-slate-800 dark:border-white/10">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 dark:from-[#ff7a45] dark:to-[#a855f7] p-0.5 shrink-0">
                   <div className="w-full h-full rounded-[0.9rem] bg-slate-950 flex items-center justify-center text-white font-black text-base uppercase italic">
                     {(editData.inGameName || profile?.inGameName || 'P').charAt(0)}
                   </div>
@@ -343,7 +409,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               {/* Section 1: Core Identity */}
               <div className="space-y-3.5">
                 <div className="flex items-center gap-2 px-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-[#ff7a45]" />
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
                     Core Identity
                   </span>
@@ -351,7 +417,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
                 {/* Full Handle */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                  <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
                     Full Handle (In-Game Name)
                   </label>
                   <div className="relative">
@@ -370,7 +436,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
                 {/* In-Game UID / League Name */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                  <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
                     {profile?.role === 'player' ? 'In-Game UID' : 'League Name'}
                   </label>
                   <div className="relative">
@@ -392,7 +458,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               </div>
 
               {/* Section 2: Social & Match Coordination Channels */}
-              <div className="space-y-3.5 pt-2 border-t border-slate-100">
+              <div className="space-y-3.5 pt-2 border-t border-slate-100 dark:border-white/10">
                 <div className="flex items-center gap-2 px-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
@@ -402,7 +468,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
                 {/* Facebook URL */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                  <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
                     Facebook Profile URL
                   </label>
                   <div className="relative">
@@ -422,7 +488,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 {/* Messenger & WhatsApp */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                    <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
                       Messenger Link
                     </label>
                     <div className="relative">
@@ -440,7 +506,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+                    <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
                       WhatsApp Number
                     </label>
                     <div className="relative">
@@ -481,7 +547,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             </div>
 
             {/* Footer Actions */}
-            <div className="p-5 bg-slate-50 border-t border-slate-100 flex items-center gap-3 shrink-0">
+            <div className="p-5 bg-slate-50 dark:bg-[#17192e]/90 border-t border-slate-100 dark:border-white/10 flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
@@ -494,9 +560,9 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex-[1.6] h-13 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 hover:from-indigo-700 hover:to-slate-950 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] italic shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                className="flex-[1.6] h-13 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] hover:from-indigo-700 hover:to-slate-950 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] italic shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
               >
-                <CheckCircle size={15} className="text-emerald-400 shrink-0" />
+                <CheckCircle size={15} className="text-emerald-400 dark:text-white shrink-0" />
                 <span>{isSaving ? 'Saving...' : 'Confirm Changes'}</span>
               </button>
             </div>

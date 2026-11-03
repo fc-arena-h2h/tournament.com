@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-soft-bg: #f3f4f6;
   --color-fc-green: #48c34b;
@@ -54,6 +56,11 @@
     color: #475569;
     font-family: 'Inter', sans-serif;
     background-color: #f0f1f5;
+    transition: background-color 0.35s ease, color 0.35s ease;
+  }
+  html.dark body {
+    color: #e2e8f0;
+    background-color: #171828;
   }
 }
 
@@ -68,6 +75,17 @@
   pointer-events: none;
   z-index: 0;
   background-color: #f8fafc;
+  transition: background 0.4s ease;
+}
+
+html.dark .app-fixed-bg {
+  background-color: #171828;
+  background-image:
+    radial-gradient(circle at 14% 18%, rgba(255, 122, 69, 0.16) 0%, transparent 42%),
+    radial-gradient(circle at 86% 15%, rgba(168, 85, 247, 0.20) 0%, transparent 46%),
+    radial-gradient(circle at 82% 78%, rgba(56, 189, 248, 0.15) 0%, transparent 45%),
+    radial-gradient(circle at 18% 84%, rgba(139, 92, 246, 0.16) 0%, transparent 45%),
+    linear-gradient(165deg, #171828 0%, #1d1f35 52%, #161726 100%);
 }
 
 @layer utilities {
@@ -110,3 +128,263 @@
     @apply bg-slate-200 rounded-full;
   }
 }
+
+/* ==========================================================================
+   DARK GLASSMORPHIC THEME (Inspired by Deep Navy-Violet & Rim-Lit Glass UI)
+   ========================================================================== */
+
+html.dark .nm-flat {
+  background: linear-gradient(145deg, rgba(44, 48, 78, 0.72) 0%, rgba(28, 30, 52, 0.66) 100%) !important;
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  box-shadow:
+    0 18px 40px -12px rgba(6, 7, 16, 0.78),
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 1px rgba(168, 85, 247, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark .nm-inset {
+  background: rgba(19, 21, 37, 0.78) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 4px 12px rgba(6, 7, 15, 0.78),
+    0 1px 0 rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+html.dark .nm-pressed {
+  background: rgba(16, 18, 32, 0.85) !important;
+  box-shadow:
+    inset 0 4px 10px rgba(4, 5, 12, 0.85),
+    0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .nm-container {
+  background: rgba(24, 26, 44, 0.85) !important;
+  box-shadow: 0 25px 60px rgba(5, 6, 14, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25);
+}
+
+/* Global Dark Glass Surface & Container Harmonization */
+html.dark .bg-soft-bg,
+html.dark .bg-\[\#f0f1f5\],
+html.dark .bg-\[\#f0f0f3\],
+html.dark .bg-\[\#f8fafc\] {
+  background-color: #171828 !important;
+  background-image:
+    radial-gradient(circle at 15% 15%, rgba(255, 122, 69, 0.11) 0%, transparent 40%),
+    radial-gradient(circle at 85% 20%, rgba(168, 85, 247, 0.14) 0%, transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(56, 189, 248, 0.11) 0%, transparent 45%);
+}
+
+html.dark .bg-\[\#e6e6e9\],
+html.dark .bg-\[\#e0e0e9\],
+html.dark .bg-\[\#f8f9fa\] {
+  background-color: rgba(22, 24, 42, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/95,
+html.dark .bg-white\/90,
+html.dark .bg-white\/80,
+html.dark .bg-white\/70,
+html.dark .bg-white\/60,
+html.dark .bg-white\/50,
+html.dark .bg-white\/40,
+html.dark .bg-white\/30 {
+  background: linear-gradient(145deg, rgba(43, 47, 76, 0.76) 0%, rgba(28, 31, 52, 0.70) 100%) !important;
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border-color: rgba(255, 255, 255, 0.13) !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/90,
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/40,
+html.dark .bg-slate-100,
+html.dark .bg-slate-100\/90,
+html.dark .bg-slate-100\/80,
+html.dark .bg-slate-100\/70 {
+  background-color: rgba(21, 24, 43, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+html.dark .bg-slate-200,
+html.dark .bg-slate-200\/80,
+html.dark .bg-slate-200\/70 {
+  background-color: rgba(51, 56, 88, 0.65) !important;
+}
+
+/* Tinted status & accent pills in Dark Glass mode */
+html.dark .bg-indigo-50,
+html.dark .bg-indigo-50\/80,
+html.dark .bg-indigo-50\/70,
+html.dark .bg-indigo-50\/50,
+html.dark .bg-indigo-50\/40,
+html.dark .bg-indigo-50\/30,
+html.dark .bg-indigo-50\/15 {
+  background-color: rgba(99, 102, 241, 0.16) !important;
+  border-color: rgba(129, 140, 248, 0.28) !important;
+}
+
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-50\/80,
+html.dark .bg-emerald-50\/75,
+html.dark .bg-emerald-50\/70,
+html.dark .bg-emerald-50\/60,
+html.dark .bg-emerald-50\/20 {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.28) !important;
+}
+
+html.dark .bg-amber-50,
+html.dark .bg-amber-50\/90,
+html.dark .bg-amber-50\/80,
+html.dark .bg-amber-50\/75,
+html.dark .bg-amber-50\/60,
+html.dark .bg-amber-50\/30,
+html.dark .bg-amber-50\/20 {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.28) !important;
+}
+
+html.dark .bg-rose-50,
+html.dark .bg-rose-50\/80 {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+  border-color: rgba(251, 113, 133, 0.28) !important;
+}
+
+html.dark .bg-blue-50,
+html.dark .bg-sky-50 {
+  background-color: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+html.dark .bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.18) !important;
+  border-color: rgba(192, 132, 252, 0.3) !important;
+}
+
+/* Dark Glass Borders */
+html.dark .border-white,
+html.dark .border-white\/60,
+html.dark .border-white\/50,
+html.dark .border-white\/40,
+html.dark .border-slate-50,
+html.dark .border-slate-100,
+html.dark .border-slate-100\/70,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/90,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/70,
+html.dark .border-slate-200\/60,
+html.dark .border-indigo-100,
+html.dark .border-indigo-100\/80,
+html.dark .border-indigo-100\/60 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Dark Glass Typography Contrast */
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-\[\#0f172a\],
+html.dark .text-fc-dark,
+html.dark .text-indigo-950 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-indigo-700,
+html.dark .text-indigo-600 {
+  color: #818cf8 !important;
+}
+
+html.dark .text-emerald-700,
+html.dark .text-emerald-600 {
+  color: #34d399 !important;
+}
+
+html.dark .text-amber-800,
+html.dark .text-amber-700,
+html.dark .text-amber-600 {
+  color: #fbbf24 !important;
+}
+
+html.dark .text-purple-600 {
+  color: #c084fc !important;
+}
+
+/* Form inputs & selects inside Dark Glass mode */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: rgba(18, 20, 36, 0.82) !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Dark Glass Markdown / Prose Typography Contrast (Support AI & Rules) */
+html.dark .prose {
+  --tw-prose-body: #f1f5f9 !important;
+  --tw-prose-headings: #ff7a45 !important;
+  --tw-prose-lead: #e2e8f0 !important;
+  --tw-prose-links: #38bdf8 !important;
+  --tw-prose-bold: #fde047 !important;
+  --tw-prose-counters: #a5b4fc !important;
+  --tw-prose-bullets: #c084fc !important;
+  --tw-prose-hr: rgba(255, 255, 255, 0.14) !important;
+  --tw-prose-quotes: #f8fafc !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .prose p,
+html.dark .prose li,
+html.dark .prose ul,
+html.dark .prose ol,
+html.dark .prose span {
+  color: #f1f5f9 !important;
+}
+
+html.dark .prose strong {
+  color: #fde047 !important;
+  font-weight: 800;
+}
+
+html.dark .prose h1,
+html.dark .prose h2,
+html.dark .prose h3,
+html.dark .prose h4 {
+  color: #ff7a45 !important;
+}
+
+html.dark .prose a {
+  color: #38bdf8 !important;
+  text-decoration: underline;
+}
+

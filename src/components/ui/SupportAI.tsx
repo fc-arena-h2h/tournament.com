@@ -521,26 +521,31 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[20001] bg-slate-950/60 backdrop-blur-md flex flex-col items-center animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[20001] bg-slate-950/60 dark:bg-[#090a14]/75 backdrop-blur-md flex flex-col items-center animate-in fade-in duration-300">
       <motion.div
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
-        className="w-full h-full sm:h-[85vh] sm:max-w-lg sm:mt-[7.5vh] bg-[#f0f1f5] flex flex-col shadow-2xl relative overflow-hidden sm:rounded-[3rem] border-t sm:border border-white/50"
+        className="w-full h-full sm:h-[85vh] sm:max-w-lg sm:mt-[7.5vh] bg-[#f0f1f5] dark:!bg-gradient-to-b dark:!from-[#1e223d]/95 dark:!via-[#171a30]/96 dark:!to-[#121426]/98 dark:backdrop-blur-3xl flex flex-col shadow-2xl dark:shadow-[0_30px_80px_rgba(0,0,0,0.92),inset_0_1px_1.5px_rgba(255,255,255,0.22)] relative overflow-hidden sm:rounded-[3rem] border-t sm:border border-white/50 dark:!border-white/18"
         onClick={e => e.stopPropagation()}
       >
+        {/* Ambient Dark Glass Glow Orbs inside Support Chat */}
+        <div className="hidden dark:block absolute -top-24 -right-20 w-64 h-64 rounded-full bg-gradient-to-br from-[#ff7a45]/22 via-[#ec4899]/18 to-transparent blur-3xl pointer-events-none" />
+        <div className="hidden dark:block absolute top-1/3 -left-24 w-64 h-64 rounded-full bg-gradient-to-tr from-[#8b5cf6]/20 via-[#38bdf8]/15 to-transparent blur-3xl pointer-events-none" />
+        <div className="hidden dark:block absolute -bottom-24 right-0 w-60 h-60 rounded-full bg-gradient-to-tl from-[#a855f7]/20 via-[#ff7a45]/12 to-transparent blur-3xl pointer-events-none" />
+
         {/* Header */}
-        <div className="p-6 sm:p-8 border-b border-white/20 flex items-center justify-between shrink-0 bg-white/30">
+        <div className="p-6 sm:p-8 border-b border-white/20 dark:!border-white/14 flex items-center justify-between shrink-0 bg-white/30 dark:!bg-[#222645]/80 dark:backdrop-blur-2xl relative z-10 dark:shadow-[0_8px_25px_-6px_rgba(4,5,14,0.6)]">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl nm-inset bg-[#e6e6e9] flex items-center justify-center text-indigo-600">
+            <div className="w-14 h-14 rounded-2xl nm-inset bg-[#e6e6e9] dark:!bg-gradient-to-br dark:!from-[#ff7a45]/25 dark:!via-[#ec4899]/20 dark:!to-[#8b5cf6]/30 dark:!border dark:!border-white/22 dark:!shadow-[0_0_22px_rgba(255,122,69,0.25),inset_0_1px_1px_rgba(255,255,255,0.25)] flex items-center justify-center text-indigo-600 dark:!text-[#ff7a45]">
               <Bot size={28} className="animate-pulse" />
             </div>
             <div>
-              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] block">
+              <span className="text-[10px] font-black text-indigo-500 dark:!text-indigo-300 uppercase tracking-[0.3em] block">
                 Arena Assistant
               </span>
-              <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">
-                Support <span className="text-indigo-600">AI</span>
+              <h2 className="text-2xl font-black text-slate-800 dark:!text-white uppercase italic tracking-tighter">
+                Support <span className="text-indigo-600 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#a855f7] dark:bg-clip-text dark:text-transparent">AI</span>
               </h2>
             </div>
           </div>
@@ -549,7 +554,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
             {messages.length > 0 && (
               <button
                 onClick={clearHistory}
-                className="w-11 h-11 rounded-2xl nm-flat bg-white flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                className="w-11 h-11 rounded-2xl nm-flat bg-white dark:!bg-[#15182e]/90 dark:!border-white/16 flex items-center justify-center text-slate-400 dark:!text-slate-300 hover:text-rose-500 dark:hover:!text-rose-400 transition-colors"
                 title="Clear history"
               >
                 <Trash2 size={18} />
@@ -557,7 +562,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
             )}
             <button
               onClick={onClose}
-              className="w-11 h-11 rounded-2xl nm-flat bg-white flex items-center justify-center text-slate-400 active:nm-pressed"
+              className="w-11 h-11 rounded-2xl nm-flat bg-white dark:!bg-[#15182e]/90 dark:!border-white/16 flex items-center justify-center text-slate-400 dark:!text-slate-200 dark:hover:!text-white active:nm-pressed"
             >
               <X size={22} />
             </button>
@@ -567,22 +572,22 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         {/* Chat Area */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar custom-scrollbar"
+          className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar custom-scrollbar relative z-10"
         >
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-5">
-              <div className="w-20 h-20 rounded-[2.5rem] nm-inset flex items-center justify-center opacity-50">
-                <MessageCircle size={36} className="text-slate-400" />
+              <div className="w-20 h-20 rounded-[2.5rem] nm-inset dark:!bg-[#15182e]/85 dark:!border-white/16 flex items-center justify-center opacity-50 dark:opacity-95 shadow-inner">
+                <MessageCircle size={36} className="text-slate-400 dark:!text-[#ff7a45]" />
               </div>
-              <div className="space-y-1 opacity-60">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 italic">
+              <div className="space-y-1 opacity-60 dark:opacity-95">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 dark:!text-white italic">
                   How can I help you today?
                 </p>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest px-10">
+                <p className="text-[8px] font-bold text-slate-400 dark:!text-indigo-200/80 uppercase tracking-widest px-10">
                   Ask me about tournaments, results, opponents, or rules
                 </p>
               </div>
-              <div className="flex flex-wrap justify-center gap-2 px-4 pt-2">
+              <div className="flex flex-wrap justify-center gap-2.5 px-4 pt-2">
                 {[
                   'টুর্নামেন্টে জয়েন করব কীভাবে?',
                   'প্রতিপক্ষের সাথে কীভাবে কথা বলব?',
@@ -592,7 +597,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                   <button
                     key={i}
                     onClick={() => sendMessage(q)}
-                    className="px-3.5 py-2 rounded-xl nm-flat bg-white text-indigo-600 text-[10px] font-bold border border-indigo-50 hover:bg-indigo-50 transition-all active:scale-95"
+                    className="px-4 py-2.5 rounded-xl nm-flat bg-white dark:!bg-gradient-to-r dark:!from-[#282d52]/90 dark:!to-[#1d213d]/92 text-indigo-600 dark:!text-indigo-100 text-[10px] font-bold border border-indigo-50 dark:!border-white/18 hover:bg-indigo-50 dark:hover:!border-[#ff7a45]/60 dark:hover:!text-white dark:!shadow-[0_10px_22px_-6px_rgba(4,5,14,0.7),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all active:scale-95"
                   >
                     {q}
                   </button>
@@ -605,12 +610,12 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                 key={idx}
                 className={cn(
                   'flex flex-col gap-2 animate-in slide-in-from-bottom-2 duration-300',
-                  m.role === 'user' ? 'items-end pl-12' : 'items-start pr-12'
+                  m.role === 'user' ? 'items-end pl-10 sm:pl-12' : 'items-start pr-8 sm:pr-12'
                 )}
               >
                 <div
                   className={cn(
-                    'flex items-center gap-2 mb-1',
+                    'flex items-center gap-2 mb-0.5',
                     m.role === 'user' ? 'flex-row-reverse' : ''
                   )}
                 >
@@ -618,36 +623,36 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                     className={cn(
                       'w-6 h-6 rounded-lg flex items-center justify-center border',
                       m.role === 'user'
-                        ? 'bg-slate-100 text-slate-400'
-                        : 'bg-indigo-50 text-indigo-500 border-indigo-100'
+                        ? 'bg-slate-100 text-slate-400 border-slate-200/70 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/30 dark:!to-[#ec4899]/30 dark:!text-[#ff7a45] dark:!border-white/20'
+                        : 'bg-indigo-50 text-indigo-500 border-indigo-100 dark:!bg-gradient-to-br dark:!from-indigo-500/30 dark:!to-purple-500/30 dark:!text-indigo-200 dark:!border-indigo-400/35'
                     )}
                   >
                     {m.role === 'user' ? <User size={12} /> : <Bot size={12} />}
                   </div>
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                  <span className="text-[8px] font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-widest">
                     {m.role === 'user' ? 'YOU' : 'ARENA AI'}
                   </span>
                 </div>
 
                 <div
                   className={cn(
-                    'px-5 py-4 rounded-[1.8rem] text-xs font-bold leading-relaxed shadow-sm border',
+                    'px-5 py-4 rounded-[1.8rem] text-xs font-bold leading-relaxed shadow-sm border relative overflow-hidden',
                     m.role === 'user'
-                      ? 'nm-flat bg-white border-white text-slate-700'
-                      : 'nm-inset bg-white border-white text-slate-800'
+                      ? 'nm-flat bg-white border-white text-slate-700 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/28 dark:!via-[#ec4899]/24 dark:!to-[#8b5cf6]/32 dark:backdrop-blur-2xl dark:!border-white/24 dark:!text-white dark:!shadow-[0_14px_32px_-8px_rgba(236,72,153,0.38),inset_0_1px_1px_rgba(255,255,255,0.28)]'
+                      : 'nm-inset bg-white border-white text-slate-800 dark:!bg-gradient-to-br dark:!from-[#2b3058]/92 dark:!via-[#202442]/94 dark:!to-[#171a30]/96 dark:backdrop-blur-2xl dark:!border-white/20 dark:!text-slate-100 dark:!shadow-[0_20px_45px_-10px_rgba(4,5,15,0.88),inset_0_1px_1.5px_rgba(255,255,255,0.22)]'
                   )}
                 >
-                  <div className="prose prose-slate prose-xs max-w-none prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-indigo-600 prose-strong:text-slate-900 prose-ul:my-1 prose-li:my-0.5">
+                  <div className="prose prose-slate dark:prose-invert prose-xs max-w-none prose-p:my-1.5 prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-indigo-600 dark:prose-headings:!text-[#ff7a45] prose-strong:text-slate-900 dark:prose-strong:!text-amber-300 dark:prose-p:!text-slate-100 dark:prose-li:!text-slate-100 dark:prose-ol:!text-slate-100 dark:prose-ul:!text-slate-100 dark:prose-a:!text-[#38bdf8] prose-ul:my-1.5 prose-li:my-1">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.parts[0].text}</ReactMarkdown>
                   </div>
 
                   {m.role === 'model' && m.recommendations && m.recommendations.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/12 flex flex-wrap gap-2">
                       {m.recommendations.map((rec, rIdx) => (
                         <button
                           key={rIdx}
                           onClick={() => sendMessage(rec)}
-                          className="px-4 py-2 rounded-xl nm-flat bg-white text-indigo-600 text-[10px] font-bold border border-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 text-left"
+                          className="px-3.5 py-2 rounded-xl nm-flat bg-white dark:!bg-gradient-to-r dark:!from-[#161930]/95 dark:!to-[#222748]/95 text-indigo-600 dark:!text-indigo-200 text-[10px] font-bold border border-indigo-50 dark:!border-indigo-400/35 hover:bg-indigo-100 dark:hover:!border-[#ff7a45]/60 dark:hover:!text-white dark:!shadow-[0_8px_18px_-4px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.16)] transition-all active:scale-95 text-left"
                         >
                           {rec}
                         </button>
@@ -661,7 +666,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                         href={TELEGRAM_LINK}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sky-500 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-500/20 active:scale-95 transition-all"
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sky-500 dark:bg-gradient-to-r dark:from-[#38bdf8] dark:to-[#6366f1] text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-500/20 dark:shadow-sky-500/30 dark:border dark:border-white/25 active:scale-95 transition-all"
                       >
                         <ExternalLink size={12} /> Contact Telegram Support
                       </a>
@@ -675,24 +680,24 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
           {loading && (
             <div className="flex flex-col items-start pr-12 animate-in fade-in">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center border border-indigo-100">
+                <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:!bg-indigo-500/25 text-indigo-500 dark:!text-indigo-300 flex items-center justify-center border border-indigo-100 dark:!border-indigo-400/35">
                   <Bot size={12} />
                 </div>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                <span className="text-[8px] font-black text-slate-400 dark:!text-indigo-200 uppercase tracking-widest">
                   THINKING...
                 </span>
               </div>
-              <div className="px-6 py-4 rounded-[1.8rem] nm-inset bg-white border-white/50 flex gap-1.5">
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="px-6 py-4 rounded-[1.8rem] nm-inset bg-white dark:!bg-[#222645]/90 border border-white/50 dark:!border-white/18 flex gap-1.5">
+                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#ff7a45] rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#ec4899] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#a855f7] rounded-full animate-bounce [animation-delay:-0.3s]" />
               </div>
             </div>
           )}
         </div>
 
         {/* Input Area */}
-        <div className="p-6 sm:p-8 border-t border-white/20 bg-white/50 shrink-0">
+        <div className="p-6 sm:p-8 border-t border-white/20 dark:!border-white/14 bg-white/50 dark:!bg-[#1b1f3a]/85 dark:backdrop-blur-2xl shrink-0 relative z-10">
           <div className="relative flex items-center gap-3">
             <input
               type="text"
@@ -701,7 +706,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               onKeyDown={e => e.key === 'Enter' && handleSend()}
               placeholder="Type your message..."
               disabled={loading}
-              className="flex-1 h-16 px-6 nm-inset bg-white rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+              className="flex-1 h-16 px-6 nm-inset bg-white dark:!bg-[#111325]/92 rounded-2xl text-xs font-bold text-slate-700 dark:!text-white dark:placeholder:!text-slate-400 border border-transparent dark:!border-white/16 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-[#a855f7]/30 dark:focus:!border-[#ff7a45]/50 disabled:opacity-50"
             />
             <button
               onClick={handleSend}
@@ -709,8 +714,8 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
               className={cn(
                 'w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl shrink-0 active:scale-95',
                 !input.trim() || loading
-                  ? 'nm-flat bg-indigo-50/80 text-indigo-600 border border-indigo-100/80 cursor-not-allowed'
-                  : 'nm-flat bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/30 active:nm-pressed'
+                  ? 'nm-flat bg-indigo-50/80 dark:!bg-[#24294a]/85 text-indigo-600 dark:!text-indigo-300 border border-indigo-100/80 dark:!border-white/16 cursor-not-allowed'
+                  : 'nm-flat bg-indigo-600 dark:!bg-gradient-to-tr dark:!from-[#ff7a45] dark:!via-[#ec4899] dark:!to-[#8b5cf6] text-white hover:bg-indigo-700 shadow-indigo-600/30 dark:!shadow-[0_10px_25px_-4px_rgba(236,72,153,0.55),inset_0_1px_1px_rgba(255,255,255,0.3)] dark:!border-white/25 active:nm-pressed'
               )}
               title="Send Message"
             >
@@ -718,7 +723,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
                 size={24}
                 className={cn(
                   'transition-colors',
-                  !input.trim() || loading ? 'text-indigo-600' : 'text-white',
+                  !input.trim() || loading ? 'text-indigo-600 dark:text-indigo-300' : 'text-white',
                   loading ? 'animate-pulse' : ''
                 )}
               />

@@ -230,21 +230,22 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
       {/* Profile Card - Enhanced FC Mobile Pro Player Passport */}
       <Reveal direction="left" delay={200}>
-        <Card className="flex flex-col gap-3.5 sm:gap-6 bg-gradient-to-b from-white via-[#fafbfe] to-[#f4f6fa] border-2 border-white shadow-[0_20px_50px_rgba(0,0,0,0.06)] p-3.5 sm:p-7 rounded-[2.2rem] sm:rounded-[2.8rem] relative overflow-hidden">
+        <Card className="flex flex-col gap-3.5 sm:gap-6 bg-gradient-to-b from-white via-[#fafbfe] to-[#f4f6fa] dark:from-[#292d4e]/85 dark:via-[#222540]/80 dark:to-[#1a1c33]/85 border-2 border-white dark:border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.06)] dark:shadow-[0_22px_50px_-12px_rgba(5,6,15,0.85)] p-3.5 sm:p-7 rounded-[2.2rem] sm:rounded-[2.8rem] relative overflow-hidden">
           {/* Subtle Corner Glow Accent */}
-          <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-gradient-to-br from-emerald-500/10 via-indigo-500/10 to-transparent blur-2xl pointer-events-none" />
+          <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-gradient-to-br from-emerald-500/10 via-indigo-500/10 to-transparent dark:from-[#ff7a45]/25 dark:via-[#ec4899]/20 dark:to-transparent blur-2xl pointer-events-none" />
+          <div className="hidden dark:block absolute -bottom-20 -left-16 w-48 h-48 rounded-full bg-gradient-to-tr from-[#38bdf8]/20 via-[#a855f7]/15 to-transparent blur-2xl pointer-events-none" />
 
           {/* Top Passport Ribbon */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 relative z-10">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10 relative z-10">
             <div className="flex items-center gap-2">
               <div className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </div>
-              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">FC ARENA PASSPORT</span>
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-300">FC ARENA PASSPORT</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100/90 border border-slate-200/60 text-slate-600 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-              <Hash size={10} className="text-indigo-500" />
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100/90 dark:bg-[#15172b]/80 border border-slate-200/60 dark:border-white/12 text-slate-600 dark:text-slate-200 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+              <Hash size={10} className="text-indigo-500 dark:text-[#ff7a45]" />
               <span>{profile?.inGameUID || profile?.uid?.slice(0, 8).toUpperCase() || 'PLAYER'}</span>
             </div>
           </div>
@@ -253,18 +254,18 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
           <div className="flex items-start justify-between relative z-10">
             <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
               <div className="relative shrink-0">
-                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green shadow-xl border border-white flex items-center justify-center bg-white">
-                  <UserIcon size={32} className="text-slate-400" />
+                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green dark:from-[#ff7a45] dark:via-[#a855f7] dark:to-[#38bdf8] shadow-xl border border-white dark:border-white/20 flex items-center justify-center bg-white dark:bg-[#191c32]">
+                  <UserIcon size={32} className="text-slate-400 dark:text-slate-200" />
                 </div>
               </div>
 
               <div className="space-y-1.5 sm:space-y-2 min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 truncate">
-                  <h2 className="text-lg sm:text-2xl font-black text-[#0f172a] uppercase italic tracking-tight truncate leading-tight">
+                  <h2 className="text-lg sm:text-2xl font-black text-[#0f172a] dark:text-white uppercase italic tracking-tight truncate leading-tight">
                     {profile?.inGameName || 'Player Name'}
                   </h2>
                   {profile?.inGameName && profile?.inGameUID && profile?.fbUrl && (
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0" title="Verified Player">
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 dark:bg-[#ff7a45] flex items-center justify-center text-white shadow-sm shrink-0" title="Verified Player">
                       <CheckCircle size={10} fill="white" />
                     </div>
                   )}
@@ -272,11 +273,11 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
                 <div className="flex gap-1.5 flex-wrap">
                   <div className="px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-100/80 text-indigo-700 flex items-center gap-1 shadow-xs">
-                    <Shield size={10} className="text-indigo-600 shrink-0" />
+                    <Shield size={10} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
                     <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">{profile?.leagueName || 'Elite League'}</span>
                   </div>
                   <div className="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-100/80 text-emerald-700 flex items-center gap-1 shadow-xs">
-                    <Activity size={10} className="text-emerald-600 shrink-0" />
+                    <Activity size={10} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
                       {profile?.role === 'admin' ? 'Admin' : (profile?.role === 'publisher' ? 'Publisher' : 'Pro Tier')}
                     </span>
@@ -299,15 +300,15 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         <Reveal direction="right">
           <div className="flex items-center justify-between px-6">
             <div className="flex flex-col">
-              <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-sm bg-fc-green rotate-45" /> 
+              <h3 className="text-[11px] font-black text-slate-800 dark:!text-white uppercase tracking-[0.2em] flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-sm bg-fc-green dark:bg-gradient-to-tr dark:from-[#ff7a45] dark:to-[#a855f7] dark:shadow-[0_0_10px_rgba(255,122,69,0.7)] rotate-45" /> 
                 ACTIVE CUPS
               </h3>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-6">Join now and win prizes</span>
+              <span className="text-[8px] font-bold text-slate-400 dark:!text-slate-300/80 uppercase tracking-widest mt-1 ml-6">Join now and win prizes</span>
             </div>
             <button 
               onClick={() => onNavigate('tournament')}
-              className="text-[10px] font-black text-fc-green uppercase flex items-center gap-2 group"
+              className="text-[10px] font-black text-fc-green dark:!text-[#ff7a45] uppercase flex items-center gap-2 group"
             >
               Explore All <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
             </button>
@@ -316,40 +317,48 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
 
         <div className="grid grid-cols-1 gap-8">
           {featuredTournaments.length === 0 && (
-            <div className="py-20 text-center space-y-4 nm-inset rounded-[2.5rem] bg-slate-50/50">
-              <Trophy size={48} className="mx-auto text-slate-200" />
+            <div className="py-20 text-center space-y-4 nm-inset rounded-[2.5rem] bg-slate-50/50 dark:!bg-[#15182c]/85 dark:!border-white/12">
+              <Trophy size={48} className="mx-auto text-slate-200 dark:!text-indigo-400/40" />
               <div className="space-y-1">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">No Active Tournaments</p>
-                <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Check back later for new events</p>
+                <p className="text-xs font-black text-slate-400 dark:!text-slate-200 uppercase tracking-widest italic">No Active Tournaments</p>
+                <p className="text-[9px] font-bold text-slate-300 dark:!text-slate-400 uppercase tracking-widest">Check back later for new events</p>
               </div>
             </div>
           )}
           {featuredTournaments.map((t, idx) => (
             <Reveal key={t.id} direction={idx % 2 === 0 ? 'left' : 'right'} delay={idx * 100}>
-              <Card className="p-0 group active:scale-[0.98] overflow-hidden border-2 border-white hover:border-fc-green/20 transition-all shadow-xl" onClick={() => onEnterTournament(t)}>
+              <Card
+                className="p-0 group active:scale-[0.98] overflow-hidden border-2 border-white hover:border-fc-green/20 dark:!bg-gradient-to-br dark:!from-[#2f355e]/90 dark:!via-[#212544]/92 dark:!to-[#161930]/96 dark:!backdrop-blur-3xl dark:!border-white/20 dark:hover:!border-[#ff7a45]/45 dark:!shadow-[0_26px_60px_-12px_rgba(4,5,14,0.92),inset_0_1px_1.5px_rgba(255,255,255,0.28),inset_0_-1px_1px_rgba(168,85,247,0.18)] transition-all shadow-xl"
+                onClick={() => onEnterTournament(t)}
+              >
                  <div className="relative p-4 sm:p-8">
+                   {/* Ambient Dark Glass Glow Orbs (Only visible in Dark Mode) */}
+                   <div className="hidden dark:block absolute -top-16 -right-14 w-48 h-48 rounded-full bg-gradient-to-br from-[#ff7a45]/28 via-[#ec4899]/22 to-transparent blur-2xl pointer-events-none" />
+                   <div className="hidden dark:block absolute -bottom-16 -left-14 w-52 h-52 rounded-full bg-gradient-to-tr from-[#38bdf8]/20 via-[#8b5cf6]/22 to-transparent blur-2xl pointer-events-none" />
+                   <div className="hidden dark:block absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
+
                    {/* Background faint image for card */}
-                   <div className="absolute inset-0 opacity-[0.03] grayscale pointer-events-none">
+                   <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02] grayscale pointer-events-none">
                       <img src="https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="" />
                    </div>
 
                    <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {t.status === 'finished' || t.status === 'completed' ? (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-slate-800 dark:!bg-[#121528]/90 dark:border dark:border-white/15 text-slate-300 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                             END
                           </div>
                         ) : t.status === 'ongoing' || (t.filledSlots >= t.totalSlots) ? (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-rose-500 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-rose-500 dark:bg-gradient-to-r dark:from-rose-500/30 dark:to-orange-500/25 dark:border dark:border-rose-400/45 text-white dark:text-rose-200 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm dark:shadow-[0_0_16px_rgba(244,63,94,0.28)]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-rose-400 animate-pulse" />
                             LIVE
                           </div>
                         ) : (
-                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-emerald-500 text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                          <div className="px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-emerald-500 dark:bg-gradient-to-r dark:from-emerald-500/30 dark:to-teal-500/25 dark:border dark:border-emerald-400/45 text-white dark:text-emerald-200 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm dark:shadow-[0_0_16px_rgba(16,185,129,0.25)]">
                             <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-white"></span>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white dark:bg-emerald-300 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-white dark:bg-emerald-400"></span>
                             </span>
                             UPCOMING
                           </div>
@@ -360,50 +369,50 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
                             navigator.clipboard.writeText(t.id);
                             alert('Tournament ID copied!');
                           }}
-                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-100 text-slate-500 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] border border-white flex items-center gap-1.5 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer"
+                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-100 dark:!bg-[#13162b]/90 text-slate-500 dark:!text-indigo-200 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] border border-white dark:!border-white/16 flex items-center gap-1.5 hover:bg-slate-200 dark:hover:!bg-[#1d2240] active:scale-95 transition-all cursor-pointer shadow-xs"
                           title="Copy ID"
                         >
-                          <Copy size={9} /> {t.id.slice(0, 8)}
+                          <Copy size={9} className="dark:text-[#38bdf8]" /> {t.id.slice(0, 8)}
                         </div>
                         {t.entryType === 'invited' ? (
-                          <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-indigo-500/20">
-                            <Lock size={10} className="text-indigo-500" />
+                          <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-indigo-500/10 dark:bg-purple-500/25 text-indigo-600 dark:text-purple-200 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-indigo-500/20 dark:border-purple-400/40 dark:shadow-[0_0_12px_rgba(168,85,247,0.2)]">
+                            <Lock size={10} className="text-indigo-500 dark:text-purple-300" />
                             ONLY INVITED
                           </div>
                         ) : (
-                          <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-emerald-500/20">
-                            <Users size={10} className="text-emerald-500" />
+                          <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/25 text-emerald-600 dark:text-emerald-200 text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-emerald-500/20 dark:border-emerald-400/40 dark:shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                            <Users size={10} className="text-emerald-500 dark:text-emerald-300" />
                             PUBLIC
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-50 text-slate-500 border border-slate-100">
-                        <Users size={12} />
+                      <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-50 dark:!bg-[#13162b]/90 text-slate-500 dark:!text-white border border-slate-100 dark:!border-white/16 shadow-xs">
+                        <Users size={12} className="dark:text-[#38bdf8]" />
                         <span className="text-[9px] sm:text-[10px] font-black">{t.filledSlots}/{t.totalSlots}</span>
                       </div>
                    </div>
                    
-                   <div className="relative z-10 mb-4 sm:mb-8 space-y-1.5 sm:space-y-2">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200/90 shadow-sm max-w-full">
-                        <div className="w-4 h-4 rounded-md bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                   <div className="relative z-10 mb-4 sm:mb-8 space-y-1.5 sm:space-y-2.5">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:!bg-[#14182e]/90 border border-slate-200/90 dark:!border-white/16 shadow-sm max-w-full">
+                        <div className="w-4 h-4 rounded-md bg-indigo-600 dark:bg-gradient-to-br dark:from-[#ff7a45] dark:to-[#8b5cf6] text-white flex items-center justify-center shrink-0 shadow-xs">
                           <Shield size={10} />
                         </div>
-                        <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">ORGANIZER:</span>
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-800 uppercase tracking-tight truncate">
+                        <span className="text-[7px] sm:text-[8px] font-black text-slate-400 dark:!text-indigo-200/80 uppercase tracking-widest shrink-0">ORGANIZER:</span>
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-800 dark:!text-white uppercase tracking-tight truncate">
                           {t.organizerName || t.organizationName || t.publisherName || 'Official FC Host'}
                         </span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 dark:shadow-[0_0_6px_rgba(52,211,153,0.9)] shrink-0" />
                       </div>
-                      <h4 className="text-xl sm:text-3xl font-black text-slate-800 uppercase italic leading-tight group-hover:text-fc-green transition-colors">{t.title}</h4>
-                      <div className="w-10 sm:w-12 h-1 bg-fc-green/20 mt-1" />
+                      <h4 className="text-xl sm:text-3xl font-black text-slate-800 dark:!text-white uppercase italic leading-tight group-hover:text-fc-green dark:group-hover:!text-[#ff7a45] transition-colors drop-shadow-xs">{t.title}</h4>
+                      <div className="w-12 sm:w-14 h-1 bg-fc-green/20 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#38bdf8] rounded-full mt-1" />
                    </div>
 
-                   <div className="flex items-center justify-between relative z-10">
+                   <div className="flex items-center justify-between relative z-10 dark:p-3.5 dark:sm:p-4 dark:rounded-2xl dark:bg-[#121528]/80 dark:backdrop-blur-xl dark:border dark:border-white/14 dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_10px_25px_-6px_rgba(0,0,0,0.5)]">
                      <div className="flex flex-col">
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Total Rewards</span>
-                        <span className="text-lg sm:text-2xl font-black text-fc-dark tracking-tight flex items-center gap-1.5">
-                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-fc-gold flex items-center justify-center text-white text-[9px] sm:text-[10px] font-black">C</div>
-                          {t.prizePool}
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Total Rewards</span>
+                        <span className="text-lg sm:text-2xl font-black text-fc-dark dark:!text-white tracking-tight flex items-center gap-2">
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-fc-gold dark:bg-gradient-to-tr dark:from-amber-500 dark:to-yellow-300 flex items-center justify-center text-white dark:text-slate-950 text-[9px] sm:text-[10px] font-black shadow-sm dark:shadow-[0_0_12px_rgba(251,191,36,0.5)]">C</div>
+                          <span className="dark:bg-gradient-to-r dark:from-amber-200 dark:via-yellow-300 dark:to-amber-400 dark:bg-clip-text dark:text-transparent">{t.prizePool}</span>
                         </span>
                      </div>
                      <Button 
@@ -411,7 +420,7 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
                          e.stopPropagation();
                          onEnterTournament(t);
                        }}
-                       className="rounded-xl px-5 sm:px-8 py-2.5 sm:py-4 bg-fc-green text-black text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-md shadow-fc-green/20 hover:bg-fc-dark transition-all"
+                       className="rounded-xl px-5 sm:px-8 py-2.5 sm:py-4 bg-fc-green text-black dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] dark:!text-white dark:border dark:border-white/30 text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-md shadow-fc-green/20 dark:shadow-[0_10px_25px_-4px_rgba(236,72,153,0.55),inset_0_1px_1px_rgba(255,255,255,0.35)] hover:bg-fc-dark transition-all"
                      >
                         {profile?.uid === t.publisherId ? 'UPDATE' : 'JOIN'}
                      </Button>
@@ -428,18 +437,19 @@ export const ArenaPage: React.FC<ArenaProps> = ({ profile, onNavigate, onEnterTo
         <Reveal direction="left">
           <button 
             onClick={() => onNavigate('tournament')}
-            className="h-32 nm-flat rounded-[2.5rem] p-8 flex items-center justify-between active:nm-pressed transition-all group w-full"
+            className="h-32 nm-flat rounded-[2.5rem] p-8 flex items-center justify-between active:nm-pressed transition-all group w-full dark:!bg-gradient-to-r dark:!from-[#2b3056]/90 dark:!via-[#1f2340]/90 dark:!to-[#181b33]/95 dark:!border-white/18 dark:!shadow-[0_22px_50px_-12px_rgba(4,5,15,0.88),inset_0_1px_1px_rgba(255,255,255,0.22)] relative overflow-hidden"
           >
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 rounded-2xl nm-inset flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+            <div className="hidden dark:block absolute -right-10 -bottom-10 w-36 h-36 rounded-full bg-gradient-to-tl from-[#ff7a45]/25 via-[#a855f7]/20 to-transparent blur-2xl pointer-events-none" />
+            <div className="flex items-center gap-6 relative z-10">
+              <div className="w-14 h-14 rounded-2xl nm-inset dark:!bg-[#13162b]/90 dark:!border-white/15 flex items-center justify-center text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform shadow-inner">
                 <Trophy size={28} fill="currentColor" />
               </div>
               <div className="text-left">
-                <span className="text-sm font-black text-slate-800 uppercase italic block leading-none mb-1">Elite Cups</span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Join active tournaments</span>
+                <span className="text-sm font-black text-slate-800 dark:!text-white uppercase italic block leading-none mb-1">Elite Cups</span>
+                <span className="text-[9px] font-bold text-slate-400 dark:!text-indigo-200/80 uppercase tracking-widest">Join active tournaments</span>
               </div>
             </div>
-            <ArrowRight size={20} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+            <ArrowRight size={20} className="text-slate-300 dark:text-slate-300 group-hover:text-amber-500 dark:group-hover:text-[#ff7a45] transition-colors relative z-10" />
           </button>
         </Reveal>
       </div>

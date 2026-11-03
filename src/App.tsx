@@ -11,6 +11,7 @@ import { ArenaDetail } from './pages/ArenaDetail';
 import { useAuth } from './hooks/useAuth';
 import { useFraudProtection } from './hooks/useFraudProtection';
 import { useI18n } from './lib/i18n';
+import { ThemeProvider } from './lib/theme';
 import { useAppUpdate } from './hooks/useAppUpdate';
 import { Header, BottomNav, NavTab } from './components/layout/Shell';
 import { SetupProfile } from './components/auth/SetupProfile';
@@ -198,36 +199,42 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthPage />;
+    return (
+      <ThemeProvider>
+        <AuthPage />
+      </ThemeProvider>
+    );
   }
 
   if (isFrozen) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-rose-500/30 text-center space-y-6 animate-in zoom-in-95">
-          <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner border border-rose-100">
-            <ShieldAlert size={40} className="animate-pulse" />
+      <ThemeProvider userUid={user?.uid} profileTheme={profile?.themePreference}>
+        <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-rose-500/30 text-center space-y-6 animate-in zoom-in-95">
+            <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner border border-rose-100">
+              <ShieldAlert size={40} className="animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">{t('security_alert')}</h2>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-relaxed">
+                {fraudReason || t('security_message')}
+              </p>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[10px] font-black text-amber-800 uppercase tracking-widest">
+              {t('waiting_admin')}
+            </div>
+            <Button 
+              onClick={async () => {
+                await signOut(auth);
+                window.location.reload();
+              }}
+              className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest"
+            >
+              {t('sign_out_button')}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">{t('security_alert')}</h2>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-relaxed">
-              {fraudReason || t('security_message')}
-            </p>
-          </div>
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-[10px] font-black text-amber-800 uppercase tracking-widest">
-            {t('waiting_admin')}
-          </div>
-          <Button 
-            onClick={async () => {
-              await signOut(auth);
-              window.location.reload();
-            }}
-            className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest"
-          >
-            {t('sign_out_button')}
-          </Button>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
@@ -253,7 +260,11 @@ export default function App() {
   }
 
   if (!profile && !loading) {
-    return <SetupProfile user={user} />;
+    return (
+      <ThemeProvider>
+        <SetupProfile user={user} />
+      </ThemeProvider>
+    );
   }
 
   const renderContent = () => {
@@ -307,78 +318,84 @@ export default function App() {
   };
 
   return (
-    <div className="relative min-h-screen font-sans selection:bg-slate-900 selection:text-white pb-safe">
-      {/* Locked Fixed Background Layer - Will NEVER move or scroll */}
-      <div className="app-fixed-bg" />
+    <ThemeProvider>
+      <div className="relative min-h-screen font-sans selection:bg-slate-900 selection:text-white pb-safe">
+        {/* Locked Fixed Background Layer - Will NEVER move or scroll */}
+        <div className="app-fixed-bg overflow-hidden">
+          <div className="hidden dark:block absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#ff7a45]/14 blur-[110px]" />
+          <div className="hidden dark:block absolute top-1/4 -right-28 w-[26rem] h-[26rem] rounded-full bg-[#a855f7]/16 blur-[120px]" />
+          <div className="hidden dark:block absolute -bottom-24 left-1/4 w-96 h-96 rounded-full bg-[#38bdf8]/12 blur-[110px]" />
+        </div>
 
-      {/* Real-time floating Notification Toast Banner */}
-      <NotificationToast 
-        notification={toastNotification}
-        onClose={() => setToastNotification(null)}
-        onClick={(n) => {
-          setToastNotification(null);
-          handleNotificationNavigate(n);
-        }}
-      />
-
-      <div className="relative z-10">
-        <Header 
-          title={getTitle()} 
-          profile={profile} 
-          onOpenNotifications={() => setShowNotificationCenter(true)}
-          unreadCount={unreadCount}
+        {/* Real-time floating Notification Toast Banner */}
+        <NotificationToast 
+          notification={toastNotification}
+          onClose={() => setToastNotification(null)}
+          onClick={(n) => {
+            setToastNotification(null);
+            handleNotificationNavigate(n);
+          }}
         />
 
-        {/* Phone Notification Enable Banner */}
-        <AnimatePresence mode="wait">
-          <motion.main 
-            key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="max-w-lg mx-auto px-4 sm:px-6 pt-28 pb-36 min-h-screen"
-          >
-            {content}
-          </motion.main>
-        </AnimatePresence>
+        <div className="relative z-10">
+          <Header 
+            title={getTitle()} 
+            profile={profile} 
+            onOpenNotifications={() => setShowNotificationCenter(true)}
+            unreadCount={unreadCount}
+          />
 
-        {/* Tournament Arena Window - Outside main to prevent transform issues */}
-        {selectedTournament && (
-          <div className="fixed inset-0 z-[8000] bg-soft-bg overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
-            <ArenaDetail 
-              tournament={selectedTournament} 
-              profile={profile} 
-              onBack={() => setSelectedTournament(null)} 
+          {/* Phone Notification Enable Banner */}
+          <AnimatePresence mode="wait">
+            <motion.main 
+              key={activeTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-lg mx-auto px-4 sm:px-6 pt-28 pb-36 min-h-screen"
+            >
+              {content}
+            </motion.main>
+          </AnimatePresence>
+
+          {/* Tournament Arena Window - Outside main to prevent transform issues */}
+          {selectedTournament && (
+            <div className="fixed inset-0 z-[8000] bg-soft-bg overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
+              <ArenaDetail 
+                tournament={selectedTournament} 
+                profile={profile} 
+                onBack={() => setSelectedTournament(null)} 
+              />
+            </div>
+          )}
+
+          <div className="relative z-[9000]">
+            <BottomNav 
+              activeTab={activeTab} 
+              onTabChange={(tab) => {
+                setSelectedTournament(null);
+                setActiveTab(tab);
+              }} 
             />
           </div>
-        )}
-
-        <div className="relative z-[9000]">
-          <BottomNav 
-            activeTab={activeTab} 
-            onTabChange={(tab) => {
-              setSelectedTournament(null);
-              setActiveTab(tab);
-            }} 
-          />
-        </div>
 
 
-        {/* Real-time Notification Center Modal */}
-        <div className="relative z-[5001]">
-          <NotificationCenter 
-            isOpen={showNotificationCenter}
-            onClose={() => setShowNotificationCenter(false)}
-            notifications={notifications}
-            userId={user?.uid}
-            onNavigateTab={(tab) => {
-              setSelectedTournament(null);
-              setActiveTab(tab as NavTab);
-            }}
-          />
+          {/* Real-time Notification Center Modal */}
+          <div className="relative z-[5001]">
+            <NotificationCenter 
+              isOpen={showNotificationCenter}
+              onClose={() => setShowNotificationCenter(false)}
+              notifications={notifications}
+              userId={user?.uid}
+              onNavigateTab={(tab) => {
+                setSelectedTournament(null);
+                setActiveTab(tab as NavTab);
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </ThemeProvider>
   );
 }

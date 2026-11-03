@@ -18,6 +18,7 @@
         "phone": { "type": "string", "maxLength": 40 },
         "pushEnabled": { "type": "boolean" },
         "fcmTokens": { "type": "array", "items": { "type": "string" } },
+        "themePreference": { "type": "string", "enum": ["light", "dark"] },
         "createdAt": { "type": "object", "description": "Firestore Timestamp" },
         "updatedAt": { "type": "object", "description": "Firestore Timestamp" }
       },

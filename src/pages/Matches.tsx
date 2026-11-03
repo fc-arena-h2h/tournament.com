@@ -477,12 +477,12 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       <div
         key={match.id}
         className={cn(
-          "nm-flat p-0 border-2 border-white bg-white text-fc-dark space-y-0 relative overflow-hidden group transition-all hover:scale-[1.01] shadow-xl flex flex-col justify-between h-full",
+          "nm-flat p-0 border-2 border-white bg-white text-fc-dark dark:!bg-gradient-to-br dark:!from-[#2b3054]/88 dark:!via-[#1e223d]/88 dark:!to-[#16192e]/94 dark:!border-white/16 dark:hover:!border-[#a855f7]/45 dark:!shadow-[0_22px_50px_-12px_rgba(4,5,14,0.88),inset_0_1px_1px_rgba(255,255,255,0.22)] space-y-0 relative overflow-hidden group transition-all hover:scale-[1.01] shadow-xl flex flex-col justify-between h-full",
           isSideBySide ? "rounded-[1.5rem] sm:rounded-[2.2rem]" : "rounded-[2.5rem]"
         )}
       >
         {/* Background faint logo */}
-        <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] grayscale pointer-events-none -mr-16 -mt-16">
+        <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] dark:opacity-[0.06] grayscale pointer-events-none -mr-16 -mt-16">
           <Trophy size={120} />
         </div>
 
@@ -495,7 +495,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           {/* Top Header */}
           <div className="flex flex-col gap-1 relative z-10">
             {!isSideBySide && (
-              <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] truncate">
+              <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 dark:!text-[#ff7a45] uppercase tracking-[0.2em] truncate">
                 {tournamentObj?.title || 'Tournament'}
               </span>
             )}
@@ -506,12 +506,12 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   <div
                     className={cn(
                       "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0",
-                      isCompleted ? "bg-emerald-500 shadow-md" : "bg-amber-500 animate-pulse"
+                      isCompleted ? "bg-emerald-500 dark:bg-emerald-400 shadow-md dark:shadow-[0_0_8px_rgba(52,211,153,0.9)]" : "bg-amber-500 dark:bg-amber-400 animate-pulse"
                     )}
                   />
                   <span
                     className={cn(
-                      "font-black text-slate-400 uppercase tracking-wider truncate",
+                      "font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-wider truncate",
                       isSideBySide ? "text-[7px] sm:text-[9px]" : "text-[8.5px] sm:text-[10px] tracking-widest"
                     )}
                   >
@@ -520,7 +520,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   {pairTotalLegs && pairTotalLegs >= 2 && (
                     <span
                       className={cn(
-                        "rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 font-black uppercase tracking-wider shrink-0",
+                        "rounded-full bg-indigo-50 dark:!bg-indigo-500/22 text-indigo-600 dark:!text-indigo-200 border border-indigo-200 dark:!border-indigo-400/35 font-black uppercase tracking-wider shrink-0",
                         isSideBySide
                           ? "px-1.5 py-0.2 text-[6.5px] sm:text-[7.5px]"
                           : "px-2 py-0.5 text-[7.5px] sm:text-[8.5px] tracking-widest"
@@ -535,7 +535,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   <div className="flex items-center gap-1 mt-0.5">
                     <span
                       className={cn(
-                        "font-bold text-slate-400 truncate",
+                        "font-bold text-slate-400 dark:!text-slate-300 truncate",
                         isSideBySide ? "text-[7px] sm:text-[8.5px] max-w-[85px] sm:max-w-none" : "text-[9px]"
                       )}
                     >
@@ -547,7 +547,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                         navigator.clipboard.writeText(match.matchId || '');
                         alert('Match ID copied to clipboard!');
                       }}
-                      className="p-0.5 hover:bg-slate-100 rounded transition-colors text-slate-400 hover:text-indigo-500 shrink-0"
+                      className="p-0.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded transition-colors text-slate-400 dark:text-slate-300 hover:text-indigo-500 shrink-0"
                     >
                       <Copy size={isSideBySide ? 9 : 10} />
                     </button>
@@ -564,7 +564,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                       openReportResultModal(match);
                     }}
                     className={cn(
-                      "flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 font-black uppercase tracking-wider shadow-xs active:scale-95 transition-all",
+                      "flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:!bg-indigo-500/22 dark:hover:!bg-indigo-500/35 text-indigo-600 dark:!text-indigo-200 border border-indigo-200 dark:!border-indigo-400/35 font-black uppercase tracking-wider shadow-xs active:scale-95 transition-all",
                       isSideBySide
                         ? "px-1.5 py-1 text-[6.5px] sm:text-[8px]"
                         : "px-3 py-1.5 sm:px-3.5 sm:py-2 text-[8px] sm:text-[9px] tracking-widest"
@@ -578,7 +578,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 {isCompleted && (
                   <span
                     className={cn(
-                      "font-black text-white uppercase bg-fc-dark rounded-lg shadow-md",
+                      "font-black text-white uppercase bg-fc-dark dark:bg-gradient-to-r dark:from-emerald-500/25 dark:to-teal-500/20 dark:!text-emerald-200 dark:border dark:border-emerald-400/35 rounded-lg shadow-md",
                       isSideBySide
                         ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 sm:px-2.5 py-1"
                         : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
@@ -590,7 +590,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 {match.status === 'reported' && (
                   <span
                     className={cn(
-                      "font-black text-amber-600 uppercase bg-amber-50 rounded-lg border border-amber-200",
+                      "font-black text-amber-600 dark:!text-amber-300 uppercase bg-amber-50 dark:!bg-amber-500/20 rounded-lg border border-amber-200 dark:!border-amber-400/35",
                       isSideBySide
                         ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 py-1"
                         : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
@@ -602,7 +602,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 {match.status === 'disputed' && (
                   <span
                     className={cn(
-                      "font-black text-red-500 uppercase bg-red-50 rounded-lg border border-red-200",
+                      "font-black text-red-500 dark:!text-rose-300 uppercase bg-red-50 dark:!bg-rose-500/20 rounded-lg border border-red-200 dark:!border-rose-400/35",
                       isSideBySide
                         ? "text-[6.5px] sm:text-[8px] tracking-wider px-1.5 py-1"
                         : "text-[8px] sm:text-[9px] tracking-[0.2em] px-3 sm:px-5 py-1.5 sm:py-2"
@@ -640,7 +640,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   className={cn(
                     "font-black uppercase",
                     isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
-                    homeWin ? "text-amber-500 font-black" : "text-slate-400"
+                    homeWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
                   )}
                 >
                   HOME
@@ -661,14 +661,14 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </div>
               <div
                 className={cn(
-                  "bg-slate-900 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
                   isSideBySide
                     ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                     : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                  isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
+                  isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
                 )}
               >
-                <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 sm:w-7 sm:h-7" />
+                <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
               </div>
               <div className="text-center w-full px-0.5">
                 <h5
@@ -677,7 +677,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                     isSideBySide
                       ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]"
                       : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
-                    homeWin && isCompleted ? "text-amber-600 font-black" : homeWin ? "text-fc-dark" : "text-slate-500"
+                    homeWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
                   )}
                 >
                   {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
@@ -698,17 +698,17 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                     className={cn(
                       "font-black italic tracking-tighter",
                       isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
-                      homeWin && isCompleted ? "text-amber-500 drop-shadow-xs" : homeWin ? "text-fc-dark" : "text-slate-300"
+                      homeWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
                     )}
                   >
                     {match.homeScore || 0}
                   </span>
-                  <div className={cn("bg-slate-200 rounded-full", isSideBySide ? "w-1.5 sm:w-2.5 h-0.5" : "w-2.5 sm:w-4 h-0.5 sm:h-1")} />
+                  <div className={cn("bg-slate-200 dark:!bg-white/25 rounded-full", isSideBySide ? "w-1.5 sm:w-2.5 h-0.5" : "w-2.5 sm:w-4 h-0.5 sm:h-1")} />
                   <span
                     className={cn(
                       "font-black italic tracking-tighter",
                       isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
-                      awayWin && isCompleted ? "text-amber-500 drop-shadow-xs" : awayWin ? "text-fc-dark" : "text-slate-300"
+                      awayWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
                     )}
                   >
                     {match.awayScore || 0}
@@ -717,7 +717,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               ) : (
                 <div
                   className={cn(
-                    "bg-fc-dark border-2 border-white flex items-center justify-center shadow-md",
+                    "bg-fc-dark dark:bg-gradient-to-br dark:from-[#ff7a45] dark:to-[#8b5cf6] border-2 border-white dark:border-white/25 flex items-center justify-center shadow-md",
                     isSideBySide ? "w-7 h-7 xs:w-8 xs:h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl" : "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl"
                   )}
                 >
@@ -728,7 +728,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               )}
               <div
                 className={cn(
-                  "bg-slate-50 rounded-lg border border-slate-100",
+                  "bg-slate-50 dark:!bg-[#131629]/90 rounded-lg border border-slate-100 dark:!border-white/12",
                   isSideBySide ? "px-1.5 py-0.5" : "px-2.5 sm:px-4 py-1 sm:py-2 sm:rounded-xl"
                 )}
               >
@@ -737,7 +737,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 ) : (
                   <span
                     className={cn(
-                      "font-black text-slate-400 uppercase tracking-widest italic block",
+                      "font-black text-slate-400 dark:!text-slate-300 uppercase tracking-widest italic block",
                       isSideBySide ? "text-[6px] sm:text-[7px]" : "text-[7px] sm:text-[8px]"
                     )}
                   >
@@ -765,7 +765,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   className={cn(
                     "font-black uppercase",
                     isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
-                    awayWin ? "text-amber-500 font-black" : "text-slate-400"
+                    awayWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
                   )}
                 >
                   AWAY
@@ -786,14 +786,14 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </div>
               <div
                 className={cn(
-                  "bg-slate-900 flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
                   isSideBySide
                     ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                     : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                  isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md scale-105" : "border-white/50"
+                  isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
                 )}
               >
-                <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 sm:w-7 sm:h-7" />
+                <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
               </div>
               <div className="text-center w-full px-0.5">
                 <h5
@@ -802,7 +802,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                     isSideBySide
                       ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]"
                       : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
-                    awayWin && isCompleted ? "text-amber-600 font-black" : awayWin ? "text-fc-dark" : "text-slate-500"
+                    awayWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
                   )}
                 >
                   {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
@@ -814,7 +814,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           {/* Action Buttons & Two-Step Verification */}
           <div
             className={cn(
-              "flex flex-wrap relative z-10 border-t border-slate-50",
+              "flex flex-wrap relative z-10 border-t border-slate-50 dark:border-white/10",
               isSideBySide ? "gap-1.5 pt-2.5" : "gap-3 pt-4"
             )}
           >
@@ -1036,15 +1036,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         return (
           <div
             key={pairKey}
-            className="p-2.5 xs:p-3 sm:p-4 rounded-[2rem] sm:rounded-[2.6rem] bg-slate-100/90 border-2 border-indigo-100/80 space-y-2.5 sm:space-y-3.5 shadow-sm"
+            className="p-2.5 xs:p-3 sm:p-4 rounded-[2rem] sm:rounded-[2.6rem] bg-slate-100/90 dark:!bg-[#181b31]/85 border-2 border-indigo-100/80 dark:!border-indigo-400/25 space-y-2.5 sm:space-y-3.5 shadow-sm dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.85)]"
           >
             {/* Tournament Name + Pair Header Banner */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-2">
-                <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] truncate">
+                <span className="text-[9px] sm:text-[10px] font-black text-indigo-600 dark:!text-[#ff7a45] uppercase tracking-[0.2em] truncate">
                   {tournamentTitle}
                 </span>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+                <span className="text-[8px] font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-widest shrink-0">
                   {leg1.stage === 'group' ? `Group Stage · Group ${leg1.groupId}` : `Knockout · ${leg1.stage}`}
                 </span>
               </div>

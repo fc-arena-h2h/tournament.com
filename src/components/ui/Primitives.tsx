@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/src/lib/utils';
-import { motion, HTMLMotionProps, AnimatePresence } from 'framer-motion';
+import { motion, HTMLMotionProps } from 'framer-motion';
 
 interface ButtonProps extends HTMLMotionProps<"button"> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'success' | 'danger' | 'premium';
@@ -10,13 +10,13 @@ interface ButtonProps extends HTMLMotionProps<"button"> {
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
     const variants = {
-      primary: 'bg-slate-900 text-white font-black uppercase tracking-[0.15em] hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95',
-      secondary: 'bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 active:scale-95',
-      outline: 'bg-white/40 backdrop-blur-md border-2 border-slate-200 text-slate-700 font-black uppercase tracking-wider hover:border-slate-900 transition-all active:scale-95',
-      ghost: 'bg-transparent text-slate-500 hover:bg-slate-100/50 hover:text-slate-900',
+      primary: 'bg-slate-900 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:to-[#a855f7] text-white font-black uppercase tracking-[0.15em] hover:bg-slate-800 shadow-lg shadow-slate-900/10 dark:shadow-[#a855f7]/25 active:scale-95',
+      secondary: 'bg-slate-100 dark:bg-[#232642]/80 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-[#2c3052] active:scale-95',
+      outline: 'bg-white/40 dark:bg-white/5 backdrop-blur-md border-2 border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 font-black uppercase tracking-wider hover:border-slate-900 dark:hover:border-white/30 transition-all active:scale-95',
+      ghost: 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white',
       success: 'bg-emerald-500 text-white font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95',
       danger: 'bg-rose-500 text-white font-black uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95',
-      premium: 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 active:scale-95',
+      premium: 'bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] text-white font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/30 dark:shadow-[#ec4899]/25 hover:shadow-indigo-500/50 active:scale-95',
     };
 
     const sizes = {
@@ -50,7 +50,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
         <input
           ref={ref}
           className={cn(
-            'w-full h-15 px-6 bg-white/60 backdrop-blur-sm rounded-2xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all border-2 border-slate-100 group-focus-within:border-indigo-500/30',
+            'w-full h-15 px-6 bg-white/60 dark:bg-[#141627]/85 backdrop-blur-md rounded-2xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-[#a855f7]/20 transition-all border-2 border-slate-100 dark:border-white/12 group-focus-within:border-indigo-500/30 dark:group-focus-within:border-[#ff7a45]/50',
             className
           )}
           {...props}
@@ -78,10 +78,10 @@ export const Card = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={hover ? { y: -4, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' } : {}}
+      whileHover={hover ? { y: -4 } : {}}
       onClick={onClick}
       className={cn(
-        'bg-white/80 backdrop-blur-xl rounded-[2rem] p-8 border border-white shadow-sm relative overflow-hidden',
+        'bg-white/80 dark:bg-[#232642]/72 backdrop-blur-2xl rounded-[2rem] p-8 border border-white dark:border-white/14 shadow-sm dark:shadow-[0_20px_45px_-12px_rgba(6,7,16,0.8),inset_0_1px_1px_rgba(255,255,255,0.16)] relative overflow-hidden',
         onClick && 'cursor-pointer active:scale-[0.99] transition-all',
         className
       )}
@@ -90,4 +90,3 @@ export const Card = ({
     </motion.div>
   );
 };
-

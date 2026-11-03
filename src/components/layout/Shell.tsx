@@ -31,7 +31,7 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
 
   return (
     <nav className="fixed bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-[9000] w-[96%] max-w-lg px-1 sm:px-2">
-      <div className="nm-flat rounded-[2.5rem] sm:rounded-[3rem] h-20 sm:h-24 flex items-center justify-around border-2 border-white/50 px-2 sm:px-4 shadow-2xl">
+      <div className="nm-flat rounded-[2.5rem] sm:rounded-[3rem] h-20 sm:h-24 flex items-center justify-around border-2 border-white/50 dark:border-white/15 px-2 sm:px-4 shadow-2xl">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -40,8 +40,10 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 transition-all h-20 min-w-[4.2rem] px-2 rounded-[2rem] relative',
-                isActive ? 'nm-inset text-indigo-500 bg-[#e6e6e9]' : 'text-slate-400'
+                'flex flex-col items-center justify-center gap-1 transition-all h-18 sm:h-20 min-w-[4.2rem] px-3 rounded-[1.8rem] relative',
+                isActive
+                  ? 'nm-inset text-indigo-500 dark:text-[#ff7a45] bg-[#e6e6e9] dark:bg-[#191b30]/90 dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.6),0_0_20px_rgba(255,122,69,0.18)]'
+                  : 'text-slate-400 dark:text-slate-400 hover:dark:text-slate-200'
               )}
             >
               <Icon size={24} strokeWidth={isActive ? 3 : 2} className={cn(isActive && 'scale-110')} />
@@ -49,7 +51,7 @@ export const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
                 {tab.label}
               </span>
               {isActive && (
-                <div className="absolute -bottom-2 w-1.5 h-1.5 rounded-full bg-indigo-500 nm-flat border border-white/50 shadow-sm" />
+                <div className="absolute -bottom-1.5 w-2 h-2 rounded-full bg-indigo-500 dark:bg-[#ff7a45] nm-flat border border-white/50 dark:border-white/30 shadow-sm dark:shadow-[0_0_10px_#ff7a45]" />
               )}
             </button>
           );

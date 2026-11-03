@@ -69,7 +69,8 @@ service cloud.firestore {
         && (!('leagueMessengerGroupLink' in data) || (data.leagueMessengerGroupLink is string))
         && (!('whatsappNumber' in data) || (data.whatsappNumber is string))
         && (!('leagueName' in data) || (data.leagueName is string))
-        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40));
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40))
+        && (!('themePreference' in data) || (data.themePreference in ['light', 'dark']));
     }
 
     function isValidTournament(data) {
@@ -152,7 +153,7 @@ service cloud.firestore {
       );
       allow update: if (isOwner(userId) && isValidUser(incoming()) && (
         // Action: Update Profile
-        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'whatsappNumber', 'phone', 'pushEnabled', 'fcmTokens', 'updatedAt']))
+        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'leagueMessengerGroupLink', 'whatsappNumber', 'phone', 'pushEnabled', 'fcmTokens', 'themePreference', 'updatedAt']))
         && incoming().role == existing().role
       )) || isAdmin();
     }
