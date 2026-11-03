@@ -91,6 +91,8 @@ service cloud.firestore {
         && (!('prizes' in data) || (data.prizes is map || data.prizes == null))
         && (!('totalSlots' in data) || (data.totalSlots is number))
         && (!('filledSlots' in data) || (data.filledSlots is number))
+        && (!('shardId' in data) || (data.shardId is string))
+        && (!('notifShardId' in data) || (data.notifShardId is string))
         && (!('createdAt' in data) || (data.createdAt is timestamp));
     }
 
@@ -127,6 +129,9 @@ service cloud.firestore {
       return data.key is string && data.key.size() >= 5
         && data.status in ['active', 'used']
         && (data.createdBy == request.auth.uid || !('createdBy' in data))
+        && (!('targetShardId' in data) || data.targetShardId is string)
+        && (!('targetShardName' in data) || data.targetShardName is string)
+        && (!('notifShardId' in data) || data.notifShardId is string)
         && (data.createdAt <= request.time || !('createdAt' in data));
     }
 
@@ -139,6 +144,7 @@ service cloud.firestore {
         && (!('linkTab' in data) || data.linkTab is string)
         && (!('tournamentId' in data) || data.tournamentId == null || data.tournamentId is string)
         && (!('matchId' in data) || data.matchId == null || data.matchId is string)
+        && (!('shardId' in data) || data.shardId == null || data.shardId is string)
         && (!('extra' in data) || data.extra == null || data.extra is map)
         && (!('createdAt' in data) || data.createdAt is timestamp);
     }
@@ -234,7 +240,7 @@ service cloud.firestore {
         existing().status == 'active' && 
         incoming().status == 'used' && 
         incoming().usedBy == request.auth.uid &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt', 'tournamentId'])
       );
       allow delete: if isAdmin();
     }

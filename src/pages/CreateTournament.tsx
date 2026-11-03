@@ -9,6 +9,8 @@ import {
 import { UserProfile } from '@/src/hooks/useAuth';
 import { cn } from '@/src/lib/utils';
 import { saveDemoTournament, saveDemoParticipants, generateDemoPlayers, DemoTournament } from '@/src/lib/localTournaments';
+import { getTournamentDbForShard, getShardClusterInfo } from '@/src/lib/shardManager';
+import { registerTournamentShard, recordUserActiveShard, invalidateLocalCache, ShardId } from '@/src/lib/localDbManager';
 
 export const CreateTournamentPage = ({ 
   profile, 
@@ -162,18 +164,18 @@ export const CreateTournamentPage = ({
         throw new Error('Invalid or already used Activation Key! Please purchase a valid key from the admin.');
       }
 
-      // 2. Mark Key as Used
-      await updateDoc(doc(db, 'licenseKeys', keyDoc.id), {
-        status: 'used',
-        usedBy: auth.currentUser.uid,
-        usedAt: serverTimestamp()
-      }).catch(err => {
-        handleFirestoreError(err, OperationType.UPDATE, `licenseKeys/${keyDoc.id}`);
-        throw err;
-      });
+      const keyData = keyDoc.data();
+      const targetShardId: ShardId =
+        keyData.targetShardId ||
+        (keyString.startsWith('FC-DB2-') ? 'shard_2' : 'shard_1');
+      const notifShardId =
+        keyData.notifShardId ||
+        (targetShardId === 'shard_2' ? 'notif_2' : 'notif_1');
+      const targetTournamentDb = getTournamentDbForShard(targetShardId);
+      const shardInfo = getShardClusterInfo(targetShardId);
 
-      // 3. Create Tournament
-      await addDoc(collection(db, 'tournaments'), {
+      // 2. Create Tournament in the Assigned Shard Database (Gariena1 or FC Tournament)
+      const createdRef = await addDoc(collection(targetTournamentDb, 'tournaments'), {
         title: formData.title,
         description: formData.description,
         organizerName: finalOrganizer,
@@ -183,7 +185,7 @@ export const CreateTournamentPage = ({
         format: formData.format,
         entryType: formData.entryType,
         invitationKey: formData.entryType === 'invited' ? formData.invitationKey.trim() : null,
-        activationKey: formData.deploymentKey.trim(), // Use the deployment key as the join key too
+        activationKey: formData.deploymentKey.trim(),
         messengerGroupLink: formData.messengerGroupLink.trim(),
         prizePool: formData.prizePool,
         rewardType: formData.rewardType,
@@ -197,10 +199,32 @@ export const CreateTournamentPage = ({
         totalSlots: Number(formData.totalSlots) || 16,
         resultUploadType: formData.resultUploadType,
         autoMatchDeploy: formData.autoMatchDeploy,
+        shardId: targetShardId,
+        notifShardId,
         createdAt: serverTimestamp()
       });
 
-      alert(`Tournament created successfully!`);
+      // 3. Mark Key as Used in Master DB (zxzx) after tournament creation succeeds
+      await updateDoc(doc(db, 'licenseKeys', keyDoc.id), {
+        status: 'used',
+        usedBy: auth.currentUser.uid,
+        usedAt: serverTimestamp(),
+        tournamentId: createdRef.id
+      }).catch(err => {
+        handleFirestoreError(err, OperationType.UPDATE, `licenseKeys/${keyDoc.id}`);
+        throw err;
+      });
+
+      // 4. Register in Local Database Management System
+      registerTournamentShard(createdRef.id, targetShardId, formData.title);
+      recordUserActiveShard(auth.currentUser.uid, targetShardId);
+      invalidateLocalCache('all_tournaments_');
+
+      alert(
+        profile?.role === 'admin'
+          ? `Tournament created successfully in ${shardInfo.name}!`
+          : 'Tournament created successfully!'
+      );
       onBack();
     } catch (error: any) {
       console.error("Tournament Creation Error:", error);

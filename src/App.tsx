@@ -18,8 +18,7 @@ import { SetupProfile } from './components/auth/SetupProfile';
 import { GameLoader } from './components/ui/GameLoader';
 import { UpdateOverlay } from './components/ui/UpdateOverlay';
 import { Button } from '@/src/components/ui/Primitives';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db, auth } from './lib/firebase';
+import { auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
   AppNotification, 
@@ -27,12 +26,14 @@ import {
   showSystemNotification, 
   markNotificationAsRead,
   requestPhoneNotificationPermission,
-  sendTestPhoneNotification,
   updateAppBadge,
+  subscribeToUserNotificationsAcrossShards,
 } from './lib/notifications';
+import { findTournamentAcrossShards } from './lib/shardManager';
+import { runLocalDbGarbageCollection } from './lib/localDbManager';
 import { NotificationCenter } from './components/ui/NotificationCenter';
 import { NotificationToast } from './components/ui/NotificationToast';
-import { Bell, BellRing, X, ShieldAlert } from 'lucide-react';
+import { X, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 
@@ -68,7 +69,11 @@ export default function App() {
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
   const initialNotifLoadRef = useRef(false);
 
-  // Real-time Notification Listener
+  // Real-time Multi-Shard Notification Listener (App v1 + MY App 1 + Master zxzx)
+  useEffect(() => {
+    runLocalDbGarbageCollection();
+  }, []);
+
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -84,35 +89,21 @@ export default function App() {
       }, 2000);
     }
 
-    const recipientIds = [user.uid, 'all'];
-    if (isAdmin) recipientIds.push('admin');
-
-    const q = query(
-      collection(db, 'notifications'),
-      where('recipientId', 'in', recipientIds),
-      orderBy('createdAt', 'desc'),
-      limit(30)
-    );
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      const list: AppNotification[] = [];
+    const unsub = subscribeToUserNotificationsAcrossShards(user.uid, isAdmin, (list) => {
       const newItems: AppNotification[] = [];
 
-      snapshot.docs.forEach((d) => {
-        const data = d.data();
-        const n: AppNotification = { id: d.id, ...data } as AppNotification;
-        list.push(n);
-
-        if (initialNotifLoadRef.current && !n.read && !knownNotifIdsRef.current.has(n.id)) {
+      list.forEach((n) => {
+        const key = `${n.shardId || 'master'}_${n.id}`;
+        if (initialNotifLoadRef.current && !n.read && !knownNotifIdsRef.current.has(key)) {
           newItems.push(n);
         }
-        knownNotifIdsRef.current.add(n.id);
+        knownNotifIdsRef.current.add(key);
       });
 
       setNotifications(list);
 
       if (!initialNotifLoadRef.current) {
-        list.forEach((item) => knownNotifIdsRef.current.add(item.id));
+        list.forEach((item) => knownNotifIdsRef.current.add(`${item.shardId || 'master'}_${item.id}`));
         initialNotifLoadRef.current = true;
       } else if (newItems.length > 0) {
         const newest = newItems[0];
@@ -124,8 +115,6 @@ export default function App() {
           url: import.meta.env.BASE_URL
         });
       }
-    }, (err) => {
-      console.warn("Notifications listener error:", err?.message || err);
     });
 
     return () => unsub();
@@ -165,16 +154,14 @@ export default function App() {
 
   const handleNotificationNavigate = async (notif: AppNotification) => {
     if (!notif.read) {
-      await markNotificationAsRead(notif.id);
+      await markNotificationAsRead(notif.id, notif.shardId);
     }
-
-
 
     if (notif.tournamentId) {
       try {
-        const tSnap = await getDoc(doc(db, 'tournaments', notif.tournamentId));
-        if (tSnap.exists()) {
-          setSelectedTournament({ id: tSnap.id, ...tSnap.data() });
+        const found = await findTournamentAcrossShards(notif.tournamentId, notif.shardId);
+        if (found.exists && found.data) {
+          setSelectedTournament(found.data);
           setShowNotificationCenter(false);
           return;
         }
@@ -208,7 +195,7 @@ export default function App() {
 
   if (isFrozen) {
     return (
-      <ThemeProvider userUid={user?.uid} profileTheme={profile?.themePreference}>
+      <ThemeProvider>
         <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-rose-500/30 text-center space-y-6 animate-in zoom-in-95">
             <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner border border-rose-100">
@@ -388,7 +375,16 @@ export default function App() {
               onClose={() => setShowNotificationCenter(false)}
               notifications={notifications}
               userId={user?.uid}
-              onNavigateTab={(tab) => {
+              onNavigateTab={async (tab, meta) => {
+                if (meta?.tournamentId) {
+                  try {
+                    const found = await findTournamentAcrossShards(meta.tournamentId, meta.shardId);
+                    if (found.exists && found.data) {
+                      setSelectedTournament(found.data);
+                      return;
+                    }
+                  } catch {}
+                }
                 setSelectedTournament(null);
                 setActiveTab(tab as NavTab);
               }}

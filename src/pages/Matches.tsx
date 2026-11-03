@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { subscribeToMatchesAcrossShards, getTournamentDbByTournamentId, findTournamentAcrossShards } from '@/src/lib/shardManager';
 import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle, Edit3, RotateCcw } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -98,63 +99,58 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const matchesQ = query(
-      collection(db, 'matches'),
-      where('participants', 'array-contains', auth.currentUser.uid)
-    );
-    const unsubMatches = onSnapshot(matchesQ, async (snap) => {
-      const matchData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
-      setMatches(matchData);
-      setLoading(false);
+    const unsubMatches = subscribeToMatchesAcrossShards(
+      { participantId: auth.currentUser.uid },
+      async (rawMatches) => {
+        const matchData = rawMatches as Match[];
+        setMatches(matchData);
+        setLoading(false);
 
-
-
-      // Fetch tournament details
-      const tIds = Array.from(new Set(matchData.map(m => m.tournamentId))).filter(Boolean);
-      const tData = { ...tournaments };
-      let tChanged = false;
-      await Promise.all(tIds.map(async (tId) => {
-        if (!tId || typeof tId !== 'string' || !tId.trim()) return;
-        if (!tData[tId]) {
-          try {
-            const tSnap = await getDoc(doc(db, 'tournaments', tId.trim()));
-            if (tSnap.exists()) {
-              tData[tId] = { id: tSnap.id, ...tSnap.data() };
-              tChanged = true;
+        // Fetch tournament details across shards
+        const tIds = Array.from(new Set(matchData.map(m => m.tournamentId))).filter(Boolean);
+        const tData = { ...tournaments };
+        let tChanged = false;
+        await Promise.all(tIds.map(async (tId) => {
+          if (!tId || typeof tId !== 'string' || !tId.trim()) return;
+          if (!tData[tId]) {
+            try {
+              const found = await findTournamentAcrossShards(tId.trim());
+              if (found && found.exists) {
+                tData[tId] = { id: found.id, ...found.data };
+                tChanged = true;
+              }
+            } catch (e) {
+              console.error('Error fetching tournament', e);
             }
-          } catch (e) {
-            console.error('Error fetching tournament', e);
-          }
-        }
-      }));
-      if (tChanged) setTournaments(tData);
-
-      // Fetch player profiles
-      const uids = new Set<string>();
-      matchData.forEach(m => {
-        if (m.homePlayerId) uids.add(m.homePlayerId);
-        if (m.awayPlayerId) uids.add(m.awayPlayerId);
-      });
-      const missing = Array.from(uids).filter(uid => !profiles[uid]);
-      if (missing.length > 0) {
-        const pData = { ...profiles };
-        let pChanged = false;
-        await Promise.all(missing.map(async (uid) => {
-          try {
-            const pSnap = await getDoc(doc(db, 'users', uid));
-            if (pSnap.exists()) {
-              pData[uid] = pSnap.data() as UserProfile;
-              pChanged = true;
-            }
-          } catch (e) {
-            console.error('Error fetching profile', e);
           }
         }));
-        if (pChanged) setProfiles(pData);
+        if (tChanged) setTournaments(tData);
+
+        // Fetch player profiles from Master DB
+        const uids = new Set<string>();
+        matchData.forEach(m => {
+          if (m.homePlayerId) uids.add(m.homePlayerId);
+          if (m.awayPlayerId) uids.add(m.awayPlayerId);
+        });
+        const missing = Array.from(uids).filter(uid => !profiles[uid]);
+        if (missing.length > 0) {
+          const pData = { ...profiles };
+          let pChanged = false;
+          await Promise.all(missing.map(async (uid) => {
+            try {
+              const pSnap = await getDoc(doc(db, 'users', uid));
+              if (pSnap.exists()) {
+                pData[uid] = pSnap.data() as UserProfile;
+                pChanged = true;
+              }
+            } catch (e) {
+              console.error('Error fetching profile', e);
+            }
+          }));
+          if (pChanged) setProfiles(pData);
+        }
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'matches');
-    });
+    );
 
     return () => unsubMatches();
   }, [auth.currentUser?.uid]);
@@ -289,7 +285,11 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
     setIsSubmittingReport(true);
     try {
-      await updateDoc(doc(db, 'matches', reportingMatch.id), {
+      const { db: targetDb } = getTournamentDbByTournamentId(
+        reportingMatch.tournamentId,
+        (reportingMatch as any).shardId || tournaments[reportingMatch.tournamentId]?.shardId
+      );
+      await updateDoc(doc(targetDb, 'matches', reportingMatch.id), {
         homeScore: reportFormData.home,
         awayScore: reportFormData.away,
         status: isDirectFinalize ? 'completed' : 'reported',
@@ -315,7 +315,11 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       return;
     }
     try {
-      await updateDoc(doc(db, 'matches', match.id), {
+      const { db: targetDb } = getTournamentDbByTournamentId(
+        match.tournamentId,
+        (match as any).shardId || tournaments[match.tournamentId]?.shardId
+      );
+      await updateDoc(doc(targetDb, 'matches', match.id), {
         status: 'completed',
         updatedAt: serverTimestamp()
       });
@@ -339,7 +343,11 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     const reason = prompt('Why are you reporting this match result? (Optional)');
     if (reason === null) return;
     try {
-      await updateDoc(doc(db, 'matches', match.id), {
+      const { db: targetDb } = getTournamentDbByTournamentId(
+        match.tournamentId,
+        (match as any).shardId || tournaments[match.tournamentId]?.shardId
+      );
+      await updateDoc(doc(targetDb, 'matches', match.id), {
         status: 'disputed',
         disputeReason: reason || 'Opponent reported incorrect match result',
         updatedAt: serverTimestamp()
@@ -366,7 +374,11 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   const handleAdminResolve = async (match: Match, action: 'approve' | 'reset') => {
     try {
       if (action === 'reset') {
-        await updateDoc(doc(db, 'matches', match.id), {
+        const { db: targetDb } = getTournamentDbByTournamentId(
+          match.tournamentId,
+          (match as any).shardId || tournaments[match.tournamentId]?.shardId
+        );
+        await updateDoc(doc(targetDb, 'matches', match.id), {
           status: 'scheduled',
           homeScore: null,
           awayScore: null,

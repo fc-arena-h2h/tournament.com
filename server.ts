@@ -103,6 +103,13 @@ async function createServer() {
     
     app.use('*', async (req, res, next) => {
       const url = req.originalUrl;
+      const cleanPath = url.split('?')[0];
+      if (
+        cleanPath.startsWith('/assets/') ||
+        /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|map|json|webmanifest|woff|woff2|ttf)$/i.test(cleanPath)
+      ) {
+        return res.status(404).end();
+      }
       try {
         let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
         template = await vite.transformIndexHtml(url, template);
@@ -117,6 +124,13 @@ async function createServer() {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
+      const cleanPath = req.originalUrl.split('?')[0];
+      if (
+        cleanPath.startsWith('/assets/') ||
+        /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|map|json|webmanifest|woff|woff2|ttf)$/i.test(cleanPath)
+      ) {
+        return res.status(404).end();
+      }
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }

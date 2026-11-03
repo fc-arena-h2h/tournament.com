@@ -65,10 +65,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleNotificationClick = async (notif: AppNotification) => {
     if (!notif.read) {
-      await markNotificationAsRead(notif.id);
+      await markNotificationAsRead(notif.id, notif.shardId);
     }
-    
-
 
     // Check if notification links to a tab
     if (notif.linkTab) {
@@ -76,6 +74,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       onNavigateTab?.(notif.linkTab, {
         tournamentId: notif.tournamentId,
         matchId: notif.matchId,
+        shardId: notif.shardId,
         extra: notif.extra
       });
     }
@@ -392,7 +391,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteNotification(n.id);
+                                deleteNotification(n.id, n.shardId);
                               }}
                               className="w-8 h-8 rounded-xl nm-inset bg-white text-slate-300 hover:text-rose-500 flex items-center justify-center transition-colors"
                               title="Delete"

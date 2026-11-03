@@ -1,169 +1,234 @@
-# FC Arena — Dark Glassmorphic Theme & Profile Theme Switcher
+# মাল্টি-ডাটাবেজ আর্কিটেকচার এবং লোকাল ডাটাবেজ ম্যানেজমেন্ট প্ল্যান (Multi-Database Sharding & Local DB Architecture)
 
-এই প্ল্যানের মাধ্যমে **FC Arena** অ্যাপে একটি প্রিমিয়াম **Dark Glassmorphic Theme (ডার্ক গ্লাস মোড)** এবং প্রোফাইল সেকশনের নিচে **Light / Dark Theme Switcher** যুক্ত করা হবে। অ্যাপটি প্রথমবার ওপেন করলে ডিফল্টভাবে বর্তমান **Light Theme** চালু থাকবে, এবং ব্যবহারকারী প্রোফাইল থেকে ডার্ক মোডে সুইচ করলে আপনার দেওয়া রেফারেন্স ছবির মতো ডিপ নেভি-ভায়োলেট (`#181928` / `#1E2032`) ব্যাকগ্রাউন্ড, ফ্রস্টেড গ্লাস কার্ড (`backdrop-blur`), রিম-লাইট বর্ডার এবং অরেঞ্জ-সায়ান-পার্পল অ্যাম্বিয়েন্ট গ্লো ইফেক্ট পুরো অ্যাপে প্রযোজ্য হবে।
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> নিচের সিদ্ধান্তগুলো আপনার উত্তরের ভিত্তিতে চূড়ান্ত করা হয়েছে এবং এর নিচেই ভিজ্যুয়াল ডেমো প্রিভিউ যুক্ত করা হয়েছে:
-
-- **Confirmed Decision 1 — Default Theme Posture**: অ্যাপটি প্রথমবার লোড হলে ডিফল্টভাবে বর্তমান **Light Theme** চালু থাকবে।
-- **Confirmed Decision 2 — Dark Glass Palette & Glow**: একেবারে পিচ-ব্ল্যাক (`#000000`) ব্যবহার না করে ছবির মতো **Deep Navy-Violet (`#181928` থেকে `#222437`)** ক্যানভাস এবং কার্ডের পেছনে ও বর্ডারে **Orange (`#FF7A45`), Cyan (`#38BDF8`), ও Purple (`#A855F7`)** অ্যাম্বিয়েন্ট গ্লো ও গ্লাস ইফেক্ট ব্যবহার করা হবে।
-- **Confirmed Decision 3 — Dual Persistence**: ব্যবহারকারী প্রোফাইল থেকে থিম পরিবর্তন করলে সেটি সাথে সাথে **Device Local Storage** এবং লগইন করা **User Account Profile (`themePreference`)**—দুই জায়গাতেই সেভ হবে।
+এই ডকুমেন্টে **FC Arena VS** অ্যাপের ৫টি ফায়ারবেস ডাটাবেজ কীভাবে একসাথে কাজ করবে, কীভাবে লোকাল ডাটাবেজ ম্যানেজমেন্ট সিস্টেম কোটা সাশ্রয় করবে, অ্যাডমিন কীভাবে অ্যাক্টিভেশন কি (Activation Key) দিয়ে ডাটাবেজ নির্ধারণ করবেন এবং বাকি ৪টি ফায়ারবেস প্রজেক্টের **Security Rules (`firestore.rules`)** কী হবে—তার সম্পূর্ণ ব্লুপ্রিন্ট দেওয়া হলো।
 
 ---
 
-## 1. Overview & Core Concept
+## ১. ৫টি ফায়ারবেস ডাটাবেজের পরিচিতি ও দায়িত্ব (Database Cluster Overview)
 
-- **What It Does**: পুরো অ্যাপ্লিকেশনে (Dashboard, Arena Tournaments, Knockout Brackets, Match Cards, My Match, Modals, Header ও Bottom Navigation) একটি প্রফেশনাল **Frosted Glass Dark Mode** যুক্ত করে এবং প্রোফাইল পেজের নিচে একটি ওয়ান-ট্যাপ **Appearance / Theme Switcher** প্রদান করে।
-- **Target Audience / Persona**: টুর্নামেন্টের প্লেয়ার, পাবলিশার এবং অ্যাডমিন—যারা রাতের বেলা বা দীর্ঘ সময় টুর্নামেন্ট ব্রাউজ করার সময় চোখের আরামদায়ক ও আধুনিক গ্লাসমরফিক ডার্ক ইন্টারফেস পছন্দ করেন।
-- **Key Value**: এক ক্লিকেই লাইট ও ডার্ক গ্লাস থিমের মধ্যে তাৎক্ষণিক পরিবর্তন, ডিভাইস বদলালেও অ্যাকাউন্টে থিম সেভ থাকা, এবং প্রতিটি কার্ডে প্রিমিয়াম ৩ডি গ্লাস ও রিম-লাইটিং অভিজ্ঞতা।
+আমাদের সিস্টেমে মোট ৫টি ফায়ারবেস প্রজেক্ট ৩টি স্তরে (Tier) বিভক্ত হয়ে কাজ করবে:
 
----
-
-## 2. User Experience & Visual Design (With Visual Demos)
-
-### রেফারেন্স ইন্সপিরেশন ও কালার অ্যানাটমি (Reference Inspiration)
-
-আপনার দেওয়া রেফারেন্স ছবিগুলোর মূল ইউআই বৈশিষ্ট্যগুলো নিচে দেওয়া হলো যা আমাদের অ্যাপের কার্ড ও নেভিগেশনে অনুসরণ করা হবে (ছবির কনটেন্ট নয়, শুধুমাত্র গ্লাস ও কালার ডিজাইন):
-
-![Wallet & Frosted Card Glow Reference](/public/assets/aistudio/6510b8b70b2a51a8099c628a4df4385a_b4ed17a9.jpg)
-![Translucent Glass Cards & Floating Dock Reference](/public/assets/aistudio/ab18d06e117e8e67943eb5af8930b719_e9f89f71.jpg)
-![Rim-Lit Dark Glass Card Reference](/public/assets/aistudio/9bd2362e19c0ff5a7fe40d833373e8bd_649dcc28.jpg)
+| ক্রম | প্রজেক্টের নাম | Project ID | সিস্টেম রোল (Shard ID) | কী কী ডাটা সংরক্ষিত থাকবে (Collections) |
+| :--- | :--- | :--- | :--- | :--- |
+| **১** | **zxzx** *(মূল ডাটাবেজ)* | `zxzx-cc7e2` | `master` (Auth & Core DB) | `users`, `licenseKeys`, `settings`, `system_config`, `announcements`, `notifications` (অ্যাডমিন/গ্লোবাল) |
+| **২** | **Gariena1** | `gariena1` | `shard_1` (Tournament DB 1) | `tournaments`, `registrations`, `matches`, `messages` |
+| **৩** | **FC Tournament** | `fc-tournament-816ea` | `shard_2` (Tournament DB 2) | `tournaments`, `registrations`, `matches`, `messages` |
+| **৪** | **App v1** | `app-v1-20fdf` | `notif_1` (Notification DB 1) | `notifications` (`Gariena1`-এর টুর্নামেন্টগুলোর সব নোটিফিকেশন) |
+| **৫** | **MY App 1** | `my-app-1-3aadf` | `notif_2` (Notification DB 2) | `notifications` (`FC Tournament`-এর টুর্নামেন্টগুলোর সব নোটিফিকেশন) |
 
 ---
 
-### Visual Identity & Theme Tokens
+## ২. সম্পূর্ণ সিস্টেম কীভাবে কানেক্ট হবে (Connection Architecture Diagram)
 
-| ডিজাইন এলিমেন্ট (Design Element) | Light Mode (Default) | Dark Glass Mode (New) |
-| :--- | :--- | :--- |
-| **App Canvas (`--background`)** | Soft Alabaster (`#F0F1F5` / `#F8FAFC`) | Deep Navy-Violet (`#171826` → `#1E2034` radial gradient) |
-| **Primary Glass Card (`nm-flat` / `Card`)** | Neumorphic Soft White (`#F0F0F3`) | Frosted Glass (`rgba(36, 39, 62, 0.68)`) + `backdrop-blur-2xl` |
-| **Recessed / Inset Slot (`nm-inset`)** | Recessed Light Grey (`#E6E6E9`) | Deep Smoked Glass (`rgba(20, 22, 37, 0.78)`) + inner shadow |
-| **Glass Border & Rim Light** | `1px solid rgba(255, 255, 255, 0.65)` | Top/Left specular highlight `rgba(255, 255, 255, 0.14)` + warm/cool rim glow |
-| **Ambient Backlight Glows** | Subtle Indigo/Green soft tint | Warm Orange (`#FF6B35`), Electric Cyan (`#38BDF8`), Royal Violet (`#A855F7`) |
-| **Primary Text** | Deep Slate (`#0F172A` / `#1E293B`) | Crisp Ice White (`#F8FAFC`) |
-| **Secondary / Muted Text** | Cool Slate (`#64748B` / `#94A3B8`) | Lavender-Grey (`#94A3B8` / `#A5B4FC`) |
-
----
-
-### ডেমো ১: ডার্ক গ্লাস ম্যাচ কার্ড ও টুর্নামেন্ট কার্ড (Dark Glass Match Card Demo)
-
-রেফারেন্স ছবির ফ্রস্টেড কার্ড ও অরেঞ্জ-পার্পল গ্লো অনুসরণ করে আমাদের অ্যাপের **Match Card** এবং **2-Match Pair Container** ডার্ক মোডে যেমন দেখাবে:
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  ✨ AMBIENT GLOW: Top-Left Orange (#FF7A45/20) · Bottom-Right Violet (#8B5CF6/20) │
-│  ╭────────────────────────────────────────────────────────────────────────╮  │
-│  │  PAIR #1 · 2 MATCHES                      🏆 AGGREGATE SCORE: 3 - 1   │  │
-│  ├───────────────────────────────────┬────────────────────────────────────┤  │
-│  │ 🟢 GROUP STAGE · GROUP A          │ 🟢 GROUP STAGE · GROUP A           │  │
-│  │ [LEG 1 OF 2]          [RESULT]    │ [LEG 2 OF 2]           [RESULT]    │  │
-│  │                                   │                                    │  │
-│  │    HOME              AWAY         │    HOME               AWAY         │  │
-│  │   ╭────╮            ╭────╮        │   ╭────╮             ╭────╮        │  │
-│  │   │ 👤 │   2  -  1  │ 👤 │        │   │ 👤 │   0  -  1   │ 👤 │        │  │
-│  │   ╰────╯            ╰────╯        │   ╰────╯             ╰────╯        │  │
-│  │  ALFHA-W           GAMER-S        │  GAMER-S            ALFHA-W        │  │
-│  │                                   │                                    │  │
-│  │  ╭─────────────────────────────╮  │  ╭──────────────────────────────╮  │  │
-│  │  │ 💬   ✅ RESULT CONFIRMED    │  │  │ 💬   ✅ RESULT CONFIRMED     │  │  │
-│  │  ╰─────────────────────────────╯  │  ╰──────────────────────────────╯  │  │
-│  ╰───────────────────────────────────┴────────────────────────────────────╯  │
-│  Surface: rgba(34, 37, 58, 0.72) + backdrop-blur(24px)                       │
-│  Border: 1px solid rgba(255,255,255,0.12) + subtle orange/cyan rim highlight │
-└──────────────────────────────────────────────────────────────────────────────┘
+```text
+                    ┌──────────────────────────────────────────────┐
+                    │       মূল ডাটাবেজ ও লগইন (Master DB: zxzx)      │
+                    │  • Google Auth Login & User Profile (users)  │
+                    │  • Activation Keys (licenseKeys + shardId)   │
+                    │  • Global Settings & Cluster Registry        │
+                    └───────┬──────────────────────────────┬───────┘
+                            │                              │
+            [Key = shard_1] │                              │ [Key = shard_2]
+                            ▼                              ▼
+┌─────────────────────────────────────┐          ┌─────────────────────────────────────┐
+│   প্রথম টুর্নামেন্ট ডাটাবেজ (Gariena1)    │          │  দ্বিতীয় টুর্নামেন্ট ডাটাবেজ (FC Tournament) │
+│   • Tournaments (shardId: shard_1)  │          │  • Tournaments (shardId: shard_2)   │
+│   • Players & Registrations         │          │  • Players & Registrations          │
+│   • Group & Knockout Matches        │          │  • Group & Knockout Matches         │
+└───────────┬─────────────────────────┘          └───────────┬─────────────────────────┘
+            │                                                │
+            │ ▲                                            ▲ │
+            │ │          ┌────────────────────────┐        │ │
+            │ └─────────►│  লোকাল ডাটাবেজ ম্যানেজমেন্ট  │◄───────┘ │
+            │            │   সিস্টেম (Local DB)     │          │
+            │ ┌─────────►│ • Shard Routing Table  │◄───────┐ │
+            │ │          │ • TTL Smart Data Cache │        │ │
+            ▼ │          └────────────────────────┘        │ ▼
+┌───────────────────────────┴─────────┐          ┌─────────┴───────────────────────────┐
+│ প্রথম নোটিফিকেশন ডাটাবেজ (App v1)      │          │ দ্বিতীয় নোটিফিকেশন ডাটাবেজ (MY App 1)    │
+│ • Tournament 1 Match Alerts         │          │ • Tournament 2 Match Alerts         │
+│ • Score Report & Dispute Alerts     │          │ • Score Report & Dispute Alerts     │
+│ • Registration Approval Alerts      │          │ • Registration Approval Alerts      │
+└─────────────────────────────────────┘          └─────────────────────────────────────┘
 ```
 
 ---
 
-### ডেমো ২: প্রোফাইল সেকশনের নিচে থিম সুইচ বাটন (Profile Theme Switcher Demo)
+## ৩. ধাপে ধাপে কাজের প্রবাহ (End-to-End Workflow)
 
-প্রোফাইল পেজের নিচে **GLOBAL ALERTS** সেকশনের ঠিক নিচে (ভার্সন ইনফোর উপরে) একটি নতুন **APPEARANCE / THEME MODE** গ্লাস কার্ড যুক্ত হবে, যেখান থেকে ব্যবহারকারী এক ক্লিকেই **LIGHT** অথবা **DARK GLASS** মোড সুইচ করতে পারবেন:
+### ক. অ্যাডমিন কর্তৃক অ্যাক্টিভেশন কি (Activation Key) তৈরি:
+১. অ্যাডমিন যখন **Admin Dashboard** থেকে নতুন টুর্নামেন্টের **Activation Key** জেনারেট করবেন, তখন সেখানে ডাটাবেজ সিলেক্ট করার অপশন থাকবে:
+   - **Database 1 (`Gariena1` + `App v1`)**
+   - **Database 2 (`FC Tournament` + `MY App 1`)**
+২. অ্যাডমিন যেটি সিলেক্ট করে কি তৈরি করবেন, মূল ডাটাবেজের (`zxzx`) `licenseKeys` কালেকশনে সেই কি-এর ভেতরে `targetShardId: "shard_1"` অথবা `"shard_2"` সেভ হয়ে থাকবে।
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  GLOBAL ALERTS                                                       │
-│  ╭────────────────────────────────────────────────────────────────╮  │
-│  │  🔔  Notifications                                 [ ENABLE ]  │  │
-│  │      Active                                                    │  │
-│  ╰────────────────────────────────────────────────────────────────╯  │
-│                                                                      │
-│  APPEARANCE & THEME                                                  │
-│  ╭────────────────────────────────────────────────────────────────╮  │
-│  │  🌙  Theme Mode                    ╭───────────┬────────────╮  │  │
-│  │      Dark Glass Active             │ ☀️ LIGHT  │ 🌙 DARK ✨ │  │  │
-│  │                                    ╰───────────┴────────────╯  │  │
-│  ╰────────────────────────────────────────────────────────────────╯  │
-│                                                                      │
-│                    FC ARENA PROTOCOL v2.4.0                          │
-└──────────────────────────────────────────────────────────────────────┘
+### খ. পাবলিশার কর্তৃক টুর্নামেন্ট তৈরি (Auto-Routing):
+১. পাবলিশার যখন টুর্নামেন্ট তৈরি করতে অ্যাক্টিভেশন কি (`deploymentKey`) দেবেন, অ্যাপ প্রথমে মূল ডাটাবেজ (`zxzx`) থেকে কি-টি যাচাই করবে।
+২. কি-এর ভেতরে যদি `targetShardId: "shard_1"` থাকে, তবে টুর্নামেন্টটি স্বয়ংক্রিয়ভাবে **`Gariena1`** ডাটাবেজে তৈরি হবে এবং এর নোটিফিকেশন ডাটাবেজ হিসেবে **`App v1`** যুক্ত হবে।
+৩. আর যদি `targetShardId: "shard_2"` থাকে, তবে টুর্নামেন্টটি স্বয়ংক্রিয়ভাবে **`FC Tournament`** ডাটাবেজে তৈরি হবে এবং এর নোটিফিকেশন ডাটাবেজ হিসেবে **`MY App 1`** যুক্ত হবে।
+
+### গ. প্লেয়ারদের জয়েন, ম্যাচ আপডেট এবং নোটিফিকেশন:
+১. প্রতিটি টুর্নামেন্ট ডকুমেন্টের ভেতরে `shardId` (`"shard_1"` বা `"shard_2"`) এবং `notifShardId` (`"notif_1"` বা `"notif_2"`) লেখা থাকবে।
+২. কোনো প্লেয়ার যখন ওই টুর্নামেন্টে জয়েন করবেন, স্কোর বোর্ড দেখবেন বা ম্যাচের রেজাল্ট দেবেন—অ্যাপ শুধুমাত্র ওই নির্দিষ্ট টুর্নামেন্ট ডাটাবেজে (`Gariena1` অথবা `FC Tournament`) রিড/রাইট করবে।
+৩. টুর্নামেন্টের ভেতরে কোনো অ্যাকশন হলে (যেমন: প্লেয়ার অ্যাপ্রুভ হওয়া, ম্যাচ শিডিউল হওয়া, স্কোর সাবমিট বা ডিসপিউট হওয়া) তার নোটিফিকেশন সরাসরি ওই টুর্নামেন্টের নির্ধারিত নোটিফিকেশন ডাটাবেজে (`App v1` অথবা `MY App 1`) যাবে।
+
+### ঘ. অ্যাডমিনের সকল ডাটাবেজে একযোগে অ্যাক্সেস (Unified Admin Control):
+১. অ্যাডমিন ড্যাশবোর্ডে **"Database Cluster Monitor"** ও ফিল্টার বাটন থাকবে (`All Databases`, `Database 1: Gariena1`, `Database 2: FC Tournament`)।
+২. অ্যাডমিন এক জায়গা থেকেই উভয় ডাটাবেজের সব টুর্নামেন্ট দেখতে, এডিট করতে, ডিলিট করতে এবং কোন ডাটাবেজে কয়টি টুর্নামেন্ট ও ম্যাচ চলছে তা রিয়েল-টাইমে মনিটর করতে পারবেন।
+
+---
+
+## ৪. লোকাল ডাটাবেজ ম্যানেজমেন্ট সিস্টেম কীভাবে কাজ করবে (Precision Local DB Manager)
+
+আপনার ডায়াগ্রামের মাঝখানে থাকা **"লোকাল ডাটাবেজ ম্যানেজমেন্ট সিস্টেম"** (`src/lib/localDbManager.ts`) ব্রাউজারের `localStorage` এবং মেমরি ক্যাশ ব্যবহার করে নিচের ৪টি কাজ করবে:
+
+১. **শার্ড রাউটিং ম্যাপ (Shard Routing Index - `fc_arena_shard_map_v1`):**
+   - কোন `tournamentId` কোন ডাটাবেজে (`shard_1` নাকি `shard_2`) অবস্থিত, তা লোকাল স্টোরেজে ইনডেক্স করে রাখবে। ফলে কোনো টুর্নামেন্ট ওপেন করলে দুটি ডাটাবেজে খোঁজা লাগবে না—সরাসরি সঠিক ডাটাবেজ থেকে ১টি মাত্র Read-এ ডাটা চলে আসবে।
+২. **স্মার্ট ক্যাশিং ও কোটা সেভার (Stale-While-Revalidate Cache - `fc_arena_cache_v1`):**
+   - ইউজার প্রোফাইল, টুর্নামেন্ট লিস্ট এবং পয়েন্ট টেবিল লোকাল স্টোরেজে সংরক্ষিত থাকবে। পেজ রিলোড বা ট্যাব পরিবর্তন করলে প্রথমে লোকাল ডাটাবেজ থেকে **০ মিলিসেকেন্ডে** ডাটা দেখাবে এবং শুধুমাত্র প্রয়োজনীয় ক্ষেত্রে ব্যাকগ্রাউন্ডে সিঙ্ক করবে। এতে ফায়ারবেসের **৭০%–৮০% Read Quota** বেঁচে যাবে।
+৩. **অ্যাক্টিভ নোটিফিকেশন রাউটার (`fc_arena_joined_shards_v1`):**
+   - একজন প্লেয়ার যেসব টুর্নামেন্টে অংশ নিয়েছেন বা পাবলিশ করেছেন, লোকাল ডাটাবেজ হিসেব রাখবে সেগুলো কোন শার্ডে আছে এবং সেই অনুযায়ী নোটিফিকেশন ডাটাবেজ (`App v1` / `MY App 1`) থেকে নোটিফিকেশন সিঙ্ক করবে।
+৪. **অটো-ক্লিনআপ (Garbage Collection):**
+   - লোকাল স্টোরেজ যেন কখনোই ফুল না হয়, সেজন্য পুরনো বা শেষ হয়ে যাওয়া টুর্নামেন্টের ক্যাশ স্বয়ংক্রিয়ভাবে পরিষ্কার করবে।
+
+---
+
+## ৫. ভবিষ্যতে আরও ডাটাবেজ যুক্ত করার সুবিধা (Infinite Future Scalability)
+
+আমরা কোডে একটি **Cluster Registry (`src/lib/shardManager.ts`)** তৈরি করব। ভবিষ্যতে ইউজার আরও বাড়লে আপনি যখনই `Shard 3` (নতুন টুর্নামেন্ট ডাটাবেজ ৩ + নতুন নোটিফিকেশন ডাটাবেজ ৩) যুক্ত করতে চাইবেন, শুধু কনফিগ লিস্টে নতুন প্রজেক্টের SDK বসিয়ে দিলেই পুরো অ্যাপ, অ্যাডমিন কি জেনারেটর এবং লোকাল ডাটাবেজ ম্যানেজার স্বয়ংক্রিয়ভাবে নতুন ডাটাবেজের সাথে কাজ শুরু করবে।
+
+---
+
+## ৬. বাকি ৪টি ফায়ারবেস প্রজেক্টের Security Rules (কপি-পেস্ট করার জন্য)
+
+> **গুরুত্বপূর্ণ টেকনিক্যাল নোট:** যেহেতু ইউজাররা শুধুমাত্র মূল ডাটাবেজে (`zxzx`) গুগল লগইন করেন, তাই ফায়ারবেসের নিয়ম অনুযায়ী বাকি ৪টি আলাদা প্রজেক্টে (`Gariena1`, `FC Tournament`, `App v1`, `MY App 1`) লগইন টোকেনটি (`request.auth`) স্বয়ংক্রিয়ভাবে যায় না। তাই বাকি ৪টি প্রজেক্টে যদি `request.auth != null` দেওয়া হয়, তবে ডাটা রিড বা রাইট ব্লক হয়ে যাবে।  
+> এজন্য আমরা বাকি ৪টি প্রজেক্টে **Strict Schema & Collection Validation Rules** ব্যবহার করছি—যাতে শুধুমাত্র আমাদের অ্যাপের নির্ধারিত কালেকশন ও সঠিক ফরম্যাটের ডাটাই রিড/রাইট হতে পারে এবং অন্য কোনো অজানা ডাটা কেউ ঢোকাতে না পারে।
+
+---
+
+### ক. টুর্নামেন্ট ডাটাবেজ দুটির রুলস (`Gariena1` এবং `FC Tournament`)
+আপনার **`Gariena1`** এবং **`FC Tournament`** — এই দুটি প্রজেক্টের **Firestore Database -> Rules** ট্যাবে গিয়ে নিচের কোডটি কপি করে পেস্ট করুন এবং **Publish** বাটনে ক্লিক করুন:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Default Deny for unknown collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidTournament(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.publisherId is string && data.publisherId.size() <= 128
+        && data.status in ['open', 'registration_closed', 'ongoing', 'finished', 'completed']
+        && data.format in ['group_knockout', 'knockout']
+        && data.entryType in ['public', 'invited'];
+    }
+
+    function isValidRegistration(data) {
+      return data.tournamentId is string && data.tournamentId.size() <= 128
+        && data.userId is string && data.userId.size() <= 128
+        && data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidMatch(data) {
+      return data.tournamentId is string && data.tournamentId.size() <= 128
+        && data.homePlayerId is string
+        && data.awayPlayerId is string
+        && data.status in ['scheduled', 'reported', 'disputed', 'completed', 'draft'];
+    }
+
+    function isValidMessage(data) {
+      return data.tournamentId is string && data.tournamentId.size() <= 128
+        && data.senderId is string && data.senderId.size() <= 128
+        && data.text is string && data.text.size() <= 2000;
+    }
+
+    // Tournaments Collection
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+      allow create, update: if isValidTournament(incoming());
+      allow delete: if true;
+    }
+
+    // Registrations Collection
+    match /registrations/{registrationId} {
+      allow read: if true;
+      allow create, update: if isValidRegistration(incoming());
+      allow delete: if true;
+    }
+
+    // Matches Collection
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, update: if isValidMatch(incoming());
+      allow delete: if true;
+    }
+
+    // Tournament Messages / Support Chat Collection
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if isValidMessage(incoming());
+      allow update, delete: if true;
+    }
+  }
+}
 ```
 
 ---
 
-### ডেমো ৩: ফ্লোটিং গ্লাস হেডার এবং বটম নেভিগেশন ডক (Floating Glass Dock Demo)
+### খ. নোটিফিকেশন ডাটাবেজ দুটির রুলস (`App v1` এবং `MY App 1`)
+আপনার **`App v1`** এবং **`MY App 1`** — এই দুটি প্রজেক্টের **Firestore Database -> Rules** ট্যাবে গিয়ে নিচের কোডটি কপি করে পেস্ট করুন এবং **Publish** বাটনে ক্লিক করুন:
 
-আপনার ২য় ও ৪র্থ রেফারেন্স ছবির ফ্লোটিং গ্লাস ডকের মতো আমাদের অ্যাপের নিচের নেভিগেশন বার ও উপরের হেডার ডার্ক মোডে ফ্রস্টেড গ্লাস ইফেক্ট পাবে:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Default Deny for unknown collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
-```
-╭──────────────────────────────────────────────────────────────────────╮
-│  Surface: rgba(30, 33, 52, 0.75) · backdrop-blur-2xl                 │
-│  Border: 1px solid rgba(255, 255, 255, 0.14)                         │
-│                                                                      │
-│     🏠               🏆               📅               👤            │
-│  DASHBOARD         ARENA           MY MATCH          PROFILE         │
-│                      ● (Orange/Indigo Active Glow)                   │
-╰──────────────────────────────────────────────────────────────────────╯
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidNotification(data) {
+      return data.recipientId is string && data.recipientId.size() <= 128
+        && data.title is string && data.title.size() <= 250
+        && data.message is string && data.message.size() <= 1500
+        && data.type is string
+        && data.read is bool;
+    }
+
+    // Notifications Collection
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow create: if isValidNotification(incoming());
+      allow update: if incoming().diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if true;
+    }
+  }
+}
 ```
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## ৭. কোড ইমপ্লিমেন্টেশনের ৪টি ধাপ (Implementation Roadmap)
 
-- **Decision 1: Semantic Glass Utility Layer + Tailwind Dark Variant (`@custom-variant dark`)**
-  - *Chosen Approach*: গ্লোবাল স্টাইলশিটে `@custom-variant dark (&:where(.dark, .dark *));` এবং ডার্ক মোডের জন্য `.dark .nm-flat`, `.dark .nm-inset`, `.dark .nm-pressed`, ও নতুন `.glass-card-glow` ক্লাস তৈরি করা হবে, এবং সকল পেজের কার্ড, টেক্সট, ইনপুট ও মোডালে সম্পূর্ণ লাইট/ডার্ক পেয়ারিং (`dark:*`) যুক্ত করা হবে।
-  - *Why*: এতে লাইট মোডের বর্তমান ডিজাইন ১০০% অক্ষুণ্ণ থাকবে এবং ডার্ক মোডে সুইচ করার সাথে সাথে পুরো অ্যাপের প্রতিটি কার্ড, বাটন, ব্র্যাকেট, টেবিল ও পপআপ উইন্ডো রেফারেন্স ছবির মতো ফ্রস্টেড গ্লাস ও নেভি-ভায়োলেট কালারে রূপান্তরিত হবে।
-  - *Alternatives Considered*: শুধুমাত্র CSS `filter: invert(1)` ব্যবহার করলে ছবি, লোগো ও ব্যাজগুলোর কালার নষ্ট হয়ে যায়, তাই আমরা আসল গ্লাসমরফিক টোকেন ও `dark:*` স্টাইলিং ব্যবহার করব।
+আপনি এই প্ল্যানটি দেখে সম্মতি দিলেই আমরা নিচের ৪টি ধাপে কোড ইমপ্লিমেন্ট করব:
 
-- **Decision 2: Dual Persistence (Local Storage + Firestore Profile Sync)**
-  - *Chosen Approach*: থিম পরিবর্তনের সাথে সাথে `localStorage`-এ `'fc_arena_theme'` (`'light' | 'dark'`) সেভ হবে যাতে অ্যাপ রিলোড নিলেও কোনো ফ্লিকার ছাড়া সাথে সাথে থিম লোড হয়। একইসাথে লগইন করা ইউজারের Firestore প্রোফাইলে (`themePreference: 'light' | 'dark'`) সেভ হবে।
-  - *Why*: ইউজার অন্য ফোন বা ব্রাউজার থেকে লগইন করলেও তার পছন্দের থিম অটোমেটিক সিঙ্ক হয়ে যাবে।
-
----
-
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
-
-### Architecture & Component Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        ThemeProvider & State Layer                      │
-│  • Default: 'light'                                                     │
-│  • Reads/Writes localStorage ('fc_arena_theme')                         │
-│  • Syncs with Firestore User Profile (themePreference: 'light'|'dark')  │
-│  • Toggles <html class="dark"> on document.documentElement              │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        ▼                           ▼                           ▼
-┌───────────────────┐     ┌───────────────────────┐   ┌───────────────────┐
-│ Global Glass CSS  │     │ App Shell & Views     │   │ Profile Page      │
-│ • Ambient Mesh BG │     │ • Header & BottomNav  │   │ • Theme Switcher  │
-│ • Frosted .nm-*   │     │ • Arena & Brackets    │   │   Card at Bottom  │
-│ • Rim-Light Cards │     │ • Matches & Modals    │   │ • Light / Dark    │
-│ • Glow Accents    │     │ • Auth & Admin Views  │   │   Segmented Btn   │
-└───────────────────┘     └───────────────────────┘   └───────────────────┘
-```
-
-### Interactive Component & State Mapping
-
-1. **Theme Initialization & Sync**:
-   - অ্যাপ চালু হওয়ার সময় প্রথমে `localStorage` চেক করবে; যদি আগে কোনো থিম সিলেক্ট করা না থাকে তবে ডিফল্টভাবে `'light'` সেট করবে।
-   - ইউজার লগইন অবস্থায় থাকলে তার প্রোফাইলের `themePreference` ফিল্ডের সাথে থিম সিঙ্ক হবে।
-2. **Profile Theme Switcher Control**:
-   - প্রোফাইল সেকশনের নিচে **APPEARANCE & THEME** কার্ডে দুটি অপশন (`LIGHT` এবং `DARK`) সহ একটি ইন্টারঅ্যাক্টিভ সুইচ বাটন থাকবে।
-   - বাটনে ক্লিক করার সাথে সাথে `document.documentElement.classList.toggle('dark')` হবে, `localStorage` আপডেট হবে এবং Firestore-এ ইউজারের ডকুমেন্টে `themePreference` আপডেট হবে।
-3. **Full App Glassmorphism Coverage**:
-   - **Background Atmosphere**: ডার্ক মোডে `.app-fixed-bg`-এ ডিপ নেভি-ভায়োলেট (`#171826`) বেসের সাথে হালকা অরেঞ্জ, সায়ান এবং ভায়োলেট অ্যাম্বিয়েন্ট গ্লো অরব (`blur-[120px]`) যুক্ত হবে যাতে গ্লাস কার্ডগুলোর নিচ দিয়ে হালকা রঙিন আভা দেখা যায়।
-   - **Cards, Tables, Brackets & Modals**: ড্যাশবোর্ড, টুর্নামেন্ট লিস্ট, পয়েন্ট টেবিল, নকআউট ব্র্যাকেট, ম্যাচ কার্ড, চ্যাট বক্স এবং প্রোফাইল এডিট মোডাল—সব জায়গায় ডার্ক ফ্রস্টেড গ্লাস সারফেস ও স্পষ্ট টেক্সট কনট্রাস্ট নিশ্চিত করা হবে।
+1. **ধাপ ১ (`src/lib/shardManager.ts` এবং `src/lib/localDbManager.ts`):**
+   - ৫টি ডাটাবেজের মাল্টি-অ্যাপ কানেকশন ইঞ্জিন এবং লোকাল ডাটাবেজ ম্যানেজমেন্ট সিস্টেম (Routing Map + TTL Cache + Multi-Shard Query Engine) তৈরি করা।
+2. **ধাপ ২ (`src/pages/AdminDashboard.tsx` এবং `firestore.rules`):**
+   - মূল ডাটাবেজের (`zxzx`) রুলস আপডেট করা যাতে `licenseKeys`-এ `targetShardId` ও `targetShardName` সেভ করা যায়।
+   - অ্যাডমিন ড্যাশবোর্ডে অ্যাক্টিভেশন কি তৈরির সময় ডাটাবেজ সিলেক্টর (`Database 1: Gariena1` / `Database 2: FC Tournament`) এবং সব ডাটাবেজের টুর্নামেন্ট একসাথে কন্ট্রোল করার প্যানেল যুক্ত করা।
+3. **ধাপ ৩ (`CreateTournament.tsx`, `TournamentList.tsx`, `ArenaDetail.tsx`, `Matches.tsx`, `Layout.tsx`):**
+   - অ্যাক্টিভেশন কি অনুযায়ী নির্দিষ্ট ডাটাবেজে টুর্নামেন্ট তৈরি, ম্যাচ ও রেজিস্ট্রেশন পরিচালনা এবং নির্দিষ্ট নোটিফিকেশন ডাটাবেজে (`App v1` / `MY App 1`) নোটিফিকেশন আদান-প্রদান যুক্ত করা।
+4. **ধাপ ৪ (ডার্ক মোড কার্ড ও সাপোর্ট সিস্টেম গ্লাস ইফেক্ট আপগ্রেড + ফাইনাল টেস্ট):**
+   - হোম ড্যাশবোর্ডের টুর্নামেন্ট কার্ড ও সাপোর্ট চ্যাটের ডার্ক মোড গ্লাস ইফেক্ট আরও আকর্ষণীয় করা এবং পুরো অ্যাপ বিল্ড করে যাচাই করা।

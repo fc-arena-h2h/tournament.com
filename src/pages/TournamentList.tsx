@@ -9,6 +9,12 @@ import { Reveal } from '@/src/components/ui/Reveal';
 
 import { GameLoader } from '@/src/components/ui/GameLoader';
 import { getDemoTournaments } from '@/src/lib/localTournaments';
+import {
+  subscribeToAllTournamentsAcrossShards,
+  subscribeToUserRegistrationsAcrossShards,
+  getTournamentDbByTournamentId
+} from '@/src/lib/shardManager';
+import { ShardId, recordUserActiveShard } from '@/src/lib/localDbManager';
 
 interface Tournament {
   id: string;
@@ -25,11 +31,14 @@ interface Tournament {
   organizerName?: string;
   organizationName?: string;
   publisherName?: string;
+  shardId?: ShardId;
+  notifShardId?: string;
 }
 
 interface Registration {
   tournamentId: string;
   status: 'pending' | 'approved' | 'rejected';
+  shardId?: ShardId;
 }
 
 interface TournamentListPageProps {
@@ -55,60 +64,71 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
   const [viewMode, setViewMode] = useState<'joined' | 'all'>('joined');
 
   useEffect(() => {
-    const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(40));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
-      
-      // Merge local demo tournaments
-      const demoTournaments = getDemoTournaments();
-      const merged = [...demoTournaments, ...tData];
-      
-      setTournaments(merged as any);
-      try {
-        localStorage.setItem('fc_arena_tournaments', JSON.stringify(merged));
-      } catch {}
+    const unsubscribe = subscribeToAllTournamentsAcrossShards(
+      (tData) => {
+        const demoTournaments = getDemoTournaments();
+        const merged = [...demoTournaments, ...tData];
 
-      // Fetch publisher profiles for tournaments that have a publisherId
-      const pubIds = Array.from(new Set(tData.map(t => t.publisherId))).filter(Boolean) as string[];
-      pubIds.forEach(async (pId) => {
-        if (!pId || typeof pId !== 'string' || !pId.trim()) return;
+        setTournaments(merged as any);
         try {
-          const uSnap = await getDoc(doc(db, 'users', pId.trim()));
-          if (uSnap.exists()) {
-            setPublisherProfiles(prev => ({ ...prev, [pId]: uSnap.data() as UserProfile }));
-          }
-        } catch (e) {
-          console.error("Error fetching publisher profile", e);
-        }
-      });
-    });
-
-    if (auth.currentUser) {
-      const regQ = query(collection(db, 'registrations'), where('userId', '==', auth.currentUser.uid));
-      getDocs(regQ).then(snapshot => {
-        const regs: Record<string, Registration> = {};
-        snapshot.forEach(doc => {
-          const data = doc.data() as Registration;
-          regs[data.tournamentId] = data;
-        });
-        setUserRegistrations(regs);
-        try {
-          localStorage.setItem('fc_arena_user_registrations', JSON.stringify(regs));
+          localStorage.setItem('fc_arena_tournaments', JSON.stringify(merged));
         } catch {}
-      });
+
+        // Fetch publisher profiles from Master DB for tournaments that have a publisherId
+        const pubIds = Array.from(new Set(tData.map((t) => t.publisherId))).filter(
+          Boolean
+        ) as string[];
+        pubIds.forEach(async (pId) => {
+          if (!pId || typeof pId !== 'string' || !pId.trim()) return;
+          try {
+            const uSnap = await getDoc(doc(db, 'users', pId.trim()));
+            if (uSnap.exists()) {
+              setPublisherProfiles((prev) => ({
+                ...prev,
+                [pId]: uSnap.data() as UserProfile
+              }));
+            }
+          } catch (e) {
+            console.error('Error fetching publisher profile', e);
+          }
+        });
+      },
+      { maxPerShard: 40 }
+    );
+
+    let unsubRegs: (() => void) | null = null;
+    if (auth.currentUser) {
+      unsubRegs = subscribeToUserRegistrationsAcrossShards(
+        auth.currentUser.uid,
+        (regList) => {
+          const regs: Record<string, Registration> = {};
+          regList.forEach((data: any) => {
+            regs[data.tournamentId] = data as Registration;
+          });
+          setUserRegistrations(regs);
+          try {
+            localStorage.setItem('fc_arena_user_registrations', JSON.stringify(regs));
+          } catch {}
+        }
+      );
     }
 
     setLoading(false);
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubRegs) unsubRegs();
+    };
   }, []);
 
   const handleJoin = async (tournament: Tournament) => {
     if (!profile) return alert('Please complete your profile first');
-    
+
     // Profile Validation
     const isProfileComplete = profile.inGameName && profile.inGameUID && profile.fbUrl;
     if (!isProfileComplete) {
-      alert('Incomplete Profile! Please add your In-Game Name, UID, and Facebook Link in your profile settings.');
+      alert(
+        'Incomplete Profile! Please add your In-Game Name, UID, and Facebook Link in your profile settings.'
+      );
       return;
     }
 
@@ -121,19 +141,27 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
     }
 
     try {
-      await setDoc(doc(db, 'registrations', `${auth.currentUser?.uid}_${tournament.id}`), {
+      const { db: targetDb, shardId } = getTournamentDbByTournamentId(
+        tournament.id,
+        tournament.shardId
+      );
+      await setDoc(doc(targetDb, 'registrations', `${auth.currentUser?.uid}_${tournament.id}`), {
         tournamentId: tournament.id,
         userId: auth.currentUser?.uid,
         status: 'pending',
         gameName: profile.inGameName,
         gameUid: profile.inGameUID,
+        shardId,
         createdAt: Timestamp.now()
       });
+      if (auth.currentUser?.uid) {
+        recordUserActiveShard(auth.currentUser.uid, shardId);
+      }
       alert('Join request sent! Waiting for publisher approval.');
       // Update local state
       setUserRegistrations({
         ...userRegistrations,
-        [tournament.id]: { tournamentId: tournament.id, status: 'pending' }
+        [tournament.id]: { tournamentId: tournament.id, status: 'pending', shardId }
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'registrations');

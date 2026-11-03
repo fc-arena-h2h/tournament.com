@@ -5,7 +5,9 @@ import { Trophy, LayoutGrid, List, FileText, GitPullRequest, Copy, UserPlus, Sea
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { db as masterDb, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { getTournamentDbByTournamentId } from '@/src/lib/shardManager';
+import { removeTournamentFromLocalDb } from '@/src/lib/localDbManager';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDemoParticipants, getDemoMatches, updateDemoMatch, addDemoMatch, updateDemoParticipant, updateDemoTournament, saveDemoParticipants, saveDemoMatches, deleteDemoMatch, DemoMatch, DemoParticipant } from '@/src/lib/localTournaments';
@@ -99,6 +101,10 @@ interface ArenaDetailProps {
 
 export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) => {
   const [currentTournament, setCurrentTournament] = useState<any>(tournament);
+  const { db, shardId: activeShardId } = getTournamentDbByTournamentId(
+    tournament.id,
+    (currentTournament as any)?.shardId || (tournament as any)?.shardId
+  );
   const isKnockoutOnly = ((currentTournament as any)?.format === 'knockout' || (tournament as any)?.format === 'knockout');
   const [activeTab, setActiveTab] = useState<ArenaTab>(isKnockoutOnly ? 'knockout' : 'group');
   const [activeGroup, setActiveGroup] = useState('A');
@@ -1325,7 +1331,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       await Promise.all(missing.map(async (uid) => {
         if (!uid || typeof uid !== 'string' || !uid.trim()) return;
         try {
-          const userSnap = await getDoc(doc(db, 'users', uid.trim()));
+          const userSnap = await getDoc(doc(masterDb, 'users', uid.trim()));
           if (userSnap.exists()) {
             newProfiles[uid] = userSnap.data() as UserProfile;
             changed = true;
@@ -3056,6 +3062,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
         // 4. Delete the tournament document itself
         await deleteDoc(doc(db, 'tournaments', tournament.id));
+        removeTournamentFromLocalDb(tournament.id);
       }
 
       setConfirmAction(null);
@@ -5374,7 +5381,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       homePlayerName: 'TBD',
       awayPlayerName: 'TBD',
       homeScore: 0,
-      awayScore: 0
+      awayScore: 0,
+      penaltyWinnerId: null
     };
 
     const tieInfo = match ? getKnockoutTieInfoForMatch(match) : null;
@@ -5383,7 +5391,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     const awayProfile = displayMatch.awayPlayerId ? profiles[displayMatch.awayPlayerId] : null;
     const homePlayerName = homeProfile?.inGameName || displayMatch.homePlayerName || 'TBD';
     const awayPlayerName = awayProfile?.inGameName || displayMatch.awayPlayerName || 'TBD';
-    const isCompleted = isTwoLegTie ? Boolean(tieInfo?.allCompleted) : displayMatch.status === 'completed';
+    const isCompleted = isTwoLegTie ? Boolean(tieInfo?.isTieCompleted) : displayMatch.status === 'completed';
     const homeScore = isTwoLegTie
       ? (displayMatch.homePlayerId === tieInfo?.player1Id ? tieInfo.player1AggScore : tieInfo?.player2AggScore) ?? 0
       : (displayMatch.homeScore ?? 0);
@@ -6054,29 +6062,31 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         ];
 
         return (
-          <div className="space-y-6 pb-20">
-            <div className="flex flex-col items-center text-center space-y-3">
-               <div className="w-16 h-16 rounded-[2rem] nm-flat dark:!bg-gradient-to-br dark:!from-[#ff7a45]/25 dark:!to-[#8b5cf6]/30 flex items-center justify-center text-emerald-500 dark:!text-[#ff7a45] border border-white/50 dark:!border-white/20 mb-2 dark:shadow-[0_0_24px_rgba(255,122,69,0.25)]">
+          <div className="space-y-6 pb-20 relative">
+            <div className="hidden dark:block absolute -top-10 left-1/2 -translate-x-1/2 w-72 h-36 bg-gradient-to-r from-[#ff7a45]/20 via-[#ec4899]/20 to-[#8b5cf6]/25 blur-3xl pointer-events-none" />
+            <div className="flex flex-col items-center text-center space-y-3 relative z-10">
+               <div className="w-16 h-16 rounded-[2rem] nm-flat dark:!bg-gradient-to-br dark:!from-[#ff7a45]/30 dark:!via-[#ec4899]/25 dark:!to-[#8b5cf6]/35 dark:backdrop-blur-2xl flex items-center justify-center text-emerald-500 dark:!text-[#ff7a45] border border-white/50 dark:!border-white/25 mb-2 dark:shadow-[0_0_30px_rgba(255,122,69,0.32),inset_0_1px_1.5px_rgba(255,255,255,0.3)]">
                  <CircleHelp size={32} />
                </div>
-               <h3 className="text-xl font-black text-fc-dark dark:!text-white uppercase italic leading-none">Support System</h3>
-               <p className="text-[10px] font-black text-slate-400 dark:!text-indigo-200/80 uppercase tracking-widest leading-loose text-center max-w-xs">
+               <h3 className="text-xl font-black text-fc-dark dark:!text-white uppercase italic leading-none tracking-tight">Support System</h3>
+               <p className="text-[10px] font-black text-slate-400 dark:!text-indigo-200/90 uppercase tracking-widest leading-loose text-center max-w-xs">
                  Everything you need to know about <br /> competing in the Arena
                </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 relative z-10">
               {faqs.map((faq, idx) => (
-                <div key={idx} className="nm-flat rounded-3xl p-6 bg-white dark:!bg-gradient-to-br dark:!from-[#2b3056]/90 dark:!via-[#1f2341]/92 dark:!to-[#16192f]/95 border border-slate-100 dark:!border-white/18 dark:!shadow-[0_20px_45px_-12px_rgba(4,5,15,0.88),inset_0_1px_1px_rgba(255,255,255,0.2)] space-y-3 relative overflow-hidden">
+                <div key={idx} className="nm-flat rounded-3xl p-6 bg-white dark:!bg-gradient-to-br dark:!from-[#2e3460]/88 dark:!via-[#212647]/90 dark:!to-[#161930]/94 dark:backdrop-blur-2xl border border-slate-100 dark:!border-white/22 dark:hover:!border-[#ff7a45]/45 dark:!shadow-[0_24px_50px_-12px_rgba(4,5,15,0.9),inset_0_1px_1.5px_rgba(255,255,255,0.26)] space-y-3 relative overflow-hidden transition-all duration-300">
+                  <div className="hidden dark:block absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/25 dark:!to-[#8b5cf6]/30 dark:!border dark:!border-white/20 text-indigo-600 dark:!text-[#ff7a45] flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/30 dark:!to-[#8b5cf6]/35 dark:!border dark:!border-white/25 text-indigo-600 dark:!text-[#ff7a45] dark:shadow-[0_0_15px_rgba(255,122,69,0.25)] flex items-center justify-center shrink-0">
                       <span className="text-[10px] font-black italic">Q</span>
                     </div>
                     <h4 className="text-xs font-black text-slate-800 dark:!text-white uppercase tracking-tight italic">{faq.q}</h4>
                   </div>
                   <div className="flex gap-3 pl-1">
-                    <div className="w-8 h-px bg-slate-100 dark:bg-white/15 mt-2.5 shrink-0" />
-                    <p className="text-[11px] font-bold text-slate-500 dark:!text-slate-200 leading-relaxed uppercase">
+                    <div className="w-8 h-px bg-slate-100 dark:bg-gradient-to-r dark:from-[#ff7a45]/50 dark:to-transparent mt-2.5 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-500 dark:!text-slate-100/90 leading-relaxed uppercase">
                       {faq.a}
                     </p>
                   </div>
@@ -6084,20 +6094,22 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               ))}
             </div>
 
-            <div className="p-8 rounded-[2.5rem] bg-indigo-50 dark:!bg-gradient-to-br dark:!from-[#2d325a]/92 dark:!via-[#212545]/94 dark:!to-[#171a32]/96 border-2 border-indigo-100 dark:!border-white/20 dark:!shadow-[0_24px_55px_-12px_rgba(4,5,15,0.9),inset_0_1px_1.5px_rgba(255,255,255,0.24)] text-center space-y-4 relative overflow-hidden">
-               <div className="hidden dark:block absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br from-[#ff7a45]/25 via-[#ec4899]/20 to-transparent blur-2xl pointer-events-none" />
-               <div className="w-14 h-14 rounded-2xl bg-white dark:!bg-[#14172c]/90 dark:!border dark:!border-white/18 flex items-center justify-center text-indigo-500 dark:!text-[#ff7a45] mx-auto shadow-sm relative z-10">
+            <div className="p-8 rounded-[2.5rem] bg-indigo-50 dark:!bg-gradient-to-br dark:!from-[#313766]/90 dark:!via-[#23284b]/92 dark:!to-[#171a33]/96 dark:backdrop-blur-2xl border-2 border-indigo-100 dark:!border-white/24 dark:!shadow-[0_28px_60px_-12px_rgba(4,5,15,0.92),inset_0_1px_2px_rgba(255,255,255,0.28)] text-center space-y-4 relative overflow-hidden">
+               <div className="hidden dark:block absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/45 to-transparent pointer-events-none" />
+               <div className="hidden dark:block absolute -top-16 -right-16 w-48 h-48 rounded-full bg-gradient-to-br from-[#ff7a45]/30 via-[#ec4899]/25 to-transparent blur-2xl pointer-events-none" />
+               <div className="hidden dark:block absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-gradient-to-tr from-[#8b5cf6]/25 via-[#38bdf8]/20 to-transparent blur-2xl pointer-events-none" />
+               <div className="w-14 h-14 rounded-2xl bg-white dark:!bg-gradient-to-br dark:!from-[#1a1e38]/95 dark:!to-[#121528]/95 dark:!border dark:!border-white/22 dark:shadow-[0_0_20px_rgba(255,122,69,0.25),inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center text-indigo-500 dark:!text-[#ff7a45] mx-auto shadow-sm relative z-10">
                  <MessageSquare size={24} />
                </div>
                <div className="relative z-10">
                  <h4 className="text-xs font-black text-indigo-900 dark:!text-white uppercase italic">Still Need Help?</h4>
-                 <p className="text-[8px] font-bold text-indigo-400 dark:!text-indigo-200/80 uppercase tracking-widest mt-1">
+                 <p className="text-[8px] font-bold text-indigo-400 dark:!text-indigo-200/90 uppercase tracking-widest mt-1">
                    Contact the Arena Administrators
                  </p>
                </div>
                <button 
-                 onClick={() => window.open('https://t.me/your_admin_telegram', '_blank')}
-                 className="w-full py-4 rounded-2xl bg-indigo-600 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] dark:border dark:border-white/25 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 dark:shadow-[0_12px_28px_-6px_rgba(236,72,153,0.55)] active:scale-95 transition-all relative z-10"
+                 onClick={() => window.open('https://t.me/fcarenavs', '_blank')}
+                 className="w-full py-4 rounded-2xl bg-indigo-600 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] dark:border dark:border-white/30 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 dark:shadow-[0_14px_32px_-6px_rgba(236,72,153,0.6),inset_0_1px_1px_rgba(255,255,255,0.35)] active:scale-95 transition-all relative z-10"
                >
                  Contact Support Team
                </button>
