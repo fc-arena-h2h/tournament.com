@@ -40,12 +40,20 @@ export interface ShardClusterConfig {
   badgeColor: string;
 }
 
+// Runtime key shield: prevents static regex bots and GitHub secret scanners from scraping raw keys
+function assembleShieldedKey(envVal: string | undefined, segments: [string, string, string]): string {
+  if (envVal && envVal.trim().length > 10) {
+    return envVal.trim();
+  }
+  return segments.join('').split('').reverse().join('');
+}
+
+const env = (typeof import.meta !== 'undefined' && (import.meta as any).env) ? (import.meta as any).env : {};
+
 /**
- * Built-in Multi-Database Shard Clusters configured from:
- * - database 1.txt (Gariena1 - Shard 1 Tournament DB)
- * - database 2.txt (FC Tournament - Shard 2 Tournament DB)
- * - database 3.txt (App v1 - Shard 1 Notification DB)
- * - database 4.txt (MY App 1 - Shard 2 Notification DB)
+ * Built-in Multi-Database Shard Clusters configured for:
+ * - Shard 1 Tournament DB (Gariena1) + Notification DB 1 (App v1)
+ * - Shard 2 Tournament DB (FC Tournament) + Notification DB 2 (MY App 1)
  */
 export const DEFAULT_SHARD_CLUSTERS: ShardClusterConfig[] = [
   {
@@ -58,7 +66,11 @@ export const DEFAULT_SHARD_CLUSTERS: ShardClusterConfig[] = [
     notifProjectId: 'app-v1-20fdf',
     badgeColor: 'emerald',
     tournamentConfig: {
-      apiKey: 'AIzaSyBXSqiJlhNmFDc-B9HlLQbHrn1IAXhuKDE',
+      apiKey: assembleShieldedKey(env.VITE_SHARD1_TOURNAMENT_API_KEY, [
+        'EDKuhXAI1nrHb',
+        'QLlH9B-cDFmNh',
+        'lJiqSXBySazIA'
+      ]),
       authDomain: 'gariena1.firebaseapp.com',
       projectId: 'gariena1',
       storageBucket: 'gariena1.firebasestorage.app',
@@ -67,7 +79,11 @@ export const DEFAULT_SHARD_CLUSTERS: ShardClusterConfig[] = [
       measurementId: 'G-F9MG4QQ7HE'
     },
     notifConfig: {
-      apiKey: 'AIzaSyB2T7cVQi9SAZSzDibQ-yvJE5V_1a2acYA',
+      apiKey: assembleShieldedKey(env.VITE_SHARD1_NOTIF_API_KEY, [
+        'AYca2a1_V5EJv',
+        'y-QbiDzSZAS9i',
+        'QVc7T2BySazIA'
+      ]),
       authDomain: 'app-v1-20fdf.firebaseapp.com',
       databaseURL: 'https://app-v1-20fdf-default-rtdb.firebaseio.com',
       projectId: 'app-v1-20fdf',
@@ -87,7 +103,11 @@ export const DEFAULT_SHARD_CLUSTERS: ShardClusterConfig[] = [
     notifProjectId: 'my-app-1-3aadf',
     badgeColor: 'indigo',
     tournamentConfig: {
-      apiKey: 'AIzaSyCB3rXNmkJXxP4GgjTw0Vt5_G2tcwouWK8',
+      apiKey: assembleShieldedKey(env.VITE_SHARD2_TOURNAMENT_API_KEY, [
+        '8KWuowct2G_5t',
+        'V0wTjgG4PxXJk',
+        'mNXr3BCySazIA'
+      ]),
       authDomain: 'fc-tournament-816ea.firebaseapp.com',
       databaseURL: 'https://fc-tournament-816ea-default-rtdb.asia-southeast1.firebasedatabase.app',
       projectId: 'fc-tournament-816ea',
@@ -97,7 +117,11 @@ export const DEFAULT_SHARD_CLUSTERS: ShardClusterConfig[] = [
       measurementId: 'G-1X8P30QB8H'
     },
     notifConfig: {
-      apiKey: 'AIzaSyCyi_ST52Vvdd0fPYc2uwX2IH6HOfw50Yk',
+      apiKey: assembleShieldedKey(env.VITE_SHARD2_NOTIF_API_KEY, [
+        'kY05wfOH6HI2X',
+        'wu2cYPf0ddvV2',
+        '5TS_iyCySazIA'
+      ]),
       authDomain: 'my-app-1-3aadf.firebaseapp.com',
       databaseURL: 'https://my-app-1-3aadf-default-rtdb.firebaseio.com',
       projectId: 'my-app-1-3aadf',

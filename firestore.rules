@@ -40,6 +40,15 @@ service cloud.firestore {
       );
     }
 
+    function isNotFrozen() {
+      return isSignedIn() && (
+        isAdmin() ||
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isFrozen', false) != true &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') != 'banned')
+      );
+    }
+
     function isPublisherOf(tournamentId) {
       return isSignedIn() && (
         isAdmin() || 
@@ -63,90 +72,96 @@ service cloud.firestore {
         && data.email == request.auth.token.email
         && data.role in ['player', 'publisher', 'admin']
         && (data.inGameName is string && data.inGameName.size() <= 100)
-        && (!('inGameUID' in data) || (data.inGameUID is string))
-        && (!('fbUrl' in data) || (data.fbUrl is string))
-        && (!('messengerLink' in data) || (data.messengerLink is string))
-        && (!('leagueMessengerGroupLink' in data) || (data.leagueMessengerGroupLink is string))
-        && (!('whatsappNumber' in data) || (data.whatsappNumber is string))
-        && (!('leagueName' in data) || (data.leagueName is string))
+        && (!('inGameUID' in data) || (data.inGameUID is string && data.inGameUID.size() <= 100))
+        && (!('fbUrl' in data) || (data.fbUrl is string && data.fbUrl.size() <= 300))
+        && (!('messengerLink' in data) || (data.messengerLink is string && data.messengerLink.size() <= 300))
+        && (!('leagueMessengerGroupLink' in data) || (data.leagueMessengerGroupLink is string && data.leagueMessengerGroupLink.size() <= 300))
+        && (!('whatsappNumber' in data) || (data.whatsappNumber is string && data.whatsappNumber.size() <= 60))
+        && (!('leagueName' in data) || (data.leagueName is string && data.leagueName.size() <= 100))
         && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40))
         && (!('themePreference' in data) || (data.themePreference in ['light', 'dark']));
     }
 
     function isValidTournament(data) {
-      return data.title is string && data.title.size() <= 200
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 200
         && data.publisherId == request.auth.uid
         && data.status in ['open', 'registration_closed', 'ongoing', 'finished', 'completed']
         && data.format in ['group_knockout', 'knockout']
         && data.entryType in ['public', 'invited']
-        && (!('activationKey' in data) || (data.activationKey is string))
-        && (!('invitationKey' in data) || (data.invitationKey == null || data.invitationKey is string))
-        && (!('messengerGroupLink' in data) || (data.messengerGroupLink is string))
-        && (!('description' in data) || (data.description is string))
-        && (!('organizerName' in data) || (data.organizerName is string))
-        && (!('organizationName' in data) || (data.organizationName is string))
-        && (!('publisherName' in data) || (data.publisherName is string))
-        && (!('prizePool' in data) || (data.prizePool is string))
-        && (!('rewardType' in data) || (data.rewardType is string))
+        && (!('activationKey' in data) || (data.activationKey is string && data.activationKey.size() <= 100))
+        && (!('invitationKey' in data) || (data.invitationKey == null || (data.invitationKey is string && data.invitationKey.size() <= 100)))
+        && (!('messengerGroupLink' in data) || (data.messengerGroupLink is string && data.messengerGroupLink.size() <= 500))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 5000))
+        && (!('organizerName' in data) || (data.organizerName is string && data.organizerName.size() <= 150))
+        && (!('organizationName' in data) || (data.organizationName is string && data.organizationName.size() <= 150))
+        && (!('publisherName' in data) || (data.publisherName is string && data.publisherName.size() <= 150))
+        && (!('prizePool' in data) || (data.prizePool is string && data.prizePool.size() <= 150))
+        && (!('rewardType' in data) || (data.rewardType is string && data.rewardType.size() <= 50))
         && (!('prizes' in data) || (data.prizes is map || data.prizes == null))
-        && (!('totalSlots' in data) || (data.totalSlots is number))
-        && (!('filledSlots' in data) || (data.filledSlots is number))
-        && (!('shardId' in data) || (data.shardId is string))
-        && (!('notifShardId' in data) || (data.notifShardId is string))
+        && (!('totalSlots' in data) || (data.totalSlots is number && data.totalSlots >= 2 && data.totalSlots <= 256))
+        && (!('filledSlots' in data) || (data.filledSlots is number && data.filledSlots >= 0))
+        && (!('shardId' in data) || (data.shardId is string && data.shardId.size() <= 64))
+        && (!('notifShardId' in data) || (data.notifShardId is string && data.notifShardId.size() <= 64))
         && (!('createdAt' in data) || (data.createdAt is timestamp));
     }
 
     function isValidMatch(data) {
-      return data.tournamentId is string
-        && data.homePlayerId is string
-        && data.awayPlayerId is string
+      return data.tournamentId is string && data.tournamentId.size() <= 128
+        && data.homePlayerId is string && data.homePlayerId.size() <= 128
+        && data.awayPlayerId is string && data.awayPlayerId.size() <= 128
         && data.status in ['scheduled', 'reported', 'disputed', 'completed', 'draft']
         && (data.participants is list && data.participants.size() <= 2)
-        && (!('homeScore' in data) || data.homeScore == null || data.homeScore is number)
-        && (!('awayScore' in data) || data.awayScore == null || data.awayScore is number)
-        && (!('penaltyWinnerId' in data) || data.penaltyWinnerId == null || data.penaltyWinnerId is string)
-        && (!('reporterId' in data) || data.reporterId == null || data.reporterId is string)
-        && (!('groupId' in data) || data.groupId == null || data.groupId is string)
-        && (!('stage' in data) || data.stage is string)
-        && (!('matchId' in data) || data.matchId is string)
-        && (!('homePlayerName' in data) || data.homePlayerName is string)
-        && (!('awayPlayerName' in data) || data.awayPlayerName is string)
+        && (!('homeScore' in data) || data.homeScore == null || (data.homeScore is number && data.homeScore >= 0 && data.homeScore <= 99))
+        && (!('awayScore' in data) || data.awayScore == null || (data.awayScore is number && data.awayScore >= 0 && data.awayScore <= 99))
+        && (!('penaltyWinnerId' in data) || data.penaltyWinnerId == null || (data.penaltyWinnerId is string && data.penaltyWinnerId.size() <= 128))
+        && (!('reporterId' in data) || data.reporterId == null || (data.reporterId is string && data.reporterId.size() <= 128))
+        && (!('groupId' in data) || data.groupId == null || (data.groupId is string && data.groupId.size() <= 64))
+        && (!('stage' in data) || (data.stage is string && data.stage.size() <= 64))
+        && (!('matchId' in data) || (data.matchId is string && data.matchId.size() <= 128))
+        && (!('homePlayerName' in data) || (data.homePlayerName is string && data.homePlayerName.size() <= 120))
+        && (!('awayPlayerName' in data) || (data.awayPlayerName is string && data.awayPlayerName.size() <= 120))
         && (!('scheduledTime' in data) || data.scheduledTime == null || data.scheduledTime is timestamp)
-        && (!('screenshotUrl' in data) || data.screenshotUrl == null || data.screenshotUrl is string)
-        && (!('disputeReason' in data) || data.disputeReason == null || data.disputeReason is string)
+        && (!('screenshotUrl' in data) || data.screenshotUrl == null || (data.screenshotUrl is string && data.screenshotUrl.size() <= 2000))
+        && (!('disputeReason' in data) || data.disputeReason == null || (data.disputeReason is string && data.disputeReason.size() <= 1000))
         && (!('updatedAt' in data) || data.updatedAt is timestamp)
         && (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidRegistration(data) {
-      return data.tournamentId is string
+      return data.tournamentId is string && data.tournamentId.size() <= 128
         && data.userId == request.auth.uid
         && data.status in ['pending', 'approved', 'rejected']
         && (data.createdAt <= request.time || !('createdAt' in data));
     }
 
     function isValidLicenseKey(data) {
-      return data.key is string && data.key.size() >= 5
+      return data.key is string && data.key.size() >= 5 && data.key.size() <= 100
         && data.status in ['active', 'used']
         && (data.createdBy == request.auth.uid || !('createdBy' in data))
-        && (!('targetShardId' in data) || data.targetShardId is string)
-        && (!('targetShardName' in data) || data.targetShardName is string)
-        && (!('notifShardId' in data) || data.notifShardId is string)
+        && (!('targetShardId' in data) || (data.targetShardId is string && data.targetShardId.size() <= 64))
+        && (!('targetShardName' in data) || (data.targetShardName is string && data.targetShardName.size() <= 128))
+        && (!('notifShardId' in data) || (data.notifShardId is string && data.notifShardId.size() <= 64))
         && (data.createdAt <= request.time || !('createdAt' in data));
     }
 
     function isValidNotification(data) {
       return data.recipientId is string && data.recipientId.size() <= 128
-        && data.title is string && data.title.size() <= 200
-        && data.message is string && data.message.size() <= 1000
-        && data.type is string
+        && data.title is string && data.title.size() <= 250
+        && data.message is string && data.message.size() <= 1500
+        && data.type is string && data.type.size() <= 64
         && data.read is bool
-        && (!('linkTab' in data) || data.linkTab is string)
-        && (!('tournamentId' in data) || data.tournamentId == null || data.tournamentId is string)
-        && (!('matchId' in data) || data.matchId == null || data.matchId is string)
-        && (!('shardId' in data) || data.shardId == null || data.shardId is string)
+        && (!('linkTab' in data) || (data.linkTab is string && data.linkTab.size() <= 64))
+        && (!('tournamentId' in data) || data.tournamentId == null || (data.tournamentId is string && data.tournamentId.size() <= 128))
+        && (!('matchId' in data) || data.matchId == null || (data.matchId is string && data.matchId.size() <= 128))
+        && (!('shardId' in data) || data.shardId == null || (data.shardId is string && data.shardId.size() <= 64))
         && (!('extra' in data) || data.extra == null || data.extra is map)
         && (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidMessage(data) {
+      return data.senderId == request.auth.uid
+        && (!('text' in data) || (data.text is string && data.text.size() <= 2000))
+        && (!('tournamentId' in data) || (data.tournamentId is string && data.tournamentId.size() <= 128));
     }
 
     // --- Collection Matches ---
@@ -157,8 +172,8 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUser(incoming()) && (
         incoming().role in ['player', 'publisher'] || (incoming().role == 'admin' && incoming().email == 'sperkplay@gmail.com')
       );
-      allow update: if (isOwner(userId) && isValidUser(incoming()) && (
-        // Action: Update Profile
+      allow update: if (isOwner(userId) && isNotFrozen() && isValidUser(incoming()) && (
+        // Action: Update Profile (strictly forbid changing role, isFrozen, or status)
         (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'leagueMessengerGroupLink', 'whatsappNumber', 'phone', 'pushEnabled', 'fcmTokens', 'themePreference', 'updatedAt']))
         && incoming().role == existing().role
       )) || isAdmin();
@@ -167,19 +182,19 @@ service cloud.firestore {
     // Tournaments Collection
     match /tournaments/{tournamentId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isValidTournament(incoming());
-      allow update, delete: if isAdmin() || (isPublisher() && existing().publisherId == request.auth.uid);
-    }
-
-    function isParticipantOf(tournamentId) {
-      let regPath = /databases/$(database)/documents/registrations/$(request.auth.uid + "_" + tournamentId);
-      return exists(regPath);
+      allow create: if isSignedIn() && isNotFrozen() && (isPublisher() || isAdmin()) && isValidTournament(incoming());
+      allow update: if isAdmin() || (
+        isPublisher() && isNotFrozen() &&
+        existing().publisherId == request.auth.uid &&
+        incoming().publisherId == existing().publisherId
+      );
+      allow delete: if isAdmin() || (isPublisher() && isNotFrozen() && existing().publisherId == request.auth.uid);
     }
 
     // Registrations Collection
     match /registrations/{registrationId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isValidRegistration(incoming());
+      allow create: if isSignedIn() && isNotFrozen() && isValidRegistration(incoming());
       allow update: if isAdmin() || isPublisherOf(existing().tournamentId);
       allow delete: if isAdmin() || isPublisherOf(existing().tournamentId);
     }
@@ -190,7 +205,7 @@ service cloud.firestore {
       allow create: if isPublisherOf(incoming().tournamentId) && isValidMatch(incoming());
       allow update: if isAdmin() || 
         isPublisherOf(existing().tournamentId) ||
-        (isSignedIn() && (
+        (isSignedIn() && isNotFrozen() && (
           // Action: Report Result (Home Player only)
           (request.auth.uid == existing().homePlayerId &&
            existing().status == 'scheduled' && incoming().status == 'reported' && 
@@ -211,7 +226,7 @@ service cloud.firestore {
     // Announcements
     match /announcements/{announcementId} {
       allow get, list: if isSignedIn();
-      allow create, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // Notifications
@@ -221,9 +236,8 @@ service cloud.firestore {
         resource.data.recipientId == 'all' || 
         (isAdmin() && resource.data.recipientId == 'admin')
       );
-      allow create: if isSignedIn() && (
-        // Allow admins/publishers more freedom, but ensure basic validation for others
-        (isAdmin() || isPublisher() || isValidNotification(incoming()))
+      allow create: if isSignedIn() && isNotFrozen() && (
+        isAdmin() || isPublisher() || (isValidNotification(incoming()) && incoming().recipientId != 'all')
       );
       allow update: if (isOwner(resource.data.recipientId) || (isAdmin() && resource.data.recipientId == 'admin')) 
         && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
@@ -236,7 +250,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow create: if isAdmin() && isValidLicenseKey(incoming());
       allow update: if isAdmin() || (
-        isSignedIn() && 
+        isSignedIn() && isNotFrozen() &&
         existing().status == 'active' && 
         incoming().status == 'used' && 
         incoming().usedBy == request.auth.uid &&
@@ -245,29 +259,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Fraud Reports
+    match /fraudReports/{reportId} {
+      allow get, list, update, delete: if isAdmin();
+      allow create: if isSignedIn();
+    }
+
     // Settings
     match /settings/{settingId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow write: if isAdmin();
     }
 
     // Messages
     match /messages/{messageId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isNotFrozen() && isValidMessage(incoming());
       allow delete: if isAdmin() || isPublisherOf(resource.data.tournamentId);
     }
 
     // system_config
     match /system_config/{configId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && isNotFrozen();
       allow write: if isAdmin();
     }
 
-    // Test Connection
+    // Test Connection (Read-only ping; writes strictly disabled)
     match /test/{testId} {
-      allow read, write: if isSignedIn();
+      allow read: if true;
+      allow write: if false;
     }
   }
 }
