@@ -86,9 +86,24 @@ export const CreateTournamentPage = ({
     return () => unsub();
   }, []);
 
+  const hasValidPrizeCurrency = (val: string) => {
+    const trimmed = val.trim();
+    if (!trimmed) return false;
+    return /\d/.test(trimmed) && /(?:^|\s|\d)(BDT|USDT)(?:\s|$)/i.test(trimmed);
+  };
+
+  const showPrizeCurrencyError =
+    formData.prizePool.trim().length > 0 && !hasValidPrizeCurrency(formData.prizePool);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth.currentUser || !profile) return;
+
+    // Validate Prize Pool Currency (BDT or USDT)
+    if (!hasValidPrizeCurrency(formData.prizePool)) {
+      alert('Please type your currency type BDT or USDT.');
+      return;
+    }
 
     // Basic Validation
     if (!formData.messengerGroupLink.trim().startsWith('http')) {
@@ -105,6 +120,10 @@ export const CreateTournamentPage = ({
 
     try {
       const finalOrganizer = formData.organizerName.trim() || profile?.inGameName || profile?.leagueName || 'Official Host';
+      const normalizedPrizePool = formData.prizePool
+        .trim()
+        .replace(/bdt/gi, 'BDT')
+        .replace(/usdt/gi, 'USDT');
       
       if (isDemo) {
         // --- Handle Demo Creation (Local Storage) ---
@@ -117,7 +136,7 @@ export const CreateTournamentPage = ({
           format: formData.format,
           totalSlots: Number(formData.totalSlots) || 16,
           entryType: formData.entryType,
-          prizePool: formData.prizePool,
+          prizePool: normalizedPrizePool,
           rewardType: formData.rewardType,
           messengerGroupLink: formData.messengerGroupLink.trim(),
           publisherId: auth.currentUser.uid,
@@ -187,7 +206,7 @@ export const CreateTournamentPage = ({
         invitationKey: formData.entryType === 'invited' ? formData.invitationKey.trim() : null,
         activationKey: formData.deploymentKey.trim(),
         messengerGroupLink: formData.messengerGroupLink.trim(),
-        prizePool: formData.prizePool,
+        prizePool: normalizedPrizePool,
         rewardType: formData.rewardType,
         prizes: formData.rewardType === 'top3' ? {
           first: Number(formData.firstPrize) || 0,
@@ -437,8 +456,17 @@ export const CreateTournamentPage = ({
                 required
                 value={formData.prizePool}
                 onChange={(e) => setFormData({...formData, prizePool: e.target.value})}
-                className="h-14 font-bold"
+                className={cn(
+                  "h-14 font-bold transition-all",
+                  showPrizeCurrencyError && "border-rose-500 focus:border-rose-500 ring-2 ring-rose-500/20 text-rose-500"
+                )}
               />
+              {showPrizeCurrencyError && (
+                <p className="text-[10px] font-extrabold text-rose-500 tracking-wide ml-2 flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                  <Info size={12} className="shrink-0" />
+                  Please type your currency type BDT or USDT.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -64,31 +64,63 @@ interface Match {
   penaltyWinnerId?: string | null;
 }
 
-const CountdownTimer = ({ targetTime }: { targetTime: Timestamp }) => {
-  const [timeLeft, setTimeLeft] = useState<string>('');
+const CountdownTimer = ({ targetTime, compact = false }: { targetTime: Timestamp; compact?: boolean }) => {
+  const [timeLeft, setTimeLeft] = useState<string>('LIVE');
+  const [isCountingDown, setIsCountingDown] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
+    const updateTimer = () => {
+      if (!targetTime || typeof targetTime.toMillis !== 'function') {
+        setTimeLeft('LIVE');
+        setIsCountingDown(false);
+        return false;
+      }
+      const now = Date.now();
       const target = targetTime.toMillis();
       const diff = target - now;
 
       if (diff <= 0) {
         setTimeLeft('LIVE');
-        clearInterval(timer);
-        return;
+        setIsCountingDown(false);
+        return false;
       }
 
-      const h = Math.floor(diff / (1000 * 60 * 60));
+      setIsCountingDown(true);
+      const totalHours = Math.floor(diff / (1000 * 60 * 60));
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const s = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft(`${h.toString().padStart(2, '0')} : ${m.toString().padStart(2, '0')} : ${s.toString().padStart(2, '0')}`);
+
+      if (totalHours >= 24) {
+        const d = Math.floor(totalHours / 24);
+        const remH = totalHours % 24;
+        setTimeLeft(`${d}D ${remH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      } else {
+        setTimeLeft(`${totalHours.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      }
+      return true;
+    };
+
+    const hasRemaining = updateTimer();
+    if (!hasRemaining) return;
+
+    const timer = setInterval(() => {
+      if (!updateTimer()) {
+        clearInterval(timer);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
   }, [targetTime]);
 
-  return <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">{timeLeft}</span>;
+  return (
+    <span className={cn(
+      "font-black uppercase italic block font-mono",
+      compact ? "text-[6.5px] sm:text-[7.5px] tracking-wider" : "text-[8px] sm:text-[9.5px] tracking-widest",
+      isCountingDown ? "text-amber-500 dark:!text-amber-400" : "text-slate-400 dark:!text-slate-300"
+    )}>
+      {isCountingDown ? `⏳ ${timeLeft}` : timeLeft}
+    </span>
+  );
 };
 
 type ArenaTab = 'group' | 'knockout' | 'players' | 'rules' | 'support' | 'manage';
@@ -149,6 +181,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const [localMatchDeployDone, setLocalMatchDeployDone] = useState(false);
   const [showAutoMatchDeployModal, setShowAutoMatchDeployModal] = useState(false);
   const [selectedDeployLegs, setSelectedDeployLegs] = useState<1 | 2>(1);
+  const [autoDeployDeadlineDate, setAutoDeployDeadlineDate] = useState('');
+  const [autoDeployDeadlineTime, setAutoDeployDeadlineTime] = useState('');
   const [progressionLegs, setProgressionLegs] = useState<1 | 2>(1);
   const [showManualGroupModal, setShowManualGroupModal] = useState(false);
   const [showManualMatchModal, setShowManualMatchModal] = useState(false);
@@ -215,11 +249,51 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   }, [autoMatchToast]);
 
+  const openPlayerProfile = async (userId?: string | null, fallbackName?: string) => {
+    if (!userId && !fallbackName) return;
+
+    if (userId && profiles[userId]) {
+      setSelectedPlayerProfile(profiles[userId]);
+      return;
+    }
+
+    const reg = participants.find(
+      (p) => (userId && p.userId === userId) || (fallbackName && p.gameName === fallbackName)
+    );
+
+    if (userId && !userId.startsWith('demo_')) {
+      try {
+        const snap = await getDoc(doc(masterDb, 'users', userId.trim()));
+        if (snap.exists()) {
+          const fetched = snap.data() as UserProfile;
+          setProfiles((prev) => ({ ...prev, [userId]: fetched }));
+          setSelectedPlayerProfile(fetched);
+          return;
+        }
+      } catch (e) {
+        console.error('Error fetching player profile on click:', e);
+      }
+    }
+
+    setSelectedPlayerProfile({
+      uid: userId || 'unknown',
+      email: reg?.email || '',
+      role: 'player',
+      inGameName: reg?.gameName || fallbackName || 'Player',
+      inGameUID: reg?.gameUid || reg?.inGameUID || 'N/A',
+      fbUrl: reg?.fbUrl || '',
+      messengerLink: reg?.messengerLink || '',
+      whatsappNumber: reg?.whatsappNumber || '',
+      status: 'active'
+    });
+  };
+
   const handleSlotClick = (matchSlotId: string, role: 'home' | 'away', matchNumber: number, existingMatch?: Match, stageOverride?: string) => {
     if (!isAdminUser) {
       const playerId = role === 'home' ? existingMatch?.homePlayerId : existingMatch?.awayPlayerId;
-      if (playerId && profiles[playerId]) {
-        setSelectedPlayerProfile(profiles[playerId]);
+      const playerName = role === 'home' ? existingMatch?.homePlayerName : existingMatch?.awayPlayerName;
+      if (playerId || playerName) {
+        openPlayerProfile(playerId, playerName);
       }
       return;
     }
@@ -792,7 +866,51 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
 
     setSelectedDeployLegs((currentTournament as any)?.matchLegs === 2 ? 2 : 1);
+    setAutoDeployDeadlineDate('');
+    setAutoDeployDeadlineTime('');
     setShowAutoMatchDeployModal(true);
+  };
+
+  const applyQuickDeadlineHours = (hours: number) => {
+    const target = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const yyyy = target.getFullYear();
+    const mm = String(target.getMonth() + 1).padStart(2, '0');
+    const dd = String(target.getDate()).padStart(2, '0');
+    const hh = String(target.getHours()).padStart(2, '0');
+    const min = String(target.getMinutes()).padStart(2, '0');
+    setAutoDeployDeadlineDate(`${yyyy}-${mm}-${dd}`);
+    setAutoDeployDeadlineTime(`${hh}:${min}`);
+  };
+
+  const getConfiguredDeadlineTimestamp = (): { firestoreTs: any; demoTs: any; formattedLabel: string | null } => {
+    if (!autoDeployDeadlineDate) {
+      return {
+        firestoreTs: serverTimestamp(),
+        demoTs: { toMillis: () => Date.now() },
+        formattedLabel: null
+      };
+    }
+    const timePart = autoDeployDeadlineTime || '23:59';
+    const parsedDate = new Date(`${autoDeployDeadlineDate}T${timePart}`);
+    if (isNaN(parsedDate.getTime())) {
+      return {
+        firestoreTs: serverTimestamp(),
+        demoTs: { toMillis: () => Date.now() },
+        formattedLabel: null
+      };
+    }
+    const ts = Timestamp.fromDate(parsedDate);
+    const formattedLabel = parsedDate.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return {
+      firestoreTs: ts,
+      demoTs: { toMillis: () => parsedDate.getTime() },
+      formattedLabel
+    };
   };
 
   const executeAutoMatchDeploy = async (legs: 1 | 2) => {
@@ -800,6 +918,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (approved.length < 2) {
       return alert('Need at least 2 approved players!');
     }
+
+    const { firestoreTs, demoTs, formattedLabel } = getConfiguredDeadlineTimestamp();
 
     setActionLoading(true);
     try {
@@ -837,7 +957,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             participants: [p1.userId, p2.userId],
             status: 'scheduled',
             publisherId: tournament.publisherId,
-            scheduledTime: serverTimestamp(),
+            scheduledTime: firestoreTs,
             createdAt: serverTimestamp()
           });
 
@@ -855,7 +975,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               participants: [p2.userId, p1.userId],
               status: 'scheduled',
               publisherId: tournament.publisherId,
-              scheduledTime: serverTimestamp(),
+              scheduledTime: firestoreTs,
               createdAt: serverTimestamp()
             });
           }
@@ -928,7 +1048,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               stage: 'group',
               groupId: gName,
               publisherId: tournament.publisherId,
-              scheduledTime: serverTimestamp(),
+              scheduledTime: firestoreTs,
               createdAt: serverTimestamp()
             });
           });
@@ -940,7 +1060,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           const demoMatches: DemoMatch[] = newMatches.map(m => ({
             ...m,
             id: `demo_m_${Math.random().toString(36).substr(2, 9)}`,
-            scheduledTime: { toMillis: () => Date.now() }
+            scheduledTime: demoTs
           }));
           saveDemoMatches(tournament.id, demoMatches);
           setMatches(demoMatches as any);
@@ -960,7 +1080,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               homePlayerId: m.homePlayerId,
               awayPlayerId: m.awayPlayerId,
               title: '⚽ New Match Scheduled!',
-              message: `${m.homePlayerName} vs ${m.awayPlayerName} is live!`,
+              message: formattedLabel
+                ? `${m.homePlayerName} vs ${m.awayPlayerName} is live! Play before deadline: ${formattedLabel}`
+                : `${m.homePlayerName} vs ${m.awayPlayerName} is live!`,
               type: 'match_scheduled',
               tournamentId: tournament.id
             }).catch(() => {});
@@ -971,7 +1093,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         setShowAutoMatchDeployModal(false);
         setAutoMatchToast({
           title: 'MATCH DEPLOY COMPLETE!',
-          subtitle: `${newMatches.length} fixtures deployed (${legs === 2 ? 'Home & Away · 2 Matches' : 'Home & Away · 1 Match'}).`
+          subtitle: formattedLabel
+            ? `${newMatches.length} fixtures deployed · Deadline: ${formattedLabel}`
+            : `${newMatches.length} fixtures deployed (${legs === 2 ? 'Home & Away · 2 Matches' : 'Home & Away · 1 Match'}).`
         });
       } else {
         alert('No matches were generated. Check group assignments.');
@@ -1101,6 +1225,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
 
     setProgressionLegs((currentTournament as any)?.matchLegs === 2 ? 2 : 1);
+    setAutoDeployDeadlineDate('');
+    setAutoDeployDeadlineTime('');
 
     const koStagesWithMatches = allPossibleStages.filter(st =>
       realMatches.some(m => m.stage === st)
@@ -1682,6 +1808,79 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     });
   };
 
+  // Helper: Determine if the Grand Final ('FINAL' stage, excluding 3RD_PLACE) has a decided champion
+  const getFinalChampionInfo = (allMatches: Match[] = matches) => {
+    const finalTies = getKnockoutStageTies('FINAL', allMatches);
+    if (finalTies.length === 0) return null;
+    const completedFinalTie = finalTies.find(t => t.isTieCompleted && Boolean(t.winnerId));
+    if (!completedFinalTie || !completedFinalTie.winnerId) return null;
+    const winnerName =
+      completedFinalTie.winnerName ||
+      profiles[completedFinalTie.winnerId]?.inGameName ||
+      'Champion';
+    return {
+      winnerId: completedFinalTie.winnerId,
+      winnerName,
+      tie: completedFinalTie
+    };
+  };
+
+  // Sync tournament document status to 'finished' ('END') whenever the Grand Final champion is decided
+  const syncTournamentFinalCompletion = async (allMatches: Match[]) => {
+    const champion = getFinalChampionInfo(allMatches);
+    if (!champion) return;
+
+    const activeTourney = currentTournament || tournament;
+    const alreadySynced =
+      activeTourney?.status === 'finished' &&
+      activeTourney?.winnerId === champion.winnerId &&
+      activeTourney?.winnerText === champion.winnerName;
+
+    if (alreadySynced) return;
+
+    setCurrentTournament((prev: any) => ({
+      ...(prev || tournament),
+      status: 'finished',
+      winnerId: champion.winnerId,
+      winnerText: champion.winnerName
+    }));
+
+    if (isDemo) {
+      updateDemoTournament(tournament.id, {
+        status: 'finished',
+        winnerId: champion.winnerId,
+        winnerText: champion.winnerName
+      });
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'tournaments', tournament.id), {
+        status: 'finished',
+        winnerId: champion.winnerId,
+        winnerText: champion.winnerName,
+        updatedAt: Timestamp.now()
+      });
+    } catch (err) {
+      console.warn('Could not sync tournament finished status:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!matches || matches.length === 0) return;
+    const champion = getFinalChampionInfo(matches);
+    if (!champion) return;
+    const activeTourney = currentTournament || tournament;
+    if (
+      activeTourney?.status !== 'finished' ||
+      activeTourney?.winnerId !== champion.winnerId ||
+      activeTourney?.winnerText !== champion.winnerName
+    ) {
+      syncTournamentFinalCompletion(matches);
+    }
+  }, [matches, currentTournament?.status, currentTournament?.winnerId, currentTournament?.winnerText]);
+
+
   // Helper: Get tie context for a specific match (including hypothetical scores while reporting)
   const getKnockoutTieInfoForMatch = (
     targetMatch: Match,
@@ -1803,24 +2002,22 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       })();
 
       if (isDemo) {
-        setMatches(prev => {
-          const updated = prev.map(m => m.id === reportingMatch.id ? { 
-            ...m, 
-            status: 'completed' as const,
-            homeScore: reportFormData.home,
-            awayScore: reportFormData.away,
-            penaltyWinnerId: effectivePenaltyWinnerId
-          } : m);
+        const updatedDemoList = matches.map(m => m.id === reportingMatch.id ? { 
+          ...m, 
+          status: 'completed' as const,
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          penaltyWinnerId: effectivePenaltyWinnerId
+        } : m);
 
-          updateDemoMatch(tournament.id, reportingMatch.id, {
-            homeScore: reportFormData.home,
-            awayScore: reportFormData.away,
-            penaltyWinnerId: effectivePenaltyWinnerId,
-            status: 'completed'
-          });
-
-          return updated;
+        setMatches(updatedDemoList);
+        updateDemoMatch(tournament.id, reportingMatch.id, {
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          penaltyWinnerId: effectivePenaltyWinnerId,
+          status: 'completed'
         });
+        await syncTournamentFinalCompletion(updatedDemoList);
         
         alert('ম্যাচ রেজাল্ট সফলভাবে রেকর্ড করা হয়েছে! (Demo Mode)');
         closeReportResultModal();
@@ -1837,6 +2034,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       });
       
       if (isAdminUser) {
+        const updatedMatchesList = matches.map(m => m.id === reportingMatch.id ? {
+          ...m,
+          status: 'completed' as const,
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          penaltyWinnerId: effectivePenaltyWinnerId
+        } : m);
+        await syncTournamentFinalCompletion(updatedMatchesList);
         alert('ম্যাচ রেজাল্ট সফলভাবে আপডেট এবং ফাইনাল করা হয়েছে!');
       } else {
         alert('রেজাল্ট রিপোর্ট করা হয়েছে! প্রতিপক্ষের কনফার্মেশনের জন্য অপেক্ষা করুন।');
@@ -1883,10 +2088,10 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       (requiresPenaltyWinner && !reportFormData.penaltyWinnerId);
 
     return createPortal(
-      <div className="fixed inset-0 z-[8000] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-        <div className="w-full max-w-md max-h-[92vh] bg-white rounded-[2.5rem] border border-slate-200 overflow-y-auto shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative my-auto">
+      <div className="fixed inset-0 z-[8000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in">
+        <div className="w-full max-w-md max-h-[92vh] solid-modal-surface bg-white rounded-[2.5rem] border border-slate-200 overflow-y-auto shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] relative my-auto">
           {/* Header */}
-          <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xs z-20">
+          <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 sticky top-0 solid-modal-header bg-white z-20">
              <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
                    {isEditingCompleted ? <Edit3 size={20} className="text-amber-600" /> : <Upload size={20} className="text-amber-600" />}
@@ -1935,11 +2140,23 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  </div>
                  {isTwoLegged && koTieInfo && (
                    <div className="px-3 py-1.5 rounded-xl bg-white/80 border border-indigo-200/70 flex items-center justify-between text-[9px] font-black uppercase">
-                     <span className="truncate max-w-[110px] text-slate-700">{homeName}</span>
+                     <button
+                       type="button"
+                       onClick={() => openPlayerProfile(reportingMatch.homePlayerId, homeName)}
+                       className="truncate max-w-[110px] text-slate-700 hover:text-indigo-600 hover:underline cursor-pointer text-left"
+                     >
+                       {homeName}
+                     </button>
                      <span className="px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 font-mono text-[10px]">
                        AGG: {koTieInfo.homePlayerAgg} - {koTieInfo.awayPlayerAgg}
                      </span>
-                     <span className="truncate max-w-[110px] text-slate-700 text-right">{awayName}</span>
+                     <button
+                       type="button"
+                       onClick={() => openPlayerProfile(reportingMatch.awayPlayerId, awayName)}
+                       className="truncate max-w-[110px] text-slate-700 hover:text-indigo-600 hover:underline cursor-pointer text-right"
+                     >
+                       {awayName}
+                     </button>
                    </div>
                  )}
                  <p className="text-[8.5px] font-bold leading-relaxed">
@@ -1959,7 +2176,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
              {/* Scores */}
              <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 space-y-3">
-                   <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{homeName}</label>
+                   <button
+                     type="button"
+                     onClick={() => openPlayerProfile(reportingMatch.homePlayerId, homeName)}
+                     className="text-[9px] font-black text-slate-700 hover:text-indigo-600 hover:underline uppercase tracking-[0.15em] text-center block truncate w-full px-2 cursor-pointer transition-colors"
+                   >
+                     {homeName}
+                   </button>
                    <input 
                      type="number"
                      min="0"
@@ -1973,7 +2196,13 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
                 <span className="text-xl font-black text-slate-400 italic pt-6">VS</span>
                 <div className="flex-1 space-y-3">
-                   <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{awayName}</label>
+                   <button
+                     type="button"
+                     onClick={() => openPlayerProfile(reportingMatch.awayPlayerId, awayName)}
+                     className="text-[9px] font-black text-slate-700 hover:text-indigo-600 hover:underline uppercase tracking-[0.15em] text-center block truncate w-full px-2 cursor-pointer transition-colors"
+                   >
+                     {awayName}
+                   </button>
                    <input 
                      type="number"
                      min="0"
@@ -2436,6 +2665,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     homePlayer: { userId: string, name: string },
     awayPlayer: { userId: string, name: string }
   ) => {
+    const { firestoreTs, demoTs } = getConfiguredDeadlineTimestamp();
     const existing = allActiveMatches.find(m => m.matchId === matchId || (m.stage === stage && m.matchId === matchId));
     if (existing) {
       const updates = {
@@ -2448,7 +2678,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         status: 'scheduled' as const,
         homeScore: undefined,
         awayScore: undefined,
-        penaltyWinnerId: null
+        penaltyWinnerId: null,
+        scheduledTime: isDemo ? demoTs : firestoreTs
       };
 
       if (isDemo) {
@@ -2479,7 +2710,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       if (isDemo) {
         const newMatch = addDemoMatch(tournament.id, {
           ...matchData,
-          scheduledTime: { toMillis: () => Date.now() }
+          scheduledTime: demoTs
         });
         setMatches(prev => [...prev, newMatch as any]);
         return;
@@ -2488,7 +2719,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         ...matchData,
         participants: [homePlayer.userId, awayPlayer.userId],
         publisherId: tournament.publisherId,
-        scheduledTime: serverTimestamp(),
+        scheduledTime: firestoreTs,
         createdAt: serverTimestamp()
       });
     }
@@ -2720,6 +2951,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       if (isDemo) {
         setMatches(updatedMatches);
       }
+
+      await syncTournamentFinalCompletion(updatedMatches);
 
       // Notify both players about confirmed match result
       const winnerName = homeScore > awayScore 
@@ -3503,15 +3736,23 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       </div>
 
                       <div className="flex items-center justify-between gap-2 px-2 py-2 rounded-xl bg-white border border-slate-100">
-                        <span className="text-[10px] font-black text-slate-800 uppercase italic truncate flex-1 text-left">
+                        <button
+                          type="button"
+                          onClick={() => openPlayerProfile(m.homePlayerId, m.homePlayerName)}
+                          className="text-[10px] font-black text-slate-800 hover:text-indigo-600 uppercase italic truncate flex-1 text-left cursor-pointer transition-colors"
+                        >
                           {m.homePlayerName}
-                        </span>
+                        </button>
                         <span className="text-base font-black text-indigo-600 italic px-3">
                           {m.homeScore ?? 0} - {m.awayScore ?? 0}
                         </span>
-                        <span className="text-[10px] font-black text-slate-800 uppercase italic truncate flex-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openPlayerProfile(m.awayPlayerId, m.awayPlayerName)}
+                          className="text-[10px] font-black text-slate-800 hover:text-indigo-600 uppercase italic truncate flex-1 text-right cursor-pointer transition-colors"
+                        >
                           {m.awayPlayerName}
-                        </span>
+                        </button>
                       </div>
 
                       {m.disputeReason && m.status === 'disputed' && (
@@ -3697,66 +3938,73 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     if (!selectedPlayerProfile) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-slate-900/40 flex items-center justify-center p-6">
-        <Card className="w-full max-w-sm p-0 overflow-hidden border-2 border-white shadow-2xl">
-          <div className="relative h-32 bg-fc-dark overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
-            <button 
-              onClick={() => setSelectedPlayerProfile(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center  active:scale-95"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div className="px-8 pb-10 -mt-12 relative z-10">
-            <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white flex items-center justify-center">
-                <UserIcon size={40} className="text-slate-300" />
-              </div>
-              
-              <div className="space-y-1">
-                <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
-                  {selectedPlayerProfile.inGameName}
-                </h3>
-                {(profile?.role === 'admin' || selectedPlayerProfile.email === auth.currentUser?.email) && (
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
-                )}
-              </div>
-
-              <div className="w-full grid grid-cols-1 gap-3">
-                <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
-                    <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID}</span>
-                  </div>
+      <div
+        onClick={() => setSelectedPlayerProfile(null)}
+        className="fixed inset-0 z-[10000] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-6"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-sm"
+        >
+          <Card className="w-full p-0 overflow-hidden border-2 border-white shadow-2xl">
+            <div className="relative h-32 bg-fc-dark overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
+              <button 
+                onClick={() => setSelectedPlayerProfile(null)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-95"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="px-8 pb-10 -mt-12 relative z-10">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white flex items-center justify-center">
+                  <UserIcon size={40} className="text-slate-300" />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
+                    {selectedPlayerProfile.inGameName}
+                  </h3>
+                  {(profile?.role === 'admin' || selectedPlayerProfile.email === auth.currentUser?.email) && (
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+                  )}
                 </div>
 
-                
-                {selectedPlayerProfile.fbUrl && (
-                  <a href={selectedPlayerProfile.fbUrl} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <Facebook size={18} className="text-blue-600" />
-                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Facebook Profile</span>
-                  </a>
-                )}
-                
-                {selectedPlayerProfile.messengerLink && (
-                  <a href={selectedPlayerProfile.messengerLink} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <MessageSquare size={18} className="text-indigo-500" />
-                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Messenger Chat</span>
-                  </a>
-                )}
-                
-                {selectedPlayerProfile.whatsappNumber && (
-                  <a href={`https://wa.me/${selectedPlayerProfile.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <Phone size={18} className="text-emerald-500" />
-                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">WhatsApp Chat</span>
-                  </a>
-                )}
+                <div className="w-full grid grid-cols-1 gap-3">
+                  <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
+                      <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID || 'Not Set'}</span>
+                    </div>
+                  </div>
+
+                  {selectedPlayerProfile.fbUrl && (
+                    <a href={selectedPlayerProfile.fbUrl} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                      <Facebook size={18} className="text-blue-600" />
+                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Facebook Profile</span>
+                    </a>
+                  )}
+                  
+                  {selectedPlayerProfile.messengerLink && (
+                    <a href={selectedPlayerProfile.messengerLink} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                      <MessageSquare size={18} className="text-indigo-500" />
+                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Messenger Chat</span>
+                    </a>
+                  )}
+                  
+                  {selectedPlayerProfile.whatsappNumber && (
+                    <a href={`https://wa.me/${selectedPlayerProfile.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                      <Phone size={18} className="text-emerald-500" />
+                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">WhatsApp Chat</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>,
       document.body
     );
@@ -3923,9 +4171,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </span>
               </div>
               {koTieInfo.isTieCompleted && koTieInfo.winnerName ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPlayerProfile(koTieInfo.winnerId, koTieInfo.winnerName || undefined);
+                  }}
+                  className="px-2.5 py-0.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+                >
                   <Trophy size={9} fill="currentColor" /> AGG WINNER: {koTieInfo.winnerName}
-                </span>
+                </button>
               ) : (
                 <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-widest text-slate-400 shrink-0">
                   {koTieInfo.completedLegs}/{koTieInfo.totalLegs} Legs Played
@@ -3940,11 +4195,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             isSideBySide ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-2"
           )}>
             {/* Home Player */}
-            <div className={cn(
-              "flex flex-col items-center flex-1 min-w-0 transition-all",
-              isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
-              isCompleted && awayWin ? "opacity-60 scale-95" : ""
-            )}>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                openPlayerProfile(match.homePlayerId, homeProfile?.inGameName || match.homePlayerName);
+              }}
+              title="Click to view player profile"
+              className={cn(
+                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/pcard",
+                isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
+                isCompleted && awayWin ? "opacity-60 scale-95" : ""
+              )}
+            >
               <div className={cn(
                 "flex flex-col items-center gap-0.5",
                 isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
@@ -3966,7 +4228,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               </div>
               <div className={cn(
-                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400",
                 isSideBySide
                   ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                   : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
@@ -3976,7 +4238,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
               <div className="text-center w-full px-0.5">
                 <h5 className={cn(
-                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
                   isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
                   homeWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
                 )}>
@@ -4024,8 +4286,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                  "bg-slate-50 dark:!bg-[#131629]/90 rounded-lg border border-slate-100 dark:!border-white/12",
                  isSideBySide ? "px-1.5 py-0.5" : "px-2.5 sm:px-4 py-1 sm:py-2 sm:rounded-xl"
                )}>
-                  {match.status === 'scheduled' && match.scheduledTime && !isSideBySide ? (
-                    <CountdownTimer targetTime={match.scheduledTime} />
+                  {match.status === 'scheduled' && match.scheduledTime ? (
+                    <CountdownTimer targetTime={match.scheduledTime} compact={isSideBySide} />
                   ) : (
                     <span className={cn(
                       "font-black text-slate-400 dark:!text-slate-300 uppercase tracking-widest italic block",
@@ -4038,11 +4300,18 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
 
             {/* Away Player */}
-            <div className={cn(
-              "flex flex-col items-center flex-1 min-w-0 transition-all",
-              isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
-              isCompleted && homeWin ? "opacity-60 scale-95" : ""
-            )}>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                openPlayerProfile(match.awayPlayerId, awayProfile?.inGameName || match.awayPlayerName);
+              }}
+              title="Click to view player profile"
+              className={cn(
+                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/pcard",
+                isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
+                isCompleted && homeWin ? "opacity-60 scale-95" : ""
+              )}
+            >
               <div className={cn(
                 "flex flex-col items-center gap-0.5",
                 isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
@@ -4064,7 +4333,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 )}
               </div>
               <div className={cn(
-                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400",
                 isSideBySide
                   ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                   : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
@@ -4074,7 +4343,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               </div>
               <div className="text-center w-full px-0.5">
                 <h5 className={cn(
-                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
                   isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
                   awayWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
                 )}>
@@ -4285,8 +4554,28 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 <span className="px-2 py-0.5 rounded-md bg-indigo-500 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:to-[#8b5cf6] text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest shrink-0">
                   PAIR #{pairIdx + 1} · 2 MATCHES
                 </span>
-                <span className="text-[8.5px] sm:text-[10px] font-black uppercase italic text-white truncate">
-                  {p1Name} <span className="text-indigo-400 dark:text-[#ff7a45] not-italic px-0.5">⇄</span> {p2Name}
+                <span className="text-[8.5px] sm:text-[10px] font-black uppercase italic text-white truncate flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPlayerProfile(leg1.homePlayerId, p1Name);
+                    }}
+                    className="hover:text-amber-300 hover:underline cursor-pointer truncate"
+                  >
+                    {p1Name}
+                  </button>
+                  <span className="text-indigo-400 dark:text-[#ff7a45] not-italic px-0.5">⇄</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPlayerProfile(leg1.awayPlayerId, p2Name);
+                    }}
+                    className="hover:text-amber-300 hover:underline cursor-pointer truncate"
+                  >
+                    {p2Name}
+                  </button>
                 </span>
               </div>
 
@@ -4296,9 +4585,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     AGG: {koTieInfo.homePlayerAgg} - {koTieInfo.awayPlayerAgg}
                   </span>
                   {koTieInfo.isTieCompleted && koTieInfo.winnerName && (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[7px] sm:text-[8px] font-black uppercase tracking-wider flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPlayerProfile(koTieInfo.winnerId, koTieInfo.winnerName || undefined);
+                      }}
+                      className="px-2 py-0.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-[7px] sm:text-[8px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                    >
                       <Trophy size={8} fill="currentColor" /> {koTieInfo.winnerName}
-                    </span>
+                    </button>
                   )}
                 </div>
               ) : (
@@ -4487,7 +4783,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     </span>
 
                     {match?.homePlayerId ? (
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPlayerProfile(match.homePlayerId, homePlayerName);
+                        }}
+                        title="Click to view player profile"
+                        className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer group/bname"
+                      >
                         <div className={cn(
                           "hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border shrink-0 items-center justify-center",
                           isHomeWinner ? "border-amber-400 text-amber-300" : "border-white/20 text-white"
@@ -4495,7 +4798,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                           <span className="text-[8px] font-black">{homePlayerName.charAt(0) || 'H'}</span>
                         </div>
                         <span className={cn(
-                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate",
+                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate group-hover/bname:underline",
                           isHomeWinner ? "text-amber-300" : isAwayWinner ? "text-slate-400" : "text-white"
                         )}>
                           {homePlayerName}
@@ -4573,7 +4876,14 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     </span>
 
                     {match?.awayPlayerId ? (
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPlayerProfile(match.awayPlayerId, awayPlayerName);
+                        }}
+                        title="Click to view player profile"
+                        className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer group/bname"
+                      >
                         <div className={cn(
                           "hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border shrink-0 items-center justify-center",
                           isAwayWinner ? "border-amber-400 text-amber-300" : "border-white/20 text-white"
@@ -4581,7 +4891,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                           <span className="text-[8px] font-black">{awayPlayerName.charAt(0) || 'A'}</span>
                         </div>
                         <span className={cn(
-                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate",
+                          "text-[8.5px] xs:text-[9.5px] sm:text-xs font-black uppercase italic tracking-tight truncate group-hover/bname:underline",
                           isAwayWinner ? "text-amber-300" : isHomeWinner ? "text-slate-400" : "text-white"
                         )}>
                           {awayPlayerName}
@@ -5216,6 +5526,82 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </button>
           </div>
 
+          {/* Optional Match Deadline / Play Window Section */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-emerald-600 shrink-0" />
+                <span className="text-[9.5px] font-black text-slate-800 uppercase tracking-wider">
+                  Match Deadline / Play Time
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-600 text-[7.5px] font-black uppercase tracking-widest">
+                Optional
+              </span>
+            </div>
+
+            <p className="text-[9.5px] font-semibold text-slate-500 leading-relaxed">
+              Set a deadline time within which players must play these matches, or leave empty to deploy without a time limit:
+            </p>
+
+            {/* Quick Duration Presets */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { label: '+6 Hours', hours: 6 },
+                { label: '+12 Hours', hours: 12 },
+                { label: '+24 Hours', hours: 24 },
+                { label: '+48 Hours', hours: 48 },
+              ].map((preset) => (
+                <button
+                  key={preset.hours}
+                  type="button"
+                  onClick={() => applyQuickDeadlineHours(preset.hours)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-400 text-[8.5px] font-black uppercase tracking-wider text-slate-700 transition-all active:scale-95"
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {(autoDeployDeadlineDate || autoDeployDeadlineTime) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoDeployDeadlineDate('');
+                    setAutoDeployDeadlineTime('');
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[8.5px] font-black uppercase tracking-wider text-rose-600 transition-all active:scale-95 ml-auto"
+                >
+                  Clear Time
+                </button>
+              )}
+            </div>
+
+            {/* Custom Date & Time Inputs */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block ml-1">
+                  Deadline Date
+                </label>
+                <input
+                  type="date"
+                  value={autoDeployDeadlineDate}
+                  onChange={(e) => setAutoDeployDeadlineDate(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold text-slate-800 outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block ml-1">
+                  Deadline Time
+                </label>
+                <input
+                  type="time"
+                  value={autoDeployDeadlineTime}
+                  onChange={(e) => setAutoDeployDeadlineTime(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold text-slate-800 outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center gap-3 pt-1">
             <button
               type="button"
@@ -5336,6 +5722,66 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
           </div>
 
+          {/* Optional Match Deadline / Play Window Section for Next Round */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Clock size={13} className="text-indigo-600 shrink-0" />
+                <span className="text-[9px] font-black text-slate-800 uppercase tracking-wider">
+                  Match Deadline / Play Time
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-600 text-[7px] font-black uppercase tracking-widest">
+                Optional
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { label: '+6H', hours: 6 },
+                { label: '+12H', hours: 12 },
+                { label: '+24H', hours: 24 },
+                { label: '+48H', hours: 48 },
+              ].map((preset) => (
+                <button
+                  key={preset.hours}
+                  type="button"
+                  onClick={() => applyQuickDeadlineHours(preset.hours)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-400 text-[8px] font-black uppercase tracking-wider text-slate-700 transition-all active:scale-95"
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {(autoDeployDeadlineDate || autoDeployDeadlineTime) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoDeployDeadlineDate('');
+                    setAutoDeployDeadlineTime('');
+                  }}
+                  className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[8px] font-black uppercase tracking-wider text-rose-600 transition-all active:scale-95 ml-auto"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={autoDeployDeadlineDate}
+                onChange={(e) => setAutoDeployDeadlineDate(e.target.value)}
+                className="w-full h-10 px-2.5 rounded-xl bg-white border border-slate-200 text-[10.5px] font-bold text-slate-800 outline-none focus:border-indigo-500"
+              />
+              <input
+                type="time"
+                value={autoDeployDeadlineTime}
+                onChange={(e) => setAutoDeployDeadlineTime(e.target.value)}
+                className="w-full h-10 px-2.5 rounded-xl bg-white border border-slate-200 text-[10.5px] font-bold text-slate-800 outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
           <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center">
             <p className="text-[11px] font-bold text-slate-800 leading-relaxed">
               Advance qualified players from {progressionModal.currentStageLabel} to {progressionModal.nextStageLabel} with {progressionLegs === 2 ? '2 Home & Away Matches (Aggregate Score)' : '1 Match per pairing'}?
@@ -5429,7 +5875,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               onClick={() => handleSlotClick('3RD_PLACE_M1', 'home', 1, match, '3RD_PLACE')}
               className={cn(
                 "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
-                isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
+                (isAdminUser || Boolean(displayMatch.homePlayerId)) ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
                 isHomeWinner ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-white/80 border-slate-100"
               )}
             >
@@ -5443,11 +5889,20 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">HOME</span>
-                  <span className={cn(
-                    "text-xs font-black uppercase italic truncate max-w-[120px]",
-                    isHomeWinner ? "text-amber-700" : 
-                    (!displayMatch.homePlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
-                  )}>
+                  <span
+                    onClick={(e) => {
+                      if (displayMatch.homePlayerId) {
+                        e.stopPropagation();
+                        openPlayerProfile(displayMatch.homePlayerId, homePlayerName);
+                      }
+                    }}
+                    className={cn(
+                      "text-xs font-black uppercase italic truncate max-w-[120px] transition-colors",
+                      displayMatch.homePlayerId ? "hover:text-indigo-600 hover:underline cursor-pointer" : "",
+                      isHomeWinner ? "text-amber-700" : 
+                      (!displayMatch.homePlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
+                    )}
+                  >
                     {!displayMatch.homePlayerId && isAdminUser ? "Assign Player" : homePlayerName}
                   </span>
                 </div>
@@ -5474,7 +5929,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
               onClick={() => handleSlotClick('3RD_PLACE_M1', 'away', 1, match, '3RD_PLACE')}
               className={cn(
                 "flex items-center justify-between p-3 rounded-2xl border transition-all select-none",
-                isAdminUser ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
+                (isAdminUser || Boolean(displayMatch.awayPlayerId)) ? "cursor-pointer hover:border-indigo-300 active:scale-95" : "",
                 isAwayWinner ? "bg-amber-50 border-amber-200 shadow-sm" : "bg-white/80 border-slate-100"
               )}
             >
@@ -5488,11 +5943,20 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">AWAY</span>
-                  <span className={cn(
-                    "text-xs font-black uppercase italic truncate max-w-[120px]",
-                    isAwayWinner ? "text-amber-700" : 
-                    (!displayMatch.awayPlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
-                  )}>
+                  <span
+                    onClick={(e) => {
+                      if (displayMatch.awayPlayerId) {
+                        e.stopPropagation();
+                        openPlayerProfile(displayMatch.awayPlayerId, awayPlayerName);
+                      }
+                    }}
+                    className={cn(
+                      "text-xs font-black uppercase italic truncate max-w-[120px] transition-colors",
+                      displayMatch.awayPlayerId ? "hover:text-indigo-600 hover:underline cursor-pointer" : "",
+                      isAwayWinner ? "text-amber-700" : 
+                      (!displayMatch.awayPlayerId && isAdminUser ? "text-emerald-600" : "text-slate-700")
+                    )}
+                  >
                     {!displayMatch.awayPlayerId && isAdminUser ? "Assign Player" : awayPlayerName}
                   </span>
                 </div>
@@ -5541,8 +6005,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                 <Card key={reg.id} className="p-6 border-none overflow-visible">
                   <div className="flex items-center justify-between gap-2">
                     <button 
-                      onClick={() => p && setSelectedPlayerProfile(p)}
-                      className="flex items-center gap-4 text-left group flex-1 min-w-0"
+                      onClick={() => openPlayerProfile(reg.userId, reg.gameName)}
+                      className="flex items-center gap-4 text-left group flex-1 min-w-0 cursor-pointer"
                     >
                       <div className="relative shrink-0">
                         <div className="w-14 h-14 rounded-[1.2rem] nm-inset flex items-center justify-center border-2 border-white/40 overflow-hidden bg-slate-900 shadow-[0_0_15px_rgba(79,70,229,0.1)] group-hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all duration-300">
@@ -5702,9 +6166,11 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                       const p = profiles[row.userId];
                       return (
                         <div 
-                          key={row.userId} 
+                          key={row.userId}
+                          onClick={() => openPlayerProfile(row.userId, p?.inGameName || row.name)}
+                          title="Click to view player profile"
                           className={cn(
-                            "flex items-center justify-between px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all border",
+                            "flex items-center justify-between px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all border cursor-pointer group/grow",
                             i < 2 
                               ? "bg-indigo-50/40 border-indigo-100/60 hover:bg-indigo-50/70 dark:!bg-gradient-to-r dark:!from-emerald-500/20 dark:!via-indigo-500/16 dark:!to-purple-500/20 dark:!border-emerald-400/35 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_4px_14px_rgba(0,0,0,0.3)]" 
                               : "bg-white border-transparent hover:bg-slate-50 dark:!bg-[#14172b]/80 dark:!border-white/[0.07] dark:hover:!bg-[#1b1f38]/90"
@@ -5731,7 +6197,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                                    {(p?.inGameName || row.name || 'P').charAt(0)}
                                  </span>
                                </div>
-                               <span className="text-[11px] sm:text-xs font-black text-slate-800 dark:!text-white uppercase italic truncate tracking-tight">
+                               <span className="text-[11px] sm:text-xs font-black text-slate-800 dark:!text-white group-hover/grow:text-indigo-600 dark:group-hover/grow:!text-[#ff7a45] group-hover/grow:underline uppercase italic truncate tracking-tight transition-colors">
                                  {p?.inGameName || row.name || `Player ${i + 1}`}
                                </span>
                             </div>
@@ -5849,19 +6315,31 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="pt-2 pb-3 px-0.5 sm:px-1">
               {activeKnockoutStage === 'FINAL' ? (
                 <div className="max-w-md mx-auto space-y-4">
-                  {tournament.status === 'finished' && tournament.winnerText && (
-                    <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-400/20 to-amber-500/10 border border-amber-300/80 p-3.5 flex items-center justify-center gap-3 text-center shadow-xs">
-                      <Trophy size={20} className="text-amber-500 shrink-0" />
-                      <div>
-                        <span className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-700 block">
-                          Tournament Champion
-                        </span>
-                        <span className="text-sm font-black uppercase italic text-slate-900 tracking-tight">
-                          {tournament.winnerText}
-                        </span>
+                  {(() => {
+                    const finalChamp = getFinalChampionInfo(matches);
+                    const activeT = currentTournament || tournament;
+                    const champText = activeT?.winnerText || finalChamp?.winnerName;
+                    const champId = activeT?.winnerId || finalChamp?.winnerId;
+                    const showChampBanner = (activeT?.status === 'finished' || activeT?.status === 'completed' || Boolean(finalChamp?.winnerId)) && Boolean(champText);
+                    if (!showChampBanner) return null;
+                    return (
+                      <div
+                        onClick={() => openPlayerProfile(champId, champText)}
+                        title="Click to view champion profile"
+                        className="rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/25 to-amber-500/15 border border-amber-400/60 dark:border-amber-400/45 p-3.5 flex items-center justify-center gap-3 text-center shadow-sm cursor-pointer hover:brightness-105 transition-all"
+                      >
+                        <Trophy size={20} className="text-amber-500 dark:text-amber-400 shrink-0" />
+                        <div>
+                          <span className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-700 dark:text-amber-300 block">
+                            Tournament Champion
+                          </span>
+                          <span className="text-sm font-black uppercase italic text-slate-900 dark:text-white tracking-tight hover:underline">
+                            {champText}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {renderBracketSide('left', 1)}
                 </div>
               ) : (
@@ -6123,15 +6601,27 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     }
   };
 
+  const finalChampion = getFinalChampionInfo(matches);
+  const activeTournamentState = currentTournament || tournament;
+  const isTournamentFinished =
+    activeTournamentState?.status === 'finished' ||
+    activeTournamentState?.status === 'completed' ||
+    Boolean(activeTournamentState?.winnerId) ||
+    Boolean(finalChampion?.winnerId);
+  const championDisplayName =
+    activeTournamentState?.winnerText ||
+    finalChampion?.winnerName ||
+    null;
+
   const renderStatusBadge = () => {
-    const t = currentTournament || tournament;
-    const isFinished = t.status === 'finished' || t.status === 'completed';
+    const t = activeTournamentState;
+    const isFinished = isTournamentFinished;
     const isLive = t.status === 'ongoing' || (t.filledSlots !== undefined && t.totalSlots !== undefined && t.filledSlots >= t.totalSlots && !isFinished);
 
     if (isFinished) {
       return (
-        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 text-slate-300 text-[8px] font-black uppercase tracking-widest border border-slate-700 flex items-center gap-2 shadow-sm ">
-          <span className="w-2 h-2 rounded-full bg-slate-400" />
+        <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 text-amber-300 text-[8px] font-black uppercase tracking-widest border border-amber-400/40 flex items-center gap-2 shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
           END
         </div>
       );
@@ -6231,12 +6721,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                    </div>
 
                    {/* ORGANIZER / CREATOR BADGE ON BANNER */}
-                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60  border border-white/20 text-white shadow-lg w-fit">
+                   <div
+                     onClick={() => openPlayerProfile(publisherId, organizerDisplayName)}
+                     title="Click to view organizer profile"
+                     className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 border border-white/20 text-white shadow-lg w-fit cursor-pointer hover:bg-black/80 transition-colors"
+                   >
                      <div className="w-5 h-5 rounded-full bg-fc-green/20 border border-fc-green/40 flex items-center justify-center shrink-0">
                        <Shield size={11} className="text-fc-green" />
                      </div>
                      <span className="text-[8px] font-black tracking-widest text-slate-300 uppercase shrink-0">ORGANIZER:</span>
-                     <span className="text-[10px] font-black text-fc-green uppercase tracking-wider truncate max-w-[180px] sm:max-w-xs">
+                     <span className="text-[10px] font-black text-fc-green uppercase tracking-wider truncate max-w-[180px] sm:max-w-xs hover:underline">
                        {organizerDisplayName}
                      </span>
                      <span className="w-1.5 h-1.5 rounded-full bg-fc-green  shrink-0" />
@@ -6266,7 +6760,16 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                           <span className="text-lg font-black text-white">{currentTournament?.filledSlots ?? tournament.filledSlots}/{currentTournament?.totalSlots ?? tournament.totalSlots}</span>
                        </div>
                     </div>
-                    {registration ? (
+                    {isTournamentFinished ? (
+                      <div
+                        onClick={() => openPlayerProfile(activeTournamentState?.winnerId || finalChampion?.winnerId, championDisplayName || undefined)}
+                        title="Click to view champion profile"
+                        className="px-5 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg cursor-pointer transition-colors"
+                      >
+                        <Trophy size={14} className="text-amber-400 shrink-0" />
+                        <span className="truncate max-w-[160px] hover:underline">{championDisplayName ? `WINNER: ${championDisplayName}` : 'TOURNAMENT ENDED'}</span>
+                      </div>
+                    ) : registration ? (
                       <div className="px-6 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
                          <CheckCircle size={14} className="text-fc-green" /> Registered
                       </div>

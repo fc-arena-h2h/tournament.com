@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  User, Facebook, Phone, Trophy, Star, Shield, LogOut, Edit3, X, 
-  Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle, ShieldCheck, 
-  Languages, Bell, BellRing, Settings, ExternalLink, MessageCircle,
+  User, Facebook, Phone, ShieldCheck, LogOut, Edit3, X, 
+  CheckCircle, BellRing, ExternalLink, MessageCircle,
   Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -15,7 +14,7 @@ import { useI18n } from '@/src/lib/i18n';
 import { useTheme } from '@/src/lib/theme';
 import { requestPushNotificationToken } from '@/src/lib/fcm';
 import { sendTestPhoneNotification } from '@/src/lib/notifications';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { APP_VERSION } from '@/src/lib/constants';
 
 interface ProfileProps {
@@ -81,64 +80,76 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f0f1f5] dark:bg-transparent pb-32 pt-6 px-4 transition-colors duration-300">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-xl mx-auto space-y-8"
-      >
-        {/* Header Section */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white uppercase italic tracking-tighter">
-            Profile <span className="text-fc-green dark:text-[#ff7a45]">Identity</span>
-          </h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">
-            Professional Arena Profile
-          </p>
-        </div>
+  const displayName = profile?.inGameName || 'Recruit';
+  const initials = displayName
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'FC';
 
-        {/* Main Identity Card */}
-        <div className="nm-flat rounded-[3rem] p-10 space-y-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-fc-green/5 dark:bg-gradient-to-bl dark:from-[#ff7a45]/20 dark:via-[#a855f7]/15 dark:to-transparent rounded-bl-full -mr-12 -mt-12 pointer-events-none blur-xl" />
-          <div className="hidden dark:block absolute -bottom-16 -left-16 w-44 h-44 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
-          
-          <div className="flex flex-col items-center relative z-10">
-            {/* Avatar Section */}
-            <div className="relative mb-6">
-              <div className="w-40 h-40 rounded-[3.5rem] nm-flat p-2 flex items-center justify-center bg-white/50 dark:bg-[#232642]/80">
-                <div className="w-full h-full rounded-[3rem] nm-inset flex items-center justify-center text-slate-300 dark:text-slate-400">
-                  <User size={64} />
+  return (
+    <div className="space-y-7 pt-2 pb-10">
+      <motion.div 
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-7"
+      >
+        {/* Main Identity Hero Card */}
+        <div className="nm-flat rounded-[2.5rem] p-6 sm:p-8 space-y-7 relative overflow-hidden border border-white/60 dark:border-white/15">
+          {/* Subtle Ambient Glow */}
+          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-gradient-to-bl from-indigo-500/15 via-purple-500/10 to-transparent dark:from-[#ff7a45]/25 dark:via-[#a855f7]/20 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-gradient-to-tr from-emerald-500/10 via-sky-500/10 to-transparent dark:from-[#38bdf8]/15 blur-2xl pointer-events-none" />
+
+          {/* Top Bar inside Hero Card */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-[0.22em]">
+              Professional Arena Profile
+            </span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck size={12} />
+              <span className="text-[8.5px] font-black uppercase tracking-widest">
+                Verified {profile?.role || 'Player'}
+              </span>
+            </div>
+          </div>
+
+          {/* Center Avatar & Player Identity */}
+          <div className="flex flex-col items-center text-center space-y-4 relative z-10">
+            <div className="relative">
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-[2.4rem] p-1 bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-400 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] shadow-xl shadow-indigo-500/15 dark:shadow-purple-500/20">
+                <div className="w-full h-full rounded-[2.15rem] bg-gradient-to-b from-white to-slate-100 dark:from-[#2b3052] dark:to-[#1e223d] flex flex-col items-center justify-center relative overflow-hidden border border-white/80 dark:border-white/15">
+                  <span className="text-3xl sm:text-4xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-white dark: via-orange-100 dark:to-[#ff7a45]">
+                    {initials}
+                  </span>
+                  <span className="text-[7px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-300 mt-0.5">
+                    FC ARENA
+                  </span>
                 </div>
               </div>
               <button 
                 onClick={handleEditClick}
-                className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl nm-flat bg-white dark:bg-[#2a2e4d] flex items-center justify-center text-fc-green dark:text-[#ff7a45] shadow-xl active:nm-pressed"
+                title="Edit Profile"
+                className="absolute -bottom-1.5 -right-1.5 w-10 h-10 rounded-xl bg-white dark:bg-[#31365c] border border-slate-200 dark:border-white/20 flex items-center justify-center text-indigo-600 dark:text-[#ff7a45] shadow-lg active:scale-95 transition-transform"
               >
-                <Camera size={20} />
+                <Camera size={17} />
               </button>
             </div>
 
-            {/* Profile Info */}
-            <div className="text-center space-y-3 w-full">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl nm-inset bg-white/30 mb-2">
-                <ShieldCheck size={12} className="text-fc-green dark:text-emerald-400" />
-                <span className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">
-                  Verified {profile?.role || 'Player'}
-                </span>
-              </div>
-              
-              <h2 className="text-4xl font-black text-slate-900 dark:text-white uppercase italic leading-none tracking-tighter drop-shadow-sm">
-                {profile?.inGameName || 'Recruit'}
+            <div className="space-y-1.5 w-full">
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase italic leading-none tracking-tighter">
+                {displayName}
               </h2>
-              
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Mail size={12} />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">{profile?.email}</span>
-                </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-slate-500 dark:text-slate-300">
+                {profile?.email && (
+                  <div className="inline-flex items-center gap-1.5">
+                    <Mail size={12} className="text-slate-400" />
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider">{profile.email}</span>
+                  </div>
+                )}
                 {profile?.leagueName && (
-                  <div className="flex items-center gap-2 text-fc-green dark:text-[#ff7a45]">
+                  <div className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-[#ff7a45]">
                     <Award size={12} />
                     <span className="text-[10px] font-black uppercase tracking-widest italic">{profile.leagueName}</span>
                   </div>
@@ -147,109 +158,171 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             </div>
           </div>
 
-          {/* Quick Stats/Actions */}
-          <div className="grid grid-cols-2 gap-4 relative z-10">
+          {/* Primary Actions */}
+          <div className="grid grid-cols-2 gap-3.5 relative z-10 pt-1">
             <button 
               onClick={handleEditClick}
-              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-slate-600 dark:text-slate-200 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
+              className="h-14 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] text-white font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-indigo-500/20 dark:shadow-orange-500/20 active:scale-95 transition-all"
             >
-              <Edit3 size={16} className="dark:text-[#38bdf8]" /> MODIFY PROFILE
+              <Edit3 size={15} />
+              <span>Modify Profile</span>
             </button>
             <button 
               onClick={async () => {
                 await signOut(auth);
                 window.location.reload();
               }}
-              className="nm-flat h-16 rounded-2xl flex items-center justify-center gap-3 text-rose-500 dark:text-rose-400 font-black text-[10px] uppercase tracking-widest active:nm-pressed"
+              className="h-14 rounded-2xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/25 text-rose-600 dark:text-rose-400 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 active:scale-95 transition-all"
             >
-              <LogOut size={16} /> Sign Out
+              <LogOut size={15} />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
 
-        {/* Detailed Info Sections */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-4">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">DIGITAL CHANNELS</h3>
-            <div className="w-12 h-1 bg-fc-green/20 dark:bg-[#a855f7]/40 rounded-full" />
+        {/* Digital Channels Section */}
+        <div className="space-y-3.5">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">
+              DIGITAL CHANNELS
+            </h3>
+            <button
+              type="button"
+              onClick={handleEditClick}
+              className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-[#ff7a45] hover:underline"
+            >
+              Update Links
+            </button>
           </div>
 
-          <div className="nm-flat rounded-[2.5rem] overflow-hidden">
-            <div className="divide-y divide-white/20 dark:divide-white/10">
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-blue-600 dark:text-blue-400">
-                    <Facebook size={20} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Facebook</span>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.fbUrl ? 'Connected' : 'Not Linked'}</span>
-                  </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Facebook Card */}
+            <div className="nm-flat rounded-3xl p-4.5 flex items-center justify-between border border-white/60 dark:border-white/12">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-blue-500/12 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                  <Facebook size={19} />
                 </div>
-                {profile?.fbUrl && (
-                  <button onClick={() => window.open(profile.fbUrl)} className="text-fc-green dark:text-[#38bdf8] p-2"><ExternalLink size={18} /></button>
-                )}
-              </div>
-
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-emerald-500 dark:text-emerald-400">
-                    <MessageSquare size={20} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</span>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.whatsappNumber || 'Not Linked'}</span>
-                  </div>
+                <div className="min-w-0">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">Facebook</span>
+                  <span className="text-xs font-black text-slate-800 dark:text-white truncate block">
+                    {profile?.fbUrl ? 'Connected' : 'Not Linked'}
+                  </span>
                 </div>
-                {profile?.whatsappNumber && (
-                  <button onClick={() => window.open(`https://wa.me/${profile.whatsappNumber?.replace(/\D/g, '')}`)} className="text-emerald-500 p-2"><ChevronRight size={18} /></button>
-                )}
               </div>
+              {profile?.fbUrl ? (
+                <button
+                  onClick={() => window.open(profile.fbUrl)}
+                  className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-500/20 transition-colors shrink-0"
+                >
+                  <ExternalLink size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleEditClick}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-[8px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                >
+                  Link
+                </button>
+              )}
+            </div>
 
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-sky-500 dark:text-sky-400">
-                    <MessageCircle size={20} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Messenger</span>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.messengerLink ? 'Connected' : 'Not Linked'}</span>
-                  </div>
+            {/* WhatsApp Card */}
+            <div className="nm-flat rounded-3xl p-4.5 flex items-center justify-between border border-white/60 dark:border-white/12">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <MessageSquare size={19} />
                 </div>
-                {profile?.messengerLink && (
-                  <button onClick={() => window.open(profile.messengerLink)} className="text-sky-500 p-2"><ExternalLink size={18} /></button>
-                )}
+                <div className="min-w-0">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">WhatsApp</span>
+                  <span className="text-xs font-black text-slate-800 dark:text-white truncate block">
+                    {profile?.whatsappNumber || 'Not Linked'}
+                  </span>
+                </div>
               </div>
+              {profile?.whatsappNumber ? (
+                <button
+                  onClick={() => window.open(`https://wa.me/${profile.whatsappNumber?.replace(/\D/g, '')}`)}
+                  className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-500/20 transition-colors shrink-0"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleEditClick}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-[8px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                >
+                  Link
+                </button>
+              )}
+            </div>
 
-              <div className="p-6 flex items-center justify-between hover:bg-white/10 dark:hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-500 dark:text-purple-400">
-                    <Hash size={20} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{profile?.role === 'player' ? 'In Game UID' : 'League Code'}</span>
-                    <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200">{profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Verified')}</span>
-                  </div>
+            {/* Messenger Card */}
+            <div className="nm-flat rounded-3xl p-4.5 flex items-center justify-between border border-white/60 dark:border-white/12">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-sky-500/12 border border-sky-500/25 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                  <MessageCircle size={19} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">Messenger</span>
+                  <span className="text-xs font-black text-slate-800 dark:text-white truncate block">
+                    {profile?.messengerLink ? 'Connected' : 'Not Linked'}
+                  </span>
+                </div>
+              </div>
+              {profile?.messengerLink ? (
+                <button
+                  onClick={() => window.open(profile.messengerLink)}
+                  className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center hover:bg-sky-500/20 transition-colors shrink-0"
+                >
+                  <ExternalLink size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleEditClick}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-[8px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                >
+                  Link
+                </button>
+              )}
+            </div>
+
+            {/* UID / League Code Card */}
+            <div className="nm-flat rounded-3xl p-4.5 flex items-center justify-between border border-white/60 dark:border-white/12">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-purple-500/12 border border-purple-500/25 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                  <Hash size={19} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">
+                    {profile?.role === 'player' ? 'In-Game UID' : 'League Code'}
+                  </span>
+                  <span className="text-xs font-mono font-black text-slate-800 dark:text-white truncate block">
+                    {profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Verified')}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Alerts Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-4">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">GLOBAL ALERTS</h3>
+        {/* Global Alerts Section */}
+        <div className="space-y-3.5">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">
+              GLOBAL ALERTS
+            </h3>
           </div>
           
-          <div className="nm-flat rounded-[2rem] p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-amber-500">
-                <BellRing size={20} className={profile?.pushEnabled ? "animate-pulse" : ""} />
+          <div className="nm-flat rounded-3xl p-5 flex items-center justify-between border border-white/60 dark:border-white/12">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/12 border border-amber-500/25 flex items-center justify-center text-amber-500">
+                <BellRing size={19} className={profile?.pushEnabled ? "animate-pulse" : ""} />
               </div>
               <div className="flex flex-col">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Notifications</span>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{profile?.pushEnabled ? 'Active' : 'Disabled'}</span>
+                <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Notifications</span>
+                <span className="text-xs font-black text-slate-800 dark:text-white">
+                  {profile?.pushEnabled ? 'Active & Receiving Alerts' : 'Push Alerts Disabled'}
+                </span>
               </div>
             </div>
             
@@ -268,58 +341,56 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               }}
               disabled={pushLoading}
               className={cn(
-                "px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                profile?.pushEnabled ? "nm-inset text-slate-400" : "nm-flat text-fc-green dark:text-[#ff7a45] active:nm-pressed"
+                "px-5 py-2.5 rounded-xl text-[9.5px] font-black uppercase tracking-widest transition-all active:scale-95",
+                profile?.pushEnabled
+                  ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                  : "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/20"
               )}
             >
-              {pushLoading ? '...' : (profile?.pushEnabled ? 'Test' : 'Enable')}
+              {pushLoading ? '...' : (profile?.pushEnabled ? 'Test Alert' : 'Enable')}
             </button>
           </div>
         </div>
 
-        {/* Appearance & Theme Switcher Section (Bottom of Profile) */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-4">
+        {/* Appearance & Theme Switcher Section */}
+        <div className="space-y-3.5">
+          <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase italic tracking-widest">
               APPEARANCE & THEME
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-[#a855f7]/20 dark:text-purple-300 dark:border-purple-400/30">
+            <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-purple-300">
               {isDark ? 'Dark Glass Active' : 'Light Mode Active'}
             </span>
           </div>
 
-          <div className="nm-flat rounded-[2.2rem] p-5 sm:p-6 space-y-5 relative overflow-hidden">
-            {/* Subtle Ambient Glow inside Theme Card */}
-            <div className="hidden dark:block absolute -top-12 -right-12 w-36 h-36 rounded-full bg-gradient-to-br from-[#ff7a45]/25 via-[#a855f7]/20 to-transparent blur-2xl pointer-events-none" />
-            <div className="hidden dark:block absolute -bottom-12 -left-12 w-36 h-36 rounded-full bg-gradient-to-tr from-[#38bdf8]/20 to-transparent blur-2xl pointer-events-none" />
-
+          <div className="nm-flat rounded-3xl p-5 sm:p-6 space-y-4 relative overflow-hidden border border-white/60 dark:border-white/12">
             <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl nm-inset flex items-center justify-center text-indigo-600 dark:text-[#ff7a45]">
-                  {isDark ? <Sparkles size={20} className="text-[#ff7a45]" /> : <Palette size={20} />}
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-500/12 dark:bg-[#ff7a45]/15 border border-indigo-500/25 dark:border-[#ff7a45]/30 flex items-center justify-center text-indigo-600 dark:text-[#ff7a45]">
+                  {isDark ? <Sparkles size={19} className="text-[#ff7a45]" /> : <Palette size={19} />}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interface Mode</span>
-                  <span className="text-sm font-black text-slate-800 dark:text-white uppercase italic tracking-tight">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Interface Mode</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase italic tracking-tight">
                     {isDark ? 'Dark Glassmorphic UI' : 'Soft Neumorphic Light'}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Dual Segmented Theme Switch Button */}
-            <div className="grid grid-cols-2 gap-3 p-1.5 rounded-[1.6rem] nm-inset relative z-10">
+            {/* Clean Dual Segmented Theme Switcher (Without dark black inset box) */}
+            <div className="grid grid-cols-2 gap-3 p-1.5 rounded-2xl bg-slate-200/70 dark:bg-white/8 border border-slate-300/60 dark:border-white/12 relative z-10">
               <button
                 type="button"
                 onClick={() => setTheme('light')}
                 className={cn(
-                  "h-13 rounded-[1.25rem] flex items-center justify-center gap-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300",
+                  "h-12 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300",
                   theme === 'light'
-                    ? "bg-white text-slate-900 shadow-md border border-white scale-[1.01]"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-white text-slate-900 shadow-md border border-slate-200/80"
+                    : "text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
-                <Sun size={16} className={cn(theme === 'light' ? "text-amber-500 fill-amber-500/20" : "text-slate-400")} />
+                <Sun size={15} className={cn(theme === 'light' ? "text-amber-500 fill-amber-500/20" : "text-slate-400")} />
                 <span>Light Mode</span>
               </button>
 
@@ -327,13 +398,13 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 type="button"
                 onClick={() => setTheme('dark')}
                 className={cn(
-                  "h-13 rounded-[1.25rem] flex items-center justify-center gap-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 relative overflow-hidden",
+                  "h-12 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300",
                   theme === 'dark'
-                    ? "bg-gradient-to-r from-[#ff7a45] via-[#ec4899] to-[#8b5cf6] text-white shadow-[0_8px_25px_-4px_rgba(255,122,69,0.5)] border border-white/25 scale-[1.01]"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-gradient-to-r from-[#ff7a45] via-[#ec4899] to-[#8b5cf6] text-white shadow-[0_8px_20px_-4px_rgba(255,122,69,0.5)] border border-white/25"
+                    : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                <Moon size={16} className={cn(theme === 'dark' ? "text-white fill-white/20" : "text-indigo-500")} />
+                <Moon size={15} className={cn(theme === 'dark' ? "text-white fill-white/20" : "text-indigo-500")} />
                 <span>Dark Glass</span>
               </button>
             </div>
@@ -341,22 +412,24 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         </div>
 
         {/* Version Info */}
-        <div className="text-center pt-4">
-          <p className="text-[8px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-[0.5em]">FC Arena Protocol v{APP_VERSION}</p>
+        <div className="text-center pt-2">
+          <p className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.45em]">
+            FC Arena Protocol v{APP_VERSION}
+          </p>
         </div>
       </motion.div>
 
-      {/* Redesigned Modify Profile Modal */}
+      {/* Solid Opaque Modify Profile Modal */}
       {isEditing && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/65 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="w-full max-w-md bg-white dark:bg-[#1e213a]/90 dark:backdrop-blur-2xl rounded-[2.5rem] border-2 border-white dark:border-white/15 shadow-[0_25px_70px_-15px_rgba(15,23,42,0.4)] overflow-hidden flex flex-col max-h-[90vh] my-auto"
+            className="w-full max-w-md solid-modal-surface bg-white rounded-[2.5rem] border border-slate-200 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] overflow-hidden flex flex-col max-h-[90vh] my-auto"
           >
             {/* Top Modal Header */}
-            <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-slate-50 to-white dark:from-[#262a48]/80 dark:to-[#1e213a]/80 border-b border-slate-100 dark:border-white/10 flex items-center justify-between shrink-0">
+            <div className="px-6 pt-6 pb-4 solid-modal-header bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-[#ff7a45] dark:to-[#8b5cf6] text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
                   <Edit3 size={20} />
@@ -383,7 +456,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             {/* Scrollable Form Body */}
             <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
               {/* Live Identity Preview Banner */}
-              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-[#15172b] text-white flex items-center gap-3.5 shadow-md border border-slate-800 dark:border-white/10">
+              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-[#141729] text-white flex items-center gap-3.5 shadow-md border border-slate-800 dark:border-white/12">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 dark:from-[#ff7a45] dark:to-[#a855f7] p-0.5 shrink-0">
                   <div className="w-full h-full rounded-[0.9rem] bg-slate-950 flex items-center justify-center text-white font-black text-base uppercase italic">
                     {(editData.inGameName || profile?.inGameName || 'P').charAt(0)}
@@ -547,12 +620,12 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             </div>
 
             {/* Footer Actions */}
-            <div className="p-5 bg-slate-50 dark:bg-[#17192e]/90 border-t border-slate-100 dark:border-white/10 flex items-center gap-3 shrink-0">
+            <div className="p-5 solid-modal-header bg-slate-50 border-t border-slate-100 flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
                 disabled={isSaving}
-                className="flex-1 h-13 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                className="flex-1 h-13 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
               >
                 Cancel
               </button>
@@ -560,7 +633,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex-[1.6] h-13 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] hover:from-indigo-700 hover:to-slate-950 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] italic shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                className="flex-[1.6] h-13 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-slate-900 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] text-white text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em] italic shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-60"
               >
                 <CheckCircle size={15} className="text-emerald-400 dark:text-white shrink-0" />
                 <span>{isSaving ? 'Saving...' : 'Confirm Changes'}</span>

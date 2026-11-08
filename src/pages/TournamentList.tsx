@@ -233,9 +233,12 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
           const remainingSpots = t.totalSlots - t.filledSlots;
           
           const isPublisher = t.publisherId === auth.currentUser?.uid;
-          const canEnter = t.status === 'open' || reg || isPublisher;
-          
-          const isFinished = t.status === 'finished' || t.status === 'completed';
+          const isFinished =
+            t.status === 'finished' ||
+            t.status === 'completed' ||
+            Boolean((t as any).winnerId) ||
+            Boolean((t as any).winnerText);
+          const canEnter = t.status === 'open' || isFinished || reg || isPublisher;
           const isLive = t.status === 'ongoing' || (isFull && !isFinished);
           const organizerName = t.organizerName || t.organizationName || t.publisherName || (t.publisherId ? publisherProfiles[t.publisherId]?.inGameName : null) || 'Official FC Host';
 

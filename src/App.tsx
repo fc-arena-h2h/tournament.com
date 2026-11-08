@@ -40,7 +40,7 @@ import { useRef } from 'react';
 export default function App() {
   const { t } = useI18n();
   const { user, profile, loading } = useAuth();
-  const { updateRequired, serverVersion, isMandatory, updateUrl, loading: updateLoading } = useAppUpdate();
+  const { updateRequired, serverVersion, isMandatory, updateUrl, telegramUpdateUrl, chromeUpdateUrl, loading: updateLoading } = useAppUpdate();
   const { isFrozen, fraudReason } = useFraudProtection(user, profile);
   const [activeTab, setActiveTab] = useState<NavTab>('arena');
   const [isAdminCreating, setIsAdminCreating] = useState(false);
@@ -182,7 +182,15 @@ export default function App() {
   }
 
   if (updateRequired) {
-    return <UpdateOverlay serverVersion={serverVersion} isMandatory={isMandatory} updateUrl={updateUrl} />;
+    return (
+      <UpdateOverlay
+        serverVersion={serverVersion}
+        isMandatory={isMandatory}
+        updateUrl={updateUrl}
+        telegramUpdateUrl={telegramUpdateUrl}
+        chromeUpdateUrl={chromeUpdateUrl}
+      />
+    );
   }
 
   if (!user) {

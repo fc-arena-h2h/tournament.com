@@ -1,28 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Send, X, Bot, User, MessageCircle, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  Send,
+  X,
+  Bot,
+  User,
+  MessageCircle,
+  ExternalLink,
+  Trash2,
+  Sparkles,
+  Copy,
+  Check,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  HelpCircle
+} from 'lucide-react';
 import Fuse from 'fuse.js';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/src/lib/utils';
+import { FAQItem, buildExpandedKnowledgeBase } from '@/src/lib/supportKnowledgeEngine';
 
 interface Message {
+  id: string;
   role: 'user' | 'model';
   parts: [{ text: string }];
   timestamp: number;
   isError?: boolean;
   confidenceTier?: number;
+  badgeText?: string;
   recommendations?: string[];
-}
-
-interface FAQ {
-  id: string;
-  keywords: string[];
-  questions: string[];
-  answer_en: string;
-  answer_bn: string;
-  related_en?: string[];
-  related_bn?: string[];
+  isStreaming?: boolean;
 }
 
 interface SupportAIProps {
@@ -33,6 +42,57 @@ interface SupportAIProps {
 
 const TELEGRAM_LINK = 'https://t.me/fcarenavs';
 
+const QUICK_CATEGORY_TABS = [
+  {
+    id: 'popular',
+    label: '🔥 Popular',
+    questions: [
+      'টুর্নামেন্টে জয়েন করব কীভাবে?',
+      'How does screenshot OCR verification work?',
+      'প্লেয়ারের নামের ওপর ক্লিক করলে কী দেখা যায়?',
+      'How to talk to opponent?',
+      'ম্যাচ রিজাল্ট কীভাবে দেব?',
+      'How to use invitation key?'
+    ]
+  },
+  {
+    id: 'matches',
+    label: '⚽ Matches & OCR',
+    questions: [
+      '১-ম্যাচ এবং ২-ম্যাচ (Home & Away) ডিপ্লয়ের পার্থক্য কী?',
+      'How to set match deadline during Auto Match Deploy?',
+      'পয়েন্ট টেবিল কীভাবে কাজ করে?',
+      'What are the rules for Knockout Draw or Penalty?',
+      'প্রতিপক্ষ ভুল স্কোর বা রেজাল্ট দিলে কী করব?',
+      'Why can\'t I see the button to upload my match result?'
+    ]
+  },
+  {
+    id: 'hosting',
+    label: '🏆 Hosting & Prizes',
+    questions: [
+      'টুর্নামেন্ট তৈরি করব কীভাবে?',
+      'Why does Prize Pool show \'Please type your currency type BDT or USDT\'?',
+      'টুর্নামেন্ট তৈরির অ্যাক্টিভেশন কী (Activation Key) কোথায় পাব?',
+      'When does a tournament show the END status and Champion banner?',
+      'পুরস্কারের টাকা কীভাবে পাব?',
+      'How do players move to the next round?'
+    ]
+  },
+  {
+    id: 'account',
+    label: '👤 Account & App',
+    questions: [
+      'রেজিস্ট্রেশন করার সময় Player এবং Host অপশনের পার্থক্য কী?',
+      'Why does the In-Game UID box only accept numbers?',
+      'রেজিস্ট্রেশন করার সময় ফেসবুক লিঙ্ক নিচ্ছে না কেন?',
+      'How to switch between Light Mode and Dark Glass Mode?',
+      'অ্যাপ আপডেট পপআপে Telegram এবং Google Chrome বাটনের কাজ কী?',
+      'Where to find FC Mobile UID?'
+    ]
+  }
+];
+
 const detectLanguage = (text: string): 'bn' | 'en' => {
   const lowerText = text.toLowerCase();
   if (/[\u0980-\u09FF]/.test(text)) return 'bn';
@@ -41,7 +101,7 @@ const detectLanguage = (text: string): 'bn' | 'en' => {
     'kivabe', 'kivaby', 'korbo', 'hoy', 'ase', 'gesi', 'bolbo', 'khulbo', 'toiri', 'kory', 'pabo',
     'desi', 'basi', 'bhule', 'amr', 'amar', 'dhukbo', 'dhukte', 'kothay', 'kothai', 'niyom', 'dekhte',
     'kore', 'koro', 'kori', 'parbo', 'parchi', 'hocche', 'bhai', 'bro', 'khelbo', 'jabo', 'dibo',
-    'keno', 'sathe', 'protipokkho', 'taka', 'namabo', 'khujbo'
+    'keno', 'sathe', 'protipokkho', 'taka', 'namabo', 'khujbo', 'mane', 'ki', 'kon', 'koto', 'lagbe'
   ];
   const words = lowerText.split(/\s+/);
   if (words.some(word => banglishKeywords.includes(word))) return 'bn';
@@ -51,51 +111,51 @@ const detectLanguage = (text: string): 'bn' | 'en' => {
 
 // Stop-words that frame a question but do NOT define the core topic
 const STOP_WORDS = new Set([
-  // Bengali stop words
   'কিভাবে', 'করব', 'করে', 'কি', 'হয়', 'হয়', 'হবে', 'যায়', 'যায়', 'বলব', 'দেব', 'পাব',
   'কোথায়', 'কোথায়', 'কখন', 'কেন', 'সাথে', 'এর', 'তে', 'এ', 'থেকে', 'জন্য', 'আমার', 'আমি',
   'কে', 'কাকে', 'কোন', 'কোনো', 'একটি', 'একটা', 'টা', 'টি', 'গুলো', 'গুলা', 'দিয়ে', 'দিয়ে',
   'হলে', 'করলে', 'গেলে', 'না', 'নিয়ম', 'নিয়ম', 'উপায়', 'উপায়', 'চাই', 'পারি', 'পারব',
-  // Banglish stop words
+  'একটু', 'বলবেন', 'ভাই', 'প্লিজ', 'জানতে', 'বলুন', 'দেখায়', 'দেখায়', 'উঠছে', 'আসছে',
   'kivabe', 'korbo', 'kore', 'ki', 'hoy', 'hobe', 'bolbo', 'dibo', 'pabo', 'kothay', 'keno',
   'sathe', 'er', 'amar', 'ami', 'diye', 'hole', 'korle', 'gele', 'na', 'niyom', 'chai', 'parbo',
-  'kory', 'jabe', 'jay', 'ache', 'ase', 'theke', 'jonno',
-  // English stop words
+  'kory', 'jabe', 'jay', 'ache', 'ase', 'theke', 'jonno', 'bhai', 'plz', 'please', 'ekto',
   'how', 'to', 'what', 'is', 'are', 'can', 'i', 'do', 'in', 'the', 'my', 'a', 'an', 'for',
   'with', 'from', 'where', 'when', 'why', 'does', 'will', 'should', 'of', 'on', 'at', 'by', 'or', 'and'
 ]);
 
-// Normalize text and unify common Bengali/Banglish spelling variants
+// Normalize text and unify common Bengali/Banglish/English synonyms
 const normalizeText = (raw: string): string => {
-  let s = raw
+  const s = raw
     .toLowerCase()
     .replace(/[?।!,.()\-/'"`:;[\]{}]/g, ' ')
-    // Unify yo-phola / nukta variations
     .replace(/য়/g, 'য়')
     .replace(/ড়/g, 'ড়')
     .replace(/ঢ়/g, 'ঢ়')
-    // Common Bengali spelling normalization
     .replace(/কীভাবে/g, 'কিভাবে')
     .replace(/কী/g, 'কি')
-    .replace(/রিজাল্ট/g, 'রেজাল্ট')
+    .replace(/রিজাল্ট|রেজালট/g, 'রেজাল্ট')
     .replace(/এডমিন/g, 'অ্যাডমিন')
     .replace(/একাউন্ট|একউন্ট/g, 'অ্যাকাউন্ট')
     .replace(/জয়েন/g, 'জয়েন')
     .replace(/পয়েন্ট/g, 'পয়েন্ট')
     .replace(/কয়েন/g, 'কয়েন')
-    .replace(/প্লেয়ার/g, 'প্লেয়ার')
+    .replace(/প্লেয়ার|পেলেয়ার|পেলেয়ার/g, 'প্লেয়ার')
     .replace(/এড/g, 'অ্যাড')
     .replace(/লিংক/g, 'লিঙ্ক')
-    .replace(/ডিপ্লয়/g, 'ডিপ্লয়')
+    .replace(/ডিপ্লয়|ডিপ্লাই/g, 'ডিপ্লয়')
     .replace(/ইনভাইটেশন/g, 'ইনভিটেশন')
     .replace(/অপোনেন্ট/g, 'প্রতিপক্ষ')
+    .replace(/ডেট লাইন|ডেড লাইন/g, 'ডেডলাইন')
+    .replace(/আফশানাল/g, 'অপশনাল')
+    .replace(/স্কিনশট|স্ক্রিন শট/g, 'স্ক্রিনশট')
     .replace(/protipokkho|protipokkher/g, 'opponent')
     .replace(/করবো/g, 'করব')
     .replace(/বলবো/g, 'বলব')
-    .replace(/দেবো/g, 'দেব')
+    .replace(/দেবো|দিবো/g, 'দেব')
     .replace(/পাবো/g, 'পাব')
     .replace(/নিব|নেবো/g, 'নেব')
     .replace(/খুজব|খুঁজবো/g, 'খুঁজব')
+    .replace(/দেখবো/g, 'দেখব')
     .replace(/kivaby|kebabe|ki vabe/g, 'kivabe')
     .replace(/passward/g, 'password')
     .replace(/\s+/g, ' ')
@@ -104,15 +164,15 @@ const normalizeText = (raw: string): string => {
   return s;
 };
 
-// Strip common Bengali/English inflectional suffixes to get the root stem for token matching
 const stemToken = (token: string): string => {
   if (token.length <= 3) return token;
-  return token
-    .replace(/(গুলোর|গুলো|দেরকে|দের|গুলোকে|টির|টাকে|টিতে|াতে|েতে|য়ের|য়ের|ের|তে|কে|রা|য়ে|য়ে)$/u, '')
-    .replace(/(ing|ed|es|s)$/i, '') || token;
+  return (
+    token
+      .replace(/(গুলোর|গুলো|দেরকে|দের|গুলোকে|টির|টাকে|টিতে|াতে|েতে|য়ের|য়ের|ের|তে|কে|রা|য়ে|য়ে)$/u, '')
+      .replace(/(ing|ed|es|s)$/i, '') || token
+  );
 };
 
-// Extract core (non-stopword) tokens and all tokens
 const tokenize = (normalized: string) => {
   const allTokens = normalized.split(' ').filter(Boolean);
   const coreTokens = allTokens.filter(t => !STOP_WORDS.has(t));
@@ -120,7 +180,6 @@ const tokenize = (normalized: string) => {
   return { allTokens, coreTokens, stemmedCore };
 };
 
-// Character bigram Dice similarity (0 to 1)
 const getBigramSimilarity = (a: string, b: string): number => {
   const s1 = a.replace(/\s+/g, '');
   const s2 = b.replace(/\s+/g, '');
@@ -146,7 +205,6 @@ const getBigramSimilarity = (a: string, b: string): number => {
   return (2 * intersection) / (s1.length - 1 + (s2.length - 1));
 };
 
-// Check if two stemmed tokens match (exact or strong root prefix/inclusion)
 const tokensMatch = (t1: string, t2: string): boolean => {
   if (t1 === t2) return true;
   const r1 = stemToken(t1);
@@ -158,7 +216,6 @@ const tokensMatch = (t1: string, t2: string): boolean => {
   return false;
 };
 
-// Compute token overlap score (0 to 100) between query tokens and target tokens
 const computeTokenMatchPercentage = (queryTokens: string[], targetTokens: string[]): number => {
   if (queryTokens.length === 0 || targetTokens.length === 0) return 0;
 
@@ -179,70 +236,52 @@ const computeTokenMatchPercentage = (queryTokens: string[], targetTokens: string
   const queryRecall = matchedQueryCount / queryTokens.length;
   const targetPrecision = matchedTargetCount / targetTokens.length;
 
-  // Weight query coverage higher so all words typed by user must be satisfied
   return (queryRecall * 0.72 + targetPrecision * 0.28) * 100;
 };
 
-// Subject conflict penalty to prevent false positives on similar sentence structures
 const getSubjectConflictPenalty = (normalizedQuery: string, faqId: string): number => {
   const hasOpponent = /(প্রতিপক্ষ|opponent|অপোনেন্ট|লবি|lobby)/.test(normalizedQuery);
   const hasAdmin = /(অ্যাডমিন|admin|টেলিগ্রাম|telegram|সাপোর্ট|support)/.test(normalizedQuery);
   const hasAccount = /(অ্যাকাউন্ট|account|রেজিস্ট্রেশন|sign up|id khulbo|আইডি খুলব)/.test(normalizedQuery);
   const hasTournament = /(টুর্নামেন্ট|tournament|কাপ|cup|হোস্ট|host)/.test(normalizedQuery);
   const hasCoin = /(কয়েন|coin|টপ আপ|top up|রিচার্জ|recharge)/.test(normalizedQuery);
-  const hasPrize = /(পুরস্কার|প্রাইজ|prize|জিতলে টাকা|উইথড্র)/.test(normalizedQuery);
+  const hasPrize = /(পুরস্কার|প্রাইজ|prize|জিতলে টাকা|উইথড্র|bdt|usdt)/.test(normalizedQuery);
 
-  // Never confuse talking to opponent with talking to admin support
   if (hasOpponent && !hasAdmin && faqId === 'telegram_support') return 55;
   if (hasAdmin && !hasOpponent && (faqId === 'match_chat' || faqId === 'opponent_not_responding')) return 55;
-
-  // Never confuse creating an account with creating a tournament
   if (hasAccount && !hasTournament && faqId === 'create_tournament') return 45;
   if (hasTournament && !hasAccount && faqId === 'create_account') return 45;
-
-  // Never confuse joining a tournament with joining the moderator team
   if (hasTournament && faqId === 'moderator') return 45;
-
-  // Never confuse adding coins with adding players or prize money
   if (hasCoin && !hasPrize && (faqId === 'add_players' || faqId === 'prize_money')) return 40;
 
   return 0;
 };
 
-// Compute final similarity percentage (0 - 100) for a single FAQ entry
 const evaluateFaqConfidence = (
   normalizedQuery: string,
   queryData: ReturnType<typeof tokenize>,
-  faq: FAQ,
-  fuseScoreMap: Map<string, number>
+  faq: FAQItem,
+  fuseScoreMap: Map<string, number>,
+  lastTopicId?: string | null
 ): number => {
   const penalty = getSubjectConflictPenalty(normalizedQuery, faq.id);
   let maxScore = 0;
 
-  // 1. Check against all FAQ questions
   for (const q of faq.questions) {
     const normQ = normalizeText(q);
-
-    // 100% Exact Normalized Question Match
     if (normQ === normalizedQuery) {
       return Math.max(0, 100 - penalty);
     }
 
     const qData = tokenize(normQ);
-
-    // Core token match (ignoring filler stop-words like কিভাবে/করব)
     const coreScore =
       queryData.coreTokens.length > 0 && qData.coreTokens.length > 0
         ? computeTokenMatchPercentage(queryData.coreTokens, qData.coreTokens)
         : computeTokenMatchPercentage(queryData.allTokens, qData.allTokens);
 
-    // Full token match (including question framing words)
     const allTokenScore = computeTokenMatchPercentage(queryData.allTokens, qData.allTokens);
-
-    // Character bigram similarity
     const bigramScore = getBigramSimilarity(normalizedQuery, normQ) * 100;
 
-    // If all core subject tokens match 100% and both have at least 1 core token
     let combinedQuestionScore = 0;
     if (coreScore >= 99 && queryData.coreTokens.length >= 1) {
       combinedQuestionScore = Math.min(100, 92 + allTokenScore * 0.08);
@@ -255,7 +294,6 @@ const evaluateFaqConfidence = (
     }
   }
 
-  // 2. Check against FAQ keywords
   let matchedKeywordsCount = 0;
   let bestSingleKeywordScore = 0;
 
@@ -263,70 +301,75 @@ const evaluateFaqConfidence = (
     const normKw = normalizeText(kw);
     if (!normKw) continue;
 
-    // Exact match with a keyword
     if (normKw === normalizedQuery) {
       return Math.max(0, 100 - penalty);
     }
 
     const kwData = tokenize(normKw);
-
-    // Direct phrase inclusion inside user query
     if (normKw.length >= 3 && normalizedQuery.includes(normKw)) {
       matchedKeywordsCount++;
-      const phraseScore = kwData.coreTokens.length >= 2 ? 94 : 84;
+      const phraseScore = kwData.coreTokens.length >= 2 ? 95 : 86;
       if (phraseScore > bestSingleKeywordScore) {
         bestSingleKeywordScore = phraseScore;
       }
     } else if (queryData.coreTokens.length > 0 && kwData.coreTokens.length > 0) {
       const kwCoreMatch = computeTokenMatchPercentage(queryData.coreTokens, kwData.coreTokens);
       if (kwCoreMatch >= 95 && kwData.coreTokens.length >= 2) {
-        bestSingleKeywordScore = Math.max(bestSingleKeywordScore, 92);
-      } else if (kwCoreMatch >= 80) {
-        bestSingleKeywordScore = Math.max(bestSingleKeywordScore, kwCoreMatch * 0.9);
+        bestSingleKeywordScore = Math.max(bestSingleKeywordScore, 93);
+      } else if (kwCoreMatch >= 78) {
+        bestSingleKeywordScore = Math.max(bestSingleKeywordScore, kwCoreMatch * 0.92);
       }
     }
   }
 
-  // Multi-keyword boost when user's query hits multiple domain keywords of the same FAQ
   if (matchedKeywordsCount >= 2) {
-    bestSingleKeywordScore = Math.min(98, bestSingleKeywordScore + (matchedKeywordsCount - 1) * 5);
+    bestSingleKeywordScore = Math.min(99, bestSingleKeywordScore + (matchedKeywordsCount - 1) * 5);
   }
 
   maxScore = Math.max(maxScore, bestSingleKeywordScore);
 
-  // 3. Blend with Fuse.js fuzzy score for minor typos
   const fuseRawScore = fuseScoreMap.get(faq.id);
   if (fuseRawScore !== undefined) {
-    // Fuse score is 0 (perfect) to 1 (mismatch)
     const fuseConfidence = Math.max(0, (1 - fuseRawScore) * 100);
-    if (maxScore >= 65) {
+    if (maxScore >= 60) {
       maxScore = Math.max(maxScore, maxScore * 0.85 + fuseConfidence * 0.15);
     } else {
-      maxScore = Math.max(maxScore, fuseConfidence * 0.85);
+      maxScore = Math.max(maxScore, fuseConfidence * 0.88);
     }
+  }
+
+  // Contextual follow-up boost if related to the previous message topic
+  if (lastTopicId && faq.id === lastTopicId && queryData.coreTokens.length <= 3) {
+    maxScore = Math.min(100, maxScore + 8);
   }
 
   return Math.max(0, Math.min(100, Math.round(maxScore - penalty)));
 };
 
-// Cascading Tiered Matcher: 100% -> 90% -> 80% -> 70% -> Fallback (<70%)
-const findBestFaqByTier = (
+const findBestFaqMatches = (
   userInput: string,
-  faqs: FAQ[]
-): { matchedFaq: FAQ | null; confidence: number; matchedTier: 100 | 90 | 80 | 70 | 0 } => {
+  faqs: FAQItem[],
+  lastTopicId?: string | null
+): {
+  primaryFaq: FAQItem | null;
+  secondaryFaq: FAQItem | null;
+  confidence: number;
+  matchedTier: 100 | 90 | 80 | 70 | 0;
+  closestSuggestions: FAQItem[];
+} => {
   const normalizedQuery = normalizeText(userInput);
   if (!normalizedQuery) {
-    return { matchedFaq: null, confidence: 0, matchedTier: 0 };
+    return { primaryFaq: null, secondaryFaq: null, confidence: 0, matchedTier: 0, closestSuggestions: [] };
   }
 
   const queryData = tokenize(normalizedQuery);
 
-  const fuse = new Fuse<FAQ>(faqs, {
+  const fuse = new Fuse<FAQItem>(faqs, {
     keys: [
       { name: 'questions', weight: 0.55 },
       { name: 'keywords', weight: 0.45 }
     ],
-    threshold: 0.35,
+    threshold: 0.38,
     distance: 100,
     ignoreLocation: true,
     includeScore: true,
@@ -344,34 +387,46 @@ const findBestFaqByTier = (
   const scoredFaqs = faqs
     .map(faq => ({
       faq,
-      confidence: evaluateFaqConfidence(normalizedQuery, queryData, faq, fuseScoreMap)
+      confidence: evaluateFaqConfidence(normalizedQuery, queryData, faq, fuseScoreMap, lastTopicId)
     }))
     .sort((a, b) => b.confidence - a.confidence);
 
-  // Cascading Tier Check: 100% -> 90% -> 80% -> 70%
+  // Check if user asked a compound/multi-intent question (e.g. "টুর্নামেন্টে জয়েন করব কীভাবে আর রেজাল্ট কীভাবে দেব?")
+  const isCompoundQuery = /\b(আর|এবং|ও|and|also)\b/i.test(userInput) && queryData.coreTokens.length >= 3;
+  const secondaryCandidate =
+    isCompoundQuery &&
+    scoredFaqs[1] &&
+    scoredFaqs[1].confidence >= 76 &&
+    scoredFaqs[1].faq.id !== scoredFaqs[0]?.faq.id
+      ? scoredFaqs[1].faq
+      : null;
+
   const tiers: Array<{ threshold: number; label: 100 | 90 | 80 | 70 }> = [
-    { threshold: 98, label: 100 }, // 100% Tier (Exact / near-exact intent match)
-    { threshold: 90, label: 90 },  // 90% Tier
-    { threshold: 80, label: 80 },  // 80% Tier
-    { threshold: 70, label: 70 }   // 70% Tier
+    { threshold: 96, label: 100 },
+    { threshold: 88, label: 90 },
+    { threshold: 76, label: 80 },
+    { threshold: 64, label: 70 }
   ];
 
   for (const tier of tiers) {
     const candidate = scoredFaqs.find(item => item.confidence >= tier.threshold);
     if (candidate) {
       return {
-        matchedFaq: candidate.faq,
+        primaryFaq: candidate.faq,
+        secondaryFaq: secondaryCandidate,
         confidence: tier.label === 100 ? 100 : candidate.confidence,
-        matchedTier: tier.label
+        matchedTier: tier.label,
+        closestSuggestions: scoredFaqs.slice(0, 3).map(s => s.faq)
       };
     }
   }
 
-  // Below 70% -> Do NOT return any uncertain answer; direct user to Telegram Support
   return {
-    matchedFaq: null,
+    primaryFaq: null,
+    secondaryFaq: null,
     confidence: scoredFaqs[0]?.confidence || 0,
-    matchedTier: 0
+    matchedTier: 0,
+    closestSuggestions: scoredFaqs.slice(0, 3).map(s => s.faq)
   };
 };
 
@@ -379,7 +434,12 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('popular');
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [lastTopicId, setLastTopicId] = useState<string | null>(null);
+  const [streamingTextMap, setStreamingTextMap] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const knowledgeCacheRef = useRef<FAQItem[] | null>(null);
 
   // Load chat history from localStorage
   useEffect(() => {
@@ -388,7 +448,8 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     try {
       const savedHistory = localStorage.getItem(chatKey);
       if (savedHistory) {
-        setMessages(JSON.parse(savedHistory));
+        const parsed: Message[] = JSON.parse(savedHistory);
+        setMessages(parsed.map(m => ({ ...m, isStreaming: false })));
       }
     } catch (e) {
       console.warn('LocalStorage load error:', e);
@@ -403,7 +464,42 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         behavior: 'smooth'
       });
     }
-  }, [messages, loading]);
+  }, [messages, loading, streamingTextMap]);
+
+  const handleCopyMessage = (msgId: string, rawText: string) => {
+    const cleanText = rawText.replace(/[*#`_~]/g, '');
+    navigator.clipboard.writeText(cleanText);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  const animateStreamingReply = (msgId: string, fullText: string) => {
+    const words = fullText.split(' ');
+    let currentIndex = 0;
+    const chunkSize = Math.max(2, Math.ceil(words.length / 28));
+
+    setStreamingTextMap(prev => ({ ...prev, [msgId]: words.slice(0, chunkSize).join(' ') }));
+
+    const interval = setInterval(() => {
+      currentIndex += chunkSize;
+      if (currentIndex >= words.length) {
+        clearInterval(interval);
+        setStreamingTextMap(prev => {
+          const next = { ...prev };
+          delete next[msgId];
+          return next;
+        });
+        setMessages(prev =>
+          prev.map(m => (m.id === msgId ? { ...m, isStreaming: false } : m))
+        );
+      } else {
+        setStreamingTextMap(prev => ({
+          ...prev,
+          [msgId]: words.slice(0, currentIndex).join(' ')
+        }));
+      }
+    }, 18);
+  };
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -417,6 +513,7 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     const lang = detectLanguage(userInput);
 
     const userMessage: Message = {
+      id: `user_${Date.now()}`,
       role: 'user',
       parts: [{ text: userInput }],
       timestamp: Date.now()
@@ -436,65 +533,98 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
     setLoading(true);
 
     try {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const faqResponse = await fetch(`${cleanBase}faqs.json?v=${Date.now()}`);
-      if (!faqResponse.ok) throw new Error('Could not load knowledge base');
-      const faqs: FAQ[] = await faqResponse.json();
+      if (!knowledgeCacheRef.current) {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+        const faqResponse = await fetch(`${cleanBase}faqs.json?v=${Date.now()}`);
+        if (!faqResponse.ok) throw new Error('Could not load knowledge base');
+        const baseFaqs: FAQItem[] = await faqResponse.json();
+        knowledgeCacheRef.current = buildExpandedKnowledgeBase(baseFaqs);
+      }
 
-      await new Promise(resolve => setTimeout(resolve, 450));
+      const faqs = knowledgeCacheRef.current;
 
-      const { matchedFaq, matchedTier } = findBestFaqByTier(userInput, faqs);
+      await new Promise(resolve => setTimeout(resolve, 320));
+
+      const { primaryFaq, secondaryFaq, matchedTier, closestSuggestions } = findBestFaqMatches(
+        userInput,
+        faqs,
+        lastTopicId
+      );
 
       let responseText = '';
       let showContact = false;
       let recommendations: string[] = [];
+      let badgeText = lang === 'bn' ? 'ভেরিফাইড গাইড' : 'VERIFIED GUIDE';
 
-      if (matchedFaq && matchedTier >= 70) {
-        responseText = lang === 'bn' ? matchedFaq.answer_bn : matchedFaq.answer_en;
-        recommendations = (lang === 'bn' ? matchedFaq.related_bn : matchedFaq.related_en) || [];
+      if (primaryFaq && matchedTier >= 70) {
+        setLastTopicId(primaryFaq.id);
+        const primaryAnswer = lang === 'bn' ? primaryFaq.answer_bn : primaryFaq.answer_en;
+        badgeText =
+          (lang === 'bn' ? primaryFaq.badge_bn : primaryFaq.badge_en) ||
+          (lang === 'bn' ? 'অ্যারেনা এআই সমাধান' : 'ARENA AI SOLUTION');
+
+        if (secondaryFaq) {
+          const secondaryAnswer = lang === 'bn' ? secondaryFaq.answer_bn : secondaryFaq.answer_en;
+          responseText = `${primaryAnswer}\n\n---\n\n${secondaryAnswer}`;
+        } else {
+          responseText = primaryAnswer;
+        }
+
+        const bnRecs = (primaryFaq.related_bn || []).slice(0, 2);
+        const enRecs = (primaryFaq.related_en || []).slice(0, 2);
+        recommendations = lang === 'bn' ? [...bnRecs, ...enRecs] : [...enRecs, ...bnRecs];
       } else {
-        // Below 70% confidence -> Instruct user to contact Telegram Support
+        const bnSuggestions = closestSuggestions
+          .map(f => f.questions.find(q => /[\u0980-\u09FF]/.test(q)))
+          .filter(Boolean) as string[];
+        const enSuggestions = closestSuggestions
+          .map(f => f.questions.find(q => !/[\u0980-\u09FF]/.test(q)))
+          .filter(Boolean) as string[];
+
         responseText =
           lang === 'bn'
-            ? "🤖 **আপনার প্রশ্নটির সাথে আমাদের ডাটাবেসের ৭০% বা তার বেশি মিল পাওয়া যায়নি।**\n\nভুল তথ্য এড়াতে আমি অনুমানের ভিত্তিতে কোনো উত্তর দিচ্ছি না। আপনার এই বিষয়টির সঠিক ও দ্রুত সমাধানের জন্য অনুগ্রহ করে সরাসরি আমাদের অফিসিয়াল **টেলিগ্রাম সাপোর্ট সিস্টেমে** যোগাযোগ করুন।\n\n🔗 **টেলিগ্রাম সাপোর্ট:** [https://t.me/fcarenavs](https://t.me/fcarenavs)\n\n💡 **অথবা নিচের জনপ্রিয় প্রশ্নগুলো থেকে আপনার কাঙ্ক্ষিত বিষয়টি বেছে নিতে পারেন:**"
-            : "🤖 **Your query did not reach our 70% confidence threshold.**\n\nTo avoid giving you an inaccurate answer, please contact our official **Telegram Support System** directly for human assistance.\n\n🔗 **Telegram Support:** [https://t.me/fcarenavs](https://t.me/fcarenavs)\n\n💡 **Or select one of the popular topics below:**";
+            ? "🤖 **আপনার প্রশ্নটি আরও নির্দিষ্ট করতে নিচের সম্পর্কিত বিষয়গুলো দেখুন**\n\nআমি **FC Arena VS**-এর টুর্নামেন্ট, ম্যাচ ডিপ্লয়মেন্ট, ওসিআর (OCR) স্ক্রিনশট ভেরিফিকেশন, প্রোফাইল ও রুলস সংক্রান্ত সব প্রশ্নের উত্তর দিতে পারি।\n\n💡 **আপনি কি নিচের কোনো বিষয় সম্পর্কে জানতে চাচ্ছেন? ট্যাপ করে সাথে সাথে উত্তর দেখুন অথবা সরাসরি আমাদের অফিসিয়াল টেলিগ্রাম সাপোর্টে যোগাযোগ করুন:**\n\n🔗 **টেলিগ্রাম সাপোর্ট:** [https://t.me/fcarenavs](https://t.me/fcarenavs)"
+            : "🤖 **Let's Find the Exact Answer You Need**\n\nI am trained on all **FC Arena VS** features including tournaments, OCR screenshot verification, match deadlines, and profile rules.\n\n💡 **Tap one of the related topics below for an instant guide, or contact our official Telegram Support team directly:**\n\n🔗 **Telegram Support:** [https://t.me/fcarenavs](https://t.me/fcarenavs)";
         showContact = true;
-        recommendations =
-          lang === 'bn'
-            ? [
-                'টুর্নামেন্টে জয়েন করব কীভাবে?',
-                'প্রতিপক্ষের সাথে কীভাবে কথা বলব?',
-                'ম্যাচ রিজাল্ট কীভাবে দেব?'
-              ]
-            : [
-                'How to join a tournament?',
-                'How to talk to opponent?',
-                'How to upload match result?'
-              ];
+        badgeText = lang === 'bn' ? 'সাপোর্ট ডিরেক্টরি' : 'SUPPORT DIRECTORY';
+        recommendations = [
+          ...(bnSuggestions.length > 0 ? bnSuggestions.slice(0, 2) : ['টুর্নামেন্টে জয়েন করব কীভাবে?', 'স্ক্রিনশট দিয়ে রেজাল্ট চেক কীভাবে কাজ করে?']),
+          ...(enSuggestions.length > 0 ? enSuggestions.slice(0, 2) : ['How to join a tournament?', 'How to talk to opponent?'])
+        ];
       }
 
+      const msgId = `ai_${Date.now()}`;
       const modelMessage: Message = {
+        id: msgId,
         role: 'model',
         parts: [{ text: responseText }],
         timestamp: Date.now(),
         isError: showContact,
         confidenceTier: matchedTier,
-        recommendations: recommendations.slice(0, 3)
+        badgeText,
+        recommendations: recommendations.slice(0, 4),
+        isStreaming: true
       };
 
       setMessages(prev => {
         const updated = [...prev, modelMessage];
         try {
-          localStorage.setItem(`fc_arena_chat_history_${userId}`, JSON.stringify(updated));
+          localStorage.setItem(
+            `fc_arena_chat_history_${userId}`,
+            JSON.stringify(updated.map(m => ({ ...m, isStreaming: false })))
+          );
         } catch (e) {
           console.warn('LocalStorage error:', e);
         }
         return updated;
       });
+
+      animateStreamingReply(msgId, responseText);
     } catch (err: any) {
       console.error('Local Chat Error:', err);
       const errorMessage: Message = {
+        id: `err_${Date.now()}`,
         role: 'model',
         parts: [
           {
@@ -515,43 +645,52 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
 
   const clearHistory = () => {
     setMessages([]);
+    setLastTopicId(null);
     localStorage.removeItem(`fc_arena_chat_history_${userId}`);
   };
+
+  const currentCategoryQuestions = useMemo(() => {
+    return QUICK_CATEGORY_TABS.find(c => c.id === activeCategory)?.questions || QUICK_CATEGORY_TABS[0].questions;
+  }, [activeCategory]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[20001] bg-slate-950/60 dark:bg-[#070812]/80 backdrop-blur-xl flex flex-col items-center animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[20001] bg-slate-950/70 dark:bg-[#070812]/85 backdrop-blur-xl flex flex-col items-center animate-in fade-in duration-300">
       <motion.div
-        initial={{ opacity: 0, y: 100 }}
+        initial={{ opacity: 0, y: 80 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 100 }}
-        className="w-full h-full sm:h-[85vh] sm:max-w-lg sm:mt-[7.5vh] bg-[#f0f1f5] dark:!bg-gradient-to-b dark:!from-[#24294a]/92 dark:!via-[#191d36]/94 dark:!to-[#111325]/96 dark:backdrop-blur-3xl flex flex-col shadow-2xl dark:shadow-[0_35px_90px_rgba(0,0,0,0.95),0_0_40px_rgba(139,92,246,0.16),inset_0_1.5px_2px_rgba(255,255,255,0.28)] relative overflow-hidden sm:rounded-[3rem] border-t sm:border border-white/50 dark:!border-white/24"
+        exit={{ opacity: 0, y: 80 }}
+        className="w-full h-full sm:h-[88vh] sm:max-w-lg sm:mt-[6vh] bg-[#f2f4f8] dark:!bg-gradient-to-b dark:!from-[#222746] dark:!via-[#181c35] dark:!to-[#101223] flex flex-col shadow-2xl dark:shadow-[0_35px_90px_rgba(0,0,0,0.95),0_0_40px_rgba(139,92,246,0.18),inset_0_1.5px_2px_rgba(255,255,255,0.28)] relative overflow-hidden sm:rounded-[2.8rem] border-t sm:border border-white/60 dark:!border-white/22"
         onClick={e => e.stopPropagation()}
       >
         {/* Top Specular Glass Rim Highlight */}
         <div className="hidden dark:block absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none z-20" />
 
-        {/* Ambient Dark Glass Glow Orbs inside Support Chat */}
-        <div className="hidden dark:block absolute -top-24 -right-16 w-72 h-72 rounded-full bg-gradient-to-br from-[#ff7a45]/28 via-[#ec4899]/22 to-transparent blur-3xl pointer-events-none" />
-        <div className="hidden dark:block absolute top-1/3 -left-24 w-72 h-72 rounded-full bg-gradient-to-tr from-[#8b5cf6]/25 via-[#38bdf8]/18 to-transparent blur-3xl pointer-events-none" />
-        <div className="hidden dark:block absolute -bottom-24 right-0 w-64 h-64 rounded-full bg-gradient-to-tl from-[#a855f7]/24 via-[#ff7a45]/16 to-transparent blur-3xl pointer-events-none" />
+        {/* Ambient Dark Glass Glow Orbs */}
+        <div className="hidden dark:block absolute -top-24 -right-16 w-72 h-72 rounded-full bg-gradient-to-br from-[#ff7a45]/24 via-[#ec4899]/18 to-transparent blur-3xl pointer-events-none" />
+        <div className="hidden dark:block absolute top-1/3 -left-24 w-72 h-72 rounded-full bg-gradient-to-tr from-[#8b5cf6]/22 via-[#38bdf8]/15 to-transparent blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="p-6 sm:p-8 border-b border-white/20 dark:!border-white/18 flex items-center justify-between shrink-0 bg-white/30 dark:!bg-gradient-to-r dark:!from-[#2b3158]/82 dark:!via-[#232849]/82 dark:!to-[#1c203d]/85 dark:backdrop-blur-2xl relative z-10 dark:shadow-[0_10px_30px_-6px_rgba(4,5,14,0.7),inset_0_1px_1px_rgba(255,255,255,0.2)]">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl nm-inset bg-[#e6e6e9] dark:!bg-gradient-to-br dark:!from-[#ff7a45]/30 dark:!via-[#ec4899]/25 dark:!to-[#8b5cf6]/35 dark:!border dark:!border-white/28 dark:!shadow-[0_0_26px_rgba(255,122,69,0.32),inset_0_1px_1.5px_rgba(255,255,255,0.32)] flex items-center justify-center text-indigo-600 dark:!text-[#ff7a45]">
-              <Bot size={28} className="animate-pulse" />
+        <div className="px-5 py-4 sm:px-7 sm:py-5 border-b border-slate-200/80 dark:!border-white/15 flex items-center justify-between shrink-0 bg-white/85 dark:!bg-gradient-to-r dark:!from-[#282e54]/95 dark:!via-[#202544]/95 dark:!to-[#191d38]/95 backdrop-blur-2xl relative z-10 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] p-[1.5px] shadow-lg shadow-indigo-500/25 dark:shadow-[#ec4899]/30">
+                <div className="w-full h-full rounded-[14px] bg-white dark:bg-[#171b34] flex items-center justify-center text-indigo-600 dark:text-[#ff7a45]">
+                  <Bot size={24} />
+                </div>
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#171b34] shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
-                <span className="text-[10px] font-black text-indigo-500 dark:!text-indigo-200 uppercase tracking-[0.3em] block">
-                  Arena Assistant
+                <Sparkles size={10} className="text-indigo-500 dark:text-[#ff7a45]" />
+                <span className="text-[9px] font-black text-indigo-600 dark:!text-indigo-200 uppercase tracking-[0.25em] block">
+                  ARENA NEURAL ASSISTANT
                 </span>
               </div>
-              <h2 className="text-2xl font-black text-slate-800 dark:!text-white uppercase italic tracking-tighter">
-                Support <span className="text-indigo-600 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#a855f7] dark:bg-clip-text dark:text-transparent">AI</span>
+              <h2 className="text-xl font-black text-slate-800 dark:!text-white uppercase italic tracking-tight leading-tight">
+                SUPPORT <span className="text-indigo-600 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#a855f7] dark:bg-clip-text dark:text-transparent">AI</span>
               </h2>
             </div>
           </div>
@@ -560,17 +699,17 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
             {messages.length > 0 && (
               <button
                 onClick={clearHistory}
-                className="w-11 h-11 rounded-2xl nm-flat bg-white dark:!bg-[#171b34]/90 dark:backdrop-blur-xl dark:!border-white/20 flex items-center justify-center text-slate-400 dark:!text-slate-200 hover:text-rose-500 dark:hover:!text-rose-400 dark:shadow-[0_6px_16px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(255,255,255,0.18)] transition-all"
-                title="Clear history"
+                className="w-10 h-10 rounded-xl bg-slate-100 dark:!bg-[#171b34] border border-slate-200/80 dark:!border-white/20 flex items-center justify-center text-slate-500 dark:!text-slate-200 hover:text-rose-500 dark:hover:!text-rose-400 transition-all active:scale-95"
+                title="Clear conversation"
               >
-                <Trash2 size={18} />
+                <Trash2 size={17} />
               </button>
             )}
             <button
               onClick={onClose}
-              className="w-11 h-11 rounded-2xl nm-flat bg-white dark:!bg-[#171b34]/90 dark:backdrop-blur-xl dark:!border-white/20 flex items-center justify-center text-slate-400 dark:!text-slate-100 dark:hover:!text-white dark:shadow-[0_6px_16px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(255,255,255,0.18)] active:nm-pressed transition-all"
+              className="w-10 h-10 rounded-xl bg-slate-100 dark:!bg-[#171b34] border border-slate-200/80 dark:!border-white/20 flex items-center justify-center text-slate-500 dark:!text-slate-100 hover:text-slate-800 dark:hover:!text-white transition-all active:scale-95"
             >
-              <X size={22} />
+              <X size={20} />
             </button>
           </div>
         </div>
@@ -578,165 +717,316 @@ export const SupportAI: React.FC<SupportAIProps> = ({ isOpen, onClose, userId })
         {/* Chat Area */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar custom-scrollbar relative z-10"
+          className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 space-y-5 no-scrollbar custom-scrollbar relative z-10"
         >
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-5">
-              <div className="w-20 h-20 rounded-[2.5rem] nm-inset dark:!bg-gradient-to-br dark:!from-[#262b4f]/85 dark:!to-[#171a32]/90 dark:backdrop-blur-2xl dark:!border-white/22 dark:shadow-[0_16px_38px_rgba(0,0,0,0.6),inset_0_1px_1.5px_rgba(255,255,255,0.24)] flex items-center justify-center opacity-50 dark:opacity-100 shadow-inner">
-                <MessageCircle size={36} className="text-slate-400 dark:!text-[#ff7a45] dark:drop-shadow-[0_0_12px_rgba(255,122,69,0.5)]" />
+            <div className="min-h-full flex flex-col items-center justify-center text-center py-4 space-y-5">
+              {/* Hero Assistant Emblem */}
+              <div className="relative">
+                <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-pink-500/15 dark:from-[#ff7a45]/20 dark:via-[#ec4899]/20 dark:to-[#8b5cf6]/25 border border-indigo-200/60 dark:border-white/20 flex items-center justify-center shadow-xl">
+                  <MessageCircle size={34} className="text-indigo-600 dark:!text-[#ff7a45] dark:drop-shadow-[0_0_12px_rgba(255,122,69,0.5)]" />
+                </div>
+                <div className="absolute -top-1 -right-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-[#ff7a45] dark:to-[#ec4899] text-white text-[8px] font-black uppercase tracking-wider shadow">
+                  PRO AI
+                </div>
               </div>
-              <div className="space-y-1 opacity-60 dark:opacity-100">
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-slate-500 dark:!text-white italic">
-                  How can I help you today?
+
+              <div className="space-y-1.5 max-w-xs">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-800 dark:!text-white italic">
+                  HOW CAN I HELP YOU TODAY?
                 </p>
-                <p className="text-[8.5px] font-bold text-slate-400 dark:!text-indigo-200/90 uppercase tracking-widest px-10">
-                  Ask me about tournaments, results, opponents, or rules
+                <p className="text-[9px] font-bold text-slate-500 dark:!text-indigo-200/85 uppercase tracking-wider leading-relaxed">
+                  Ask me about tournaments, OCR results, profiles, or rules
                 </p>
               </div>
-              <div className="flex flex-wrap justify-center gap-2.5 px-4 pt-2">
-                {[
-                  'টুর্নামেন্টে জয়েন করব কীভাবে?',
-                  'প্রতিপক্ষের সাথে কীভাবে কথা বলব?',
-                  'ম্যাচ রিজাল্ট কীভাবে দেব?',
-                  'ইনভিটেশন কোড কীভাবে দেব?'
-                ].map((q, i) => (
+
+              {/* Category Filter Tabs */}
+              <div className="w-full max-w-md flex items-center justify-center gap-1.5 flex-wrap px-2">
+                {QUICK_CATEGORY_TABS.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-xl text-[9.5px] font-black tracking-wide transition-all border',
+                      activeCategory === cat.id
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-[#ff7a45] dark:to-[#ec4899] text-white border-transparent shadow-md'
+                        : 'bg-white/90 dark:bg-[#1d2240]/90 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-white/15 hover:border-indigo-300'
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Quick Question Cards */}
+              <div className="w-full max-w-md grid grid-cols-1 sm:grid-cols-2 gap-2.5 px-2 pt-1">
+                {currentCategoryQuestions.map((q, i) => (
                   <button
                     key={i}
                     onClick={() => sendMessage(q)}
-                    className="px-4 py-2.5 rounded-xl nm-flat bg-white dark:!bg-gradient-to-r dark:!from-[#2d335c]/90 dark:!to-[#202444]/92 dark:backdrop-blur-xl text-indigo-600 dark:!text-white text-[10px] font-bold border border-indigo-50 dark:!border-white/22 hover:bg-indigo-50 dark:hover:!border-[#ff7a45]/65 dark:hover:!from-[#343b6a]/95 dark:hover:!to-[#252a4f]/95 dark:!shadow-[0_12px_26px_-6px_rgba(4,5,14,0.75),inset_0_1px_1.5px_rgba(255,255,255,0.24)] transition-all active:scale-95"
+                    className="group p-3.5 rounded-2xl bg-white dark:!bg-gradient-to-r dark:!from-[#262c50]/95 dark:!to-[#1d213f]/95 text-left border border-slate-200/80 dark:!border-white/18 hover:border-indigo-400 dark:hover:!border-[#ff7a45]/70 shadow-sm hover:shadow-md transition-all active:scale-98 flex items-center justify-between gap-2"
                   >
-                    {q}
+                    <span className="text-[10.5px] font-extrabold text-slate-700 dark:!text-slate-100 group-hover:text-indigo-600 dark:group-hover:!text-white leading-snug">
+                      {q}
+                    </span>
+                    <ChevronRight
+                      size={14}
+                      className="shrink-0 text-slate-400 dark:text-indigo-300 group-hover:text-indigo-600 dark:group-hover:text-[#ff7a45] group-hover:translate-x-0.5 transition-transform"
+                    />
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  'flex flex-col gap-2 animate-in slide-in-from-bottom-2 duration-300',
-                  m.role === 'user' ? 'items-end pl-10 sm:pl-12' : 'items-start pr-8 sm:pr-12'
-                )}
-              >
+            messages.map((m, idx) => {
+              const displayedText =
+                m.role === 'model' && streamingTextMap[m.id] !== undefined
+                  ? streamingTextMap[m.id]
+                  : m.parts[0].text;
+              const isCopied = copiedMsgId === m.id;
+
+              return (
                 <div
+                  key={m.id || idx}
                   className={cn(
-                    'flex items-center gap-2 mb-0.5',
-                    m.role === 'user' ? 'flex-row-reverse' : ''
+                    'flex flex-col gap-1.5 animate-in slide-in-from-bottom-2 duration-300',
+                    m.role === 'user' ? 'items-end pl-8 sm:pl-14' : 'items-start pr-2 sm:pr-6'
                   )}
                 >
+                  {/* Sender Meta Row */}
                   <div
                     className={cn(
-                      'w-6 h-6 rounded-lg flex items-center justify-center border',
-                      m.role === 'user'
-                        ? 'bg-slate-100 text-slate-400 border-slate-200/70 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/35 dark:!to-[#ec4899]/35 dark:!text-[#ff7a45] dark:!border-white/25 dark:shadow-[0_0_12px_rgba(255,122,69,0.3)]'
-                        : 'bg-indigo-50 text-indigo-500 border-indigo-100 dark:!bg-gradient-to-br dark:!from-indigo-500/35 dark:!to-purple-500/35 dark:!text-indigo-200 dark:!border-indigo-400/40 dark:shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      'flex items-center gap-2 px-1',
+                      m.role === 'user' ? 'flex-row-reverse' : ''
                     )}
                   >
-                    {m.role === 'user' ? <User size={12} /> : <Bot size={12} />}
+                    <div
+                      className={cn(
+                        'w-6 h-6 rounded-lg flex items-center justify-center border shadow-xs',
+                        m.role === 'user'
+                          ? 'bg-indigo-600 text-white border-indigo-500 dark:bg-gradient-to-br dark:from-[#ff7a45] dark:to-[#ec4899] dark:border-white/25'
+                          : 'bg-white text-indigo-600 border-indigo-200 dark:bg-[#252b4d] dark:text-[#ff7a45] dark:border-indigo-400/35'
+                      )}
+                    >
+                      {m.role === 'user' ? <User size={12} /> : <Bot size={13} />}
+                    </div>
+                    <span className="text-[9px] font-black text-slate-500 dark:!text-indigo-200 uppercase tracking-widest">
+                      {m.role === 'user' ? 'YOU' : 'ARENA AI'}
+                    </span>
+                    {m.role === 'model' && m.badgeText && (
+                      <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200/70 dark:bg-[#ff7a45]/15 dark:text-[#ff986b] dark:border-[#ff7a45]/30 flex items-center gap-1">
+                        <ShieldCheck size={10} />
+                        {m.badgeText}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[8px] font-black text-slate-400 dark:!text-indigo-200/90 uppercase tracking-widest">
-                    {m.role === 'user' ? 'YOU' : 'ARENA AI'}
-                  </span>
-                </div>
 
-                <div
-                  className={cn(
-                    'px-5 py-4 rounded-[1.8rem] text-xs font-bold leading-relaxed shadow-sm border relative overflow-hidden',
-                    m.role === 'user'
-                      ? 'nm-flat bg-white border-white text-slate-700 dark:!bg-gradient-to-br dark:!from-[#ff7a45]/32 dark:!via-[#ec4899]/28 dark:!to-[#8b5cf6]/36 dark:backdrop-blur-2xl dark:!border-white/28 dark:!text-white dark:!shadow-[0_16px_36px_-8px_rgba(236,72,153,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32)]'
-                      : 'nm-inset bg-white border-white text-slate-800 dark:!bg-gradient-to-br dark:!from-[#303663]/92 dark:!via-[#23284b]/94 dark:!to-[#181b34]/96 dark:backdrop-blur-2xl dark:!border-white/24 dark:!text-slate-100 dark:!shadow-[0_22px_50px_-10px_rgba(4,5,15,0.9),inset_0_1px_1.5px_rgba(255,255,255,0.26)]'
-                  )}
-                >
-                  <div className="hidden dark:block absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
-                  <div className="prose prose-slate dark:prose-invert prose-xs max-w-none prose-p:my-1.5 prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-indigo-600 dark:prose-headings:!text-[#ff7a45] prose-strong:text-slate-900 dark:prose-strong:!text-amber-300 dark:prose-p:!text-slate-100 dark:prose-li:!text-slate-100 dark:prose-ol:!text-slate-100 dark:prose-ul:!text-slate-100 dark:prose-a:!text-[#38bdf8] prose-ul:my-1.5 prose-li:my-1">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.parts[0].text}</ReactMarkdown>
-                  </div>
+                  {/* Message Card */}
+                  {m.role === 'user' ? (
+                    <div className="px-4 py-3 rounded-2xl rounded-tr-xs bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] text-white text-xs font-bold leading-relaxed shadow-md border border-indigo-500/30 dark:border-white/25">
+                      {m.parts[0].text}
+                    </div>
+                  ) : (
+                    <div className="w-full rounded-[1.75rem] rounded-tl-xs bg-white dark:!bg-gradient-to-b dark:!from-[#262c52]/96 dark:!via-[#1e2342]/98 dark:!to-[#171a33]/98 border border-slate-200/90 dark:!border-white/22 shadow-lg dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.85),inset_0_1px_1.5px_rgba(255,255,255,0.22)] overflow-hidden relative">
+                      {/* Top Accent Gradient Bar on AI Reply Card */}
+                      <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6]" />
 
-                  {m.role === 'model' && m.recommendations && m.recommendations.length > 0 && (
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/15 flex flex-wrap gap-2">
-                      {m.recommendations.map((rec, rIdx) => (
+                      {/* AI Card Inner Header with Copy Action */}
+                      <div className="px-4 pt-3 pb-2 border-b border-slate-100 dark:border-white/10 flex items-center justify-between gap-2 bg-slate-50/70 dark:bg-white/[0.03]">
+                        <div className="flex items-center gap-1.5">
+                          <Zap size={12} className="text-amber-500 dark:text-[#ff7a45]" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-indigo-200/90">
+                            OFFICIAL ARENA KNOWLEDGE BASE
+                          </span>
+                        </div>
                         <button
-                          key={rIdx}
-                          onClick={() => sendMessage(rec)}
-                          className="px-3.5 py-2 rounded-xl nm-flat bg-white dark:!bg-gradient-to-r dark:!from-[#1a1e38]/95 dark:!to-[#262b50]/95 text-indigo-600 dark:!text-indigo-100 text-[10px] font-bold border border-indigo-50 dark:!border-indigo-400/40 hover:bg-indigo-100 dark:hover:!border-[#ff7a45]/65 dark:hover:!text-white dark:!shadow-[0_8px_20px_-4px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-all active:scale-95 text-left"
+                          onClick={() => handleCopyMessage(m.id, m.parts[0].text)}
+                          className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#161930] border border-slate-200/80 dark:border-white/15 text-[9px] font-bold text-slate-600 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-[#ff7a45] flex items-center gap-1 transition-all active:scale-95"
+                          title="Copy reply"
                         >
-                          {rec}
+                          {isCopied ? (
+                            <>
+                              <Check size={11} className="text-emerald-500" />
+                              <span className="text-emerald-500">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={11} />
+                              <span>Copy</span>
+                            </>
+                          )}
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      </div>
 
-                  {m.isError && (
-                    <div className="mt-4">
-                      <a
-                        href={TELEGRAM_LINK}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-sky-500 dark:bg-gradient-to-r dark:from-[#38bdf8] dark:to-[#6366f1] text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-500/20 dark:shadow-sky-500/35 dark:border dark:border-white/30 active:scale-95 transition-all"
-                      >
-                        <ExternalLink size={12} /> Contact Telegram Support
-                      </a>
+                      {/* Structured Rich Markdown Body */}
+                      <div className="p-4 sm:p-5 text-xs leading-relaxed text-slate-700 dark:text-slate-100">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => {
+                              const textContent = React.Children.toArray(children)
+                                .map(c => (typeof c === 'string' ? c : ''))
+                                .join('');
+                              const isTip = textContent.includes('💡') || textContent.includes('টিপস') || textContent.includes('দ্রষ্টব্য');
+                              const isWarning = textContent.includes('⚠️') || textContent.includes('সতর্কতা');
+
+                              if (isTip) {
+                                return (
+                                  <div className="my-3 p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-500/15 border border-indigo-200/80 dark:border-indigo-400/30 text-[11.5px] font-semibold text-indigo-950 dark:text-indigo-100 leading-relaxed shadow-2xs">
+                                    {children}
+                                  </div>
+                                );
+                              }
+                              if (isWarning) {
+                                return (
+                                  <div className="my-3 p-3.5 rounded-2xl bg-amber-50/90 dark:bg-amber-500/15 border border-amber-200/90 dark:border-amber-400/30 text-[11.5px] font-semibold text-amber-950 dark:text-amber-100 leading-relaxed shadow-2xs">
+                                    {children}
+                                  </div>
+                                );
+                              }
+                              return (
+                                <p className="my-2 text-[12px] font-semibold text-slate-700 dark:text-slate-100 leading-relaxed">
+                                  {children}
+                                </p>
+                              );
+                            },
+                            strong: ({ children }) => (
+                              <strong className="font-black text-slate-900 dark:text-amber-300">
+                                {children}
+                              </strong>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="my-3 space-y-2 list-decimal list-inside bg-slate-50/90 dark:bg-[#14182e]/85 p-3.5 rounded-2xl border border-slate-200/70 dark:border-white/12">
+                                {children}
+                              </ol>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="my-3 space-y-2 list-disc list-inside bg-slate-50/90 dark:bg-[#14182e]/85 p-3.5 rounded-2xl border border-slate-200/70 dark:border-white/12">
+                                {children}
+                              </ul>
+                            ),
+                            li: ({ children }) => (
+                              <li className="text-[11.5px] font-semibold text-slate-700 dark:text-slate-100 leading-relaxed py-0.5">
+                                {children}
+                              </li>
+                            ),
+                            code: ({ children }) => (
+                              <code className="px-2 py-0.5 mx-0.5 rounded-md bg-indigo-100/90 dark:bg-[#ff7a45]/20 text-indigo-800 dark:text-[#ff9d76] border border-indigo-200/80 dark:border-[#ff7a45]/35 font-mono text-[10.5px] font-black">
+                                {children}
+                              </code>
+                            ),
+                            hr: () => (
+                              <hr className="my-4 border-slate-200 dark:border-white/15" />
+                            ),
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-indigo-600 dark:text-[#38bdf8] font-black underline underline-offset-2 hover:opacity-80"
+                              >
+                                {children}
+                                <ExternalLink size={11} />
+                              </a>
+                            )
+                          }}
+                        >
+                          {displayedText}
+                        </ReactMarkdown>
+
+                        {/* Follow-up Recommendation Chips */}
+                        {!m.isStreaming && m.recommendations && m.recommendations.length > 0 && (
+                          <div className="mt-4 pt-3.5 border-t border-slate-200/70 dark:border-white/12 space-y-2">
+                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-indigo-200/80">
+                              <HelpCircle size={11} className="text-indigo-500 dark:text-[#ff7a45]" />
+                              <span>Related Questions (Tap to Ask):</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {m.recommendations.map((rec, rIdx) => (
+                                <button
+                                  key={rIdx}
+                                  onClick={() => sendMessage(rec)}
+                                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-indigo-50 dark:bg-[#151931] dark:hover:bg-[#2a315c] text-indigo-700 dark:text-indigo-100 text-[10px] font-extrabold border border-slate-200/80 dark:border-indigo-400/30 hover:border-indigo-300 dark:hover:border-[#ff7a45]/65 transition-all active:scale-95 text-left flex items-center gap-1.5 shadow-2xs"
+                                >
+                                  <Sparkles size={10} className="shrink-0 text-indigo-500 dark:text-[#ff7a45]" />
+                                  <span>{rec}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {m.isError && (
+                          <div className="mt-4 pt-2">
+                            <a
+                              href={TELEGRAM_LINK}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-md hover:opacity-95 active:scale-95 transition-all"
+                            >
+                              <ExternalLink size={12} /> Contact Official Telegram Support
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {loading && (
             <div className="flex flex-col items-start pr-12 animate-in fade-in">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:!bg-indigo-500/25 text-indigo-500 dark:!text-indigo-300 flex items-center justify-center border border-indigo-100 dark:!border-indigo-400/35">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:!bg-indigo-500/25 text-indigo-600 dark:!text-[#ff7a45] flex items-center justify-center border border-indigo-200 dark:!border-indigo-400/35">
                   <Bot size={12} />
                 </div>
-                <span className="text-[8px] font-black text-slate-400 dark:!text-indigo-200 uppercase tracking-widest">
-                  THINKING...
+                <span className="text-[8.5px] font-black text-slate-500 dark:!text-indigo-200 uppercase tracking-widest">
+                  ARENA AI IS ANALYZING...
                 </span>
               </div>
-              <div className="px-6 py-4 rounded-[1.8rem] nm-inset bg-white dark:!bg-[#24294c]/90 dark:backdrop-blur-xl border border-white/50 dark:!border-white/22 flex gap-1.5">
-                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#ff7a45] rounded-full animate-bounce" />
-                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#ec4899] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-1.5 h-1.5 bg-indigo-400 dark:bg-[#a855f7] rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="px-5 py-3.5 rounded-2xl bg-white dark:!bg-[#24294c]/95 border border-slate-200 dark:!border-white/22 flex gap-1.5 shadow-md">
+                <div className="w-2 h-2 bg-indigo-500 dark:bg-[#ff7a45] rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-purple-500 dark:bg-[#ec4899] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-2 h-2 bg-pink-500 dark:bg-[#a855f7] rounded-full animate-bounce [animation-delay:-0.3s]" />
               </div>
             </div>
           )}
         </div>
 
         {/* Input Area */}
-        <div className="p-6 sm:p-8 border-t border-white/20 dark:!border-white/18 bg-white/50 dark:!bg-gradient-to-t dark:!from-[#15182d]/95 dark:!to-[#1f2442]/88 dark:backdrop-blur-2xl shrink-0 relative z-10 dark:shadow-[0_-10px_30px_-8px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.18)]">
-          <div className="relative flex items-center gap-3">
+        <div className="p-4 sm:p-6 border-t border-slate-200/80 dark:!border-white/15 bg-white/90 dark:!bg-gradient-to-t dark:!from-[#14172b]/98 dark:!to-[#1d2240]/92 backdrop-blur-2xl shrink-0 relative z-10">
+          <div className="relative flex items-center gap-2.5">
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Type your message..."
+              placeholder="Type your question in English or বাংলা..."
               disabled={loading}
-              className="flex-1 h-16 px-6 nm-inset bg-white dark:!bg-[#111325]/92 dark:backdrop-blur-xl rounded-2xl text-xs font-bold text-slate-700 dark:!text-white dark:placeholder:!text-slate-300/70 border border-transparent dark:!border-white/22 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-[#a855f7]/35 dark:focus:!border-[#ff7a45]/60 dark:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] disabled:opacity-50"
+              className="flex-1 h-14 px-5 bg-slate-100/90 dark:!bg-[#101324]/95 rounded-2xl text-xs font-bold text-slate-800 dark:!text-white placeholder:text-slate-400 dark:placeholder:!text-slate-400 border border-slate-200/90 dark:!border-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 dark:focus:ring-[#ff7a45]/35 focus:border-indigo-500 dark:focus:!border-[#ff7a45]/70 transition-all disabled:opacity-50"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || loading}
               className={cn(
-                'w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xl shrink-0 active:scale-95',
+                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg shrink-0 active:scale-95',
                 !input.trim() || loading
-                  ? 'nm-flat bg-indigo-50/80 dark:!bg-[#262b4f]/88 text-indigo-600 dark:!text-indigo-200 border border-indigo-100/80 dark:!border-white/20 cursor-not-allowed'
-                  : 'nm-flat bg-indigo-600 dark:!bg-gradient-to-tr dark:!from-[#ff7a45] dark:!via-[#ec4899] dark:!to-[#8b5cf6] text-white hover:bg-indigo-700 shadow-indigo-600/30 dark:!shadow-[0_12px_28px_-4px_rgba(236,72,153,0.6),inset_0_1px_1.5px_rgba(255,255,255,0.35)] dark:!border-white/30 active:nm-pressed'
+                  ? 'bg-slate-200/80 dark:!bg-[#252a4d] text-slate-400 dark:!text-slate-400 border border-slate-300/60 dark:!border-white/15 cursor-not-allowed'
+                  : 'bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] text-white shadow-indigo-500/25 dark:shadow-[#ec4899]/40 border border-white/25'
               )}
               title="Send Message"
             >
               <Send
-                size={24}
+                size={20}
                 className={cn(
-                  'transition-colors',
-                  !input.trim() || loading ? 'text-indigo-600 dark:text-indigo-200' : 'text-white',
-                  loading ? 'animate-pulse' : ''
+                  'transition-transform',
+                  input.trim() && !loading ? 'translate-x-0.5 -translate-y-0.5' : ''
                 )}
               />
             </button>
           </div>
-          <div className="h-6 sm:hidden" />
         </div>
       </motion.div>
     </div>

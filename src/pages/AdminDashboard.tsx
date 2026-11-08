@@ -38,7 +38,8 @@ import {
   MessageCircle,
   Database,
   Server,
-  HardDrive
+  HardDrive,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -116,7 +117,9 @@ export const AdminDashboard = ({
     min_version: '2.4.4',
     app_id: 'fc-arena-vs-2025',
     force_update: true,
-    update_url: 'https://t.me/fcarenavsofficial'
+    update_url: 'https://t.me/fcarenavsofficial',
+    telegram_update_url: 'https://t.me/fcarenavsofficial',
+    chrome_update_url: 'https://t.me/fcarenavsofficial'
   });
 
   const shardClusters = getShardClusters();
@@ -323,13 +326,23 @@ export const AdminDashboard = ({
 
       unsubAppSettings = onSnapshot(doc(db, 'settings', 'app_update'), (snap) => {
         if (snap.exists()) {
-          setAppSettings(snap.data() as any);
+          const data = snap.data() as any;
+          setAppSettings({
+            min_version: data.min_version || '2.4.4',
+            app_id: data.app_id || 'fc-arena-vs-2025',
+            force_update: data.force_update ?? true,
+            update_url: data.update_url || data.telegram_update_url || 'https://t.me/fcarenavsofficial',
+            telegram_update_url: data.telegram_update_url || data.update_url || 'https://t.me/fcarenavsofficial',
+            chrome_update_url: data.chrome_update_url || data.update_url || 'https://t.me/fcarenavsofficial'
+          });
         } else {
           setDoc(doc(db, 'settings', 'app_update'), {
             min_version: '2.4.4',
             app_id: 'fc-arena-vs-2025',
             force_update: true,
-            update_url: 'https://t.me/fcarenavsofficial'
+            update_url: 'https://t.me/fcarenavsofficial',
+            telegram_update_url: 'https://t.me/fcarenavsofficial',
+            chrome_update_url: 'https://t.me/fcarenavsofficial'
           }).catch(console.error);
         }
       });
@@ -1010,17 +1023,39 @@ export const AdminDashboard = ({
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <span className="text-[8px] font-black text-slate-400 uppercase ml-2">
-                        Official Update URL
-                      </span>
-                      <Input
-                        value={appSettings.update_url}
-                        onChange={(e) =>
-                          setAppSettings({ ...appSettings, update_url: e.target.value })
-                        }
-                        placeholder="https://t.me/..."
-                      />
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <span className="text-[8px] font-black text-sky-600 uppercase ml-2 flex items-center gap-1.5">
+                          <Send size={10} /> Telegram Update Link (Continue Update in Telegram)
+                        </span>
+                        <Input
+                          value={appSettings.telegram_update_url || appSettings.update_url || ''}
+                          onChange={(e) =>
+                            setAppSettings({
+                              ...appSettings,
+                              telegram_update_url: e.target.value,
+                              update_url: e.target.value
+                            })
+                          }
+                          placeholder="https://t.me/..."
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="text-[8px] font-black text-indigo-600 uppercase ml-2 flex items-center gap-1.5">
+                          <Globe size={10} /> Google Chrome Update Link (Continue Update in Google Chrome)
+                        </span>
+                        <Input
+                          value={appSettings.chrome_update_url || ''}
+                          onChange={(e) =>
+                            setAppSettings({
+                              ...appSettings,
+                              chrome_update_url: e.target.value
+                            })
+                          }
+                          placeholder="https://..."
+                        />
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between p-4 rounded-2xl nm-inset bg-slate-50">

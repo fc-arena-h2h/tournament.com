@@ -19,6 +19,10 @@ export interface OcrVerificationResult {
   feedbackMessage: string;
 }
 
+const LEFT_BANNER_MARKER = '<<<OCR_LEFT_BANNER_SECTION>>>';
+const RIGHT_BANNER_MARKER = '<<<OCR_RIGHT_BANNER_SECTION>>>';
+const HEADER_PASS_MARKER = '<<<OCR_HEADER_PASS_SECTION>>>';
+
 /**
  * Loads an image File into an HTMLImageElement in browser memory.
  */
@@ -41,19 +45,19 @@ function loadImageElement(file: File): Promise<{ img: HTMLImageElement; revoke: 
 }
 
 /**
- * Pre-processes the full image (or top half containing player names & scoreboard)
- * for accurate player name extraction.
+ * Pre-processes the top header region (top 38% of screen containing player names & scoreboard)
+ * in either standard high-contrast grayscale or inverted grayscale.
  */
-function createFullPassCanvasDataUrl(
+function createHeaderPassCanvasDataUrl(
   img: HTMLImageElement,
-  mode: 'standard' | 'top-header-contrast'
+  mode: 'standard' | 'inverted-contrast'
 ): string {
   const maxDim = 1800;
   const srcWidth = img.naturalWidth || img.width;
   const srcHeight = img.naturalHeight || img.height;
 
-  // For top-header-contrast, we focus on the top 40% of the screen where player names and scoreboards live
-  const cropHeight = mode === 'top-header-contrast' ? Math.round(srcHeight * 0.42) : srcHeight;
+  // Focus on the top 38% of the screen where player names and scoreboards live
+  const cropHeight = Math.round(srcHeight * 0.38);
 
   let targetWidth = srcWidth;
   let targetHeight = cropHeight;
@@ -102,12 +106,12 @@ function createFullPassCanvasDataUrl(
 }
 
 /**
- * Extracts a dedicated binary (black text on white background) canvas for a single
+ * Extracts a dedicated binary (black text on white background) 2x-upscaled canvas for a single
  * scoreboard digit box (left score or right score) in EA FC Mobile / eFootball screenshots.
  *
  * Uses height-relative coordinates anchored to horizontal center (w / 2) so it works
  * across 16:9, 18:9, 19.5:9, and 20:9 mobile screens, and filters for pure bright white
- * scoreboard pixels so colored annotations (like red circles) or dark stadium backgrounds are ignored.
+ * scoreboard pixels so colored annotations or dark stadium backgrounds are ignored.
  */
 function createScoreDigitCropDataUrl(
   img: HTMLImageElement,
@@ -118,8 +122,6 @@ function createScoreDigitCropDataUrl(
   const centerX = w / 2;
 
   // Main score digits sit between 0.052*h and 0.152*h from centerX, and vertically at 0.110*h..0.212*h
-  // (keeping clear of the top player banner border at 0.085*h, the 90:00 timer below 0.212*h,
-  // and the outer penalty score parentheses at 0.16*h..0.25*h)
   const innerOffset = Math.round(h * 0.052);
   const outerOffset = Math.round(h * 0.152);
 
@@ -136,14 +138,19 @@ function createScoreDigitCropDataUrl(
   const cropW = Math.max(1, ex - sx);
   const cropH = Math.max(1, ey - sy);
 
+  const scale = 2;
+  const scaledW = cropW * scale;
+  const scaledH = cropH * scale;
+
   const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = cropW;
-  tempCanvas.height = cropH;
+  tempCanvas.width = scaledW;
+  tempCanvas.height = scaledH;
   const tempCtx = tempCanvas.getContext('2d');
   if (!tempCtx) return '';
 
-  tempCtx.drawImage(img, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
-  const imgData = tempCtx.getImageData(0, 0, cropW, cropH);
+  tempCtx.imageSmoothingEnabled = true;
+  tempCtx.drawImage(img, sx, sy, cropW, cropH, 0, 0, scaledW, scaledH);
+  const imgData = tempCtx.getImageData(0, 0, scaledW, scaledH);
   const d = imgData.data;
 
   let whitePixelCount = 0;
@@ -156,8 +163,7 @@ function createScoreDigitCropDataUrl(
     const saturationDelta = maxC - minC;
 
     // Pure bright white scoreboard font pixel: high luminance + low color saturation
-    // (ignores red/colored pen circles and dark background)
-    const isBrightWhiteGlyph = r >= 185 && g >= 185 && b >= 185 && saturationDelta <= 45;
+    const isBrightWhiteGlyph = r >= 180 && g >= 180 && b >= 180 && saturationDelta <= 48;
     if (isBrightWhiteGlyph) whitePixelCount++;
 
     const out = isBrightWhiteGlyph ? 0 : 255; // Black ink (0) on White paper (255)
@@ -167,15 +173,15 @@ function createScoreDigitCropDataUrl(
     d[i + 3] = 255;
   }
 
-  if (whitePixelCount < 15) return '';
+  if (whitePixelCount < 40) return '';
 
   tempCtx.putImageData(imgData, 0, 0);
 
   // Place into a generously padded white canvas
-  const pad = 36;
+  const pad = 48;
   const outCanvas = document.createElement('canvas');
-  outCanvas.width = cropW + pad * 2;
-  outCanvas.height = cropH + pad * 2;
+  outCanvas.width = scaledW + pad * 2;
+  outCanvas.height = scaledH + pad * 2;
   const outCtx = outCanvas.getContext('2d');
   if (!outCtx) return '';
 
@@ -188,13 +194,7 @@ function createScoreDigitCropDataUrl(
 
 /**
  * Extracts a dedicated binary canvas for the penalty shootout score inside parentheses, e.g. "(4)" or "(3)".
- * In EA FC Mobile penalty results, penalty scores appear at [centerX - 0.25*h, centerX - 0.145*h] (left)
- * and [centerX + 0.145*h, centerX + 0.25*h] (right), y in [0.095*h, 0.185*h].
- *
- * Because the parentheses '(' and ')' hug the digit closely (causing raw OCR to misread "(3)" as "(€))" or "131"),
- * this function detects horizontal ink column segments:
- * - Requires at least 3 segments: '(' + digit(s) + ')'
- * - Strips the first segment '(' and last segment ')' so only the clean inner penalty digit(s) remain!
+ * Only valid when the main regulation/extra-time score is a draw AND parentheses segments '(' + digit + ')' exist.
  */
 function createPenaltyDigitCropDataUrl(
   img: HTMLImageElement,
@@ -204,7 +204,7 @@ function createPenaltyDigitCropDataUrl(
   const h = img.naturalHeight || img.height;
   const centerX = w / 2;
 
-  const innerOffset = Math.round(h * 0.145);
+  const innerOffset = Math.round(h * 0.155);
   const outerOffset = Math.round(h * 0.255);
 
   const sx = side === 'left'
@@ -281,8 +281,6 @@ function createPenaltyDigitCropDataUrl(
     segments.push({ startX: segStart, endX: cropW - 1, totalPixels: segPixels });
   }
 
-  // A parenthesized penalty score "(4)" or "(3)" typically has 3 segments: '(', digit(s), ')'
-  // If parentheses touch the digit (1 or 2 segments), fall back to the inner digit window [0.170*h, 0.216*h]
   let innerStartX = 0;
   let innerEndX = cropW - 1;
 
@@ -290,9 +288,8 @@ function createPenaltyDigitCropDataUrl(
     innerStartX = segments[1].startX;
     innerEndX = segments[segments.length - 2].endX;
   } else {
-    // Fallback to exact inner window between '(' and ')' (0.170*h .. 0.216*h from centerX)
-    const fallbackStartOffset = Math.round(h * 0.170);
-    const fallbackEndOffset = Math.round(h * 0.216);
+    const fallbackStartOffset = Math.round(h * 0.172);
+    const fallbackEndOffset = Math.round(h * 0.214);
     const absStart = side === 'left'
       ? Math.max(sx, Math.round(centerX - fallbackEndOffset))
       : Math.max(sx, Math.round(centerX + fallbackStartOffset));
@@ -303,18 +300,16 @@ function createPenaltyDigitCropDataUrl(
     innerStartX = Math.max(0, absStart - sx);
     innerEndX = Math.min(cropW - 1, absEnd - sx);
 
-    // Ensure there are actual white glyph pixels inside the inner window
     let innerWhitePixels = 0;
     for (let x = innerStartX; x <= innerEndX; x++) {
       innerWhitePixels += colCounts[x];
     }
-    if (innerWhitePixels < 12) {
+    if (innerWhitePixels < 20) {
       return '';
     }
   }
 
   const innerW = Math.max(1, innerEndX - innerStartX + 1);
-
   tempCtx.putImageData(imgData, 0, 0);
 
   const pad = 36;
@@ -349,6 +344,27 @@ function parseSingleScoreBoxText(raw: string): number | null {
   const num = parseInt(match[1], 10);
   if (Number.isNaN(num) || num < 0 || num > 30) return null;
   return num;
+}
+
+/**
+ * Helper to recognize a single cropped score digit image with PSM 6 and automatic fallback to PSM 8 / PSM 13.
+ * (PSM 10 often drops bold angular digits like '4' in EA FC Mobile's scoreboard font, whereas PSM 6/8 read them cleanly.)
+ */
+async function recognizeScoreDigitWithFallback(worker: any, cropDataUrl: string): Promise<number | null> {
+  if (!cropDataUrl) return null;
+
+  for (const psm of ['6', '8', '13', '10']) {
+    await worker.setParameters({
+      tessedit_pageseg_mode: psm as any,
+      tessedit_char_whitelist: '0123456789OoQDIl|'
+    });
+    const res = await worker.recognize(cropDataUrl);
+    const parsed = parseSingleScoreBoxText(res?.data?.text || '');
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 /**
@@ -479,9 +495,9 @@ function createPlayerNameBannerCropDataUrl(
  * Runs local OCR on the selected screenshot file in the browser.
  * Performs:
  * 1) Dedicated 3x-upscaled Left & Right player name banner crops (for accurate mixed-case & stylized name detection)
- * 2) Dedicated left & right scoreboard digit crops (eliminating the middle FC logo & bottom match stats)
- * 3) Dedicated left & right penalty score crops (stripping parentheses around '(4)' and '(3)')
- * 4) Standard full-screen pass & top-header contrast pass for fallback context
+ * 2) Top-header standard & inverted contrast passes (focused on top 38% of image, excluding bottom match stats noise)
+ * 3) Dedicated 2x-upscaled left & right scoreboard digit crops with multi-PSM fallback
+ * 4) Dedicated left & right penalty score crops (only when regulation score is tied)
  */
 export async function extractTextFromMatchScreenshot(
   file: File,
@@ -513,57 +529,54 @@ export async function extractTextFromMatchScreenshot(
       rightBannerText = rRes.data.text || '';
     }
 
-    // Pass 2: Standard full image (captures player names and layout context)
-    const standardDataUrl = createFullPassCanvasDataUrl(img, 'standard');
-    const firstPass = await worker.recognize(standardDataUrl);
+    // Pass 2: Standard top-header pass (captures player names & scoreboard row without bottom match stats noise)
+    const standardHeaderUrl = createHeaderPassCanvasDataUrl(img, 'standard');
+    const firstPass = await worker.recognize(standardHeaderUrl);
     const firstText = firstPass.data.text || '';
 
-    // Pass 3: High-contrast top header (captures white player names on dark/colored banners)
-    const headerDataUrl = createFullPassCanvasDataUrl(img, 'top-header-contrast');
-    const secondPass = await worker.recognize(headerDataUrl);
+    // Pass 3: High-contrast inverted top-header pass (captures white player names on dark/colored banners)
+    const invertedHeaderUrl = createHeaderPassCanvasDataUrl(img, 'inverted-contrast');
+    const secondPass = await worker.recognize(invertedHeaderUrl);
     const secondText = secondPass.data.text || '';
 
-    // Pass 4: Dedicated Scoreboard Left & Right Main Digit Boxes (PSM 10 / single token mode)
+    // Pass 4: Dedicated Scoreboard Left & Right Main Digit Boxes (multi-PSM fallback)
     const leftCropUrl = createScoreDigitCropDataUrl(img, 'left');
     const rightCropUrl = createScoreDigitCropDataUrl(img, 'right');
 
-    await worker.setParameters({
-      tessedit_pageseg_mode: '10' as any,
-      tessedit_char_whitelist: '0123456789OoQDIl|'
-    });
-
     let scoreboardTag = '';
+    let mainLeftScore: number | null = null;
+    let mainRightScore: number | null = null;
+
     if (leftCropUrl && rightCropUrl) {
-      const leftRes = await worker.recognize(leftCropUrl);
-      const rightRes = await worker.recognize(rightCropUrl);
+      mainLeftScore = await recognizeScoreDigitWithFallback(worker, leftCropUrl);
+      mainRightScore = await recognizeScoreDigitWithFallback(worker, rightCropUrl);
 
-      const leftScore = parseSingleScoreBoxText(leftRes.data.text);
-      const rightScore = parseSingleScoreBoxText(rightRes.data.text);
-
-      if (leftScore !== null && rightScore !== null) {
-        scoreboardTag = `[SCOREBOARD_CROPPED: ${leftScore} - ${rightScore}]`;
+      if (mainLeftScore !== null && mainRightScore !== null) {
+        scoreboardTag = `[SCOREBOARD_CROPPED: ${mainLeftScore} - ${mainRightScore}]`;
       }
     }
 
-    // Pass 5: Dedicated Penalty Shootout Left & Right Digit Boxes (inside parentheses '(4)' / '(3)')
-    const leftPenUrl = createPenaltyDigitCropDataUrl(img, 'left');
-    const rightPenUrl = createPenaltyDigitCropDataUrl(img, 'right');
-
+    // Pass 5: Dedicated Penalty Shootout Left & Right Digit Boxes
+    // A penalty shootout ONLY occurs when the main regulation/extra-time score is a draw (mainLeftScore === mainRightScore)
     let penaltyTag = '';
-    if (leftPenUrl && rightPenUrl) {
-      await worker.setParameters({
-        tessedit_pageseg_mode: '10' as any,
-        tessedit_char_whitelist: '0123456789Il|'
-      });
+    const isRegulationDraw =
+      mainLeftScore !== null && mainRightScore !== null && mainLeftScore === mainRightScore;
 
-      const leftPenRes = await worker.recognize(leftPenUrl);
-      const rightPenRes = await worker.recognize(rightPenUrl);
+    if (isRegulationDraw) {
+      const leftPenUrl = createPenaltyDigitCropDataUrl(img, 'left');
+      const rightPenUrl = createPenaltyDigitCropDataUrl(img, 'right');
 
-      const leftPenScore = parseSingleScoreBoxText(leftPenRes.data.text);
-      const rightPenScore = parseSingleScoreBoxText(rightPenRes.data.text);
+      if (leftPenUrl && rightPenUrl) {
+        const leftPenScore = await recognizeScoreDigitWithFallback(worker, leftPenUrl);
+        const rightPenScore = await recognizeScoreDigitWithFallback(worker, rightPenUrl);
 
-      if (leftPenScore !== null && rightPenScore !== null) {
-        penaltyTag = `[PENALTY_SCORE_CROPPED: ${leftPenScore} - ${rightPenScore}]`;
+        if (
+          leftPenScore !== null &&
+          rightPenScore !== null &&
+          leftPenScore !== rightPenScore
+        ) {
+          penaltyTag = `[PENALTY_SCORE_CROPPED: ${leftPenScore} - ${rightPenScore}]`;
+        }
       }
     }
 
@@ -571,8 +584,11 @@ export async function extractTextFromMatchScreenshot(
     return [
       scoreboardTag,
       penaltyTag,
-      `[LEFT_PLAYER_BANNER]\n${leftBannerText}`,
-      `[RIGHT_PLAYER_BANNER]\n${rightBannerText}`,
+      LEFT_BANNER_MARKER,
+      leftBannerText,
+      RIGHT_BANNER_MARKER,
+      rightBannerText,
+      HEADER_PASS_MARKER,
       firstText,
       secondText
     ]
@@ -601,7 +617,7 @@ const FANCY_UNICODE_LOOKALIKE_MAP: Record<string, string> = {
   'в': 'b', 'В': 'b', 'β': 'b',
   'с': 'c', 'С': 'c', '¢': 'c',
   '∂': 'd', 'ԁ': 'd',
-  'є': 'e', 'е': 'e', 'Е': 'e', 'є̈': 'e', 'Σ': 'e', '£': 'e',
+  'є': 'e', 'е': 'e', 'Е': 'e', 'Σ': 'e', '£': 'e',
   'ƒ': 'f',
   'ǥ': 'g',
   'н': 'h', 'Н': 'h', 'ћ': 'h',
@@ -626,11 +642,7 @@ const FANCY_UNICODE_LOOKALIKE_MAP: Record<string, string> = {
 
 function normalizeFancyUnicodeToAscii(value: string): string {
   if (!value) return '';
-  // Step 1: NFKD decomposes Mathematical Alphanumeric Symbols (e.g. 𝘎𝘈𝘔𝘌𝘙 -> GAMER),
-  // fullwidth characters, superscripts, and accented Latin letters into base ASCII + combining marks.
   const decomposed = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-
-  // Step 2: Map remaining Small Caps / Greek / Cyrillic lookalikes
   let out = '';
   for (const ch of decomposed) {
     out += FANCY_UNICODE_LOOKALIKE_MAP[ch] ?? ch;
@@ -652,21 +664,14 @@ function normalizeCompact(value: string): string {
 }
 
 /**
- * Normalizes mixed-case vs uppercase visual homoglyphs in EA FC Mobile / eFootball fonts:
- * - Lowercase 'l', uppercase 'I', digit '1', and '|' are identical vertical bars in sans-serif game fonts
- *   (e.g., in-game "AlFHA-WALID" -> app uppercase "ALFHA-WALID" -> OCR "AIFHA-WALID").
- * - '0' and 'o'/'O'
- * - '5' and 's'/'S'
- * - '8' and 'b'/'B'
- * - '2' and 'z'/'Z'
+ * Normalizes ONLY true sans-serif vertical-bar homoglyphs ('l', 'I', '1', '|') -> 'i'
+ * and '0' -> 'o' when comparing letter-based gamer tags (e.g. "AlFHA-WALID" vs "ALFHA-WALID").
+ * IMPORTANT: Never converts digits 2..9 into letters (so "88" or "77" never matches "BB" or "TT").
  */
 function normalizeHomoglyphChar(ch: string): string {
   const lower = ch.toLowerCase();
   if (lower === 'l' || lower === 'i' || lower === '1' || lower === '|') return 'i';
   if (lower === '0' || lower === 'o') return 'o';
-  if (lower === '5' || lower === 's') return 's';
-  if (lower === '8' || lower === 'b') return 'b';
-  if (lower === '2' || lower === 'z') return 'z';
   return lower;
 }
 
@@ -707,132 +712,255 @@ function computeEditDistance(a: string, b: string): number {
   return dp[m * (n + 1) + n];
 }
 
-function findFuzzyTokenInText(
-  haystack: string,
-  token: string,
-  startFrom: number,
-  maxDist: number
+function findFuzzyTokenInLine(
+  lineHomoglyph: string,
+  lineCompact: string,
+  rawToken: string,
+  startFrom: number
 ): { found: boolean; index: number; endIndex: number } {
-  const exactIdx = haystack.indexOf(token, startFrom);
-  if (exactIdx !== -1) {
-    return { found: true, index: exactIdx, endIndex: exactIdx + token.length };
-  }
-  if (maxDist <= 0 || token.length < 4 || haystack.length < token.length) {
+  const isPureNumericToken = /^\d+$/.test(rawToken);
+  if (isPureNumericToken) {
+    // Pure number tokens (like "88" or "77" in "Player 88") MUST match exact digits, no fuzzy edit distance!
+    const exactNumIdx = lineCompact.indexOf(rawToken, startFrom);
+    if (exactNumIdx !== -1) {
+      return { found: true, index: exactNumIdx, endIndex: exactNumIdx + rawToken.length };
+    }
     return { found: false, index: -1, endIndex: -1 };
   }
-  for (let i = startFrom; i <= haystack.length - token.length; i++) {
-    const sub = haystack.slice(i, i + token.length);
-    if (computeEditDistance(token, sub) <= maxDist) {
-      return { found: true, index: i, endIndex: i + token.length };
+
+  const homoToken = normalizeHomoglyphsCompact(rawToken);
+  const exactIdx = lineHomoglyph.indexOf(homoToken, startFrom);
+  if (exactIdx !== -1) {
+    return { found: true, index: exactIdx, endIndex: exactIdx + homoToken.length };
+  }
+
+  // Allow at most 1 character OCR noise ONLY on alphabetic tokens of length >= 5
+  const maxDist = homoToken.length >= 5 ? 1 : 0;
+  if (maxDist <= 0 || lineHomoglyph.length < homoToken.length) {
+    return { found: false, index: -1, endIndex: -1 };
+  }
+
+  for (let i = startFrom; i <= lineHomoglyph.length - homoToken.length; i++) {
+    const sub = lineHomoglyph.slice(i, i + homoToken.length);
+    if (sub[0] !== homoToken[0] && sub[sub.length - 1] !== homoToken[homoToken.length - 1]) {
+      continue;
+    }
+    if (computeEditDistance(homoToken, sub) <= maxDist) {
+      return { found: true, index: i, endIndex: i + homoToken.length };
     }
   }
   return { found: false, index: -1, endIndex: -1 };
 }
 
-function checkStrictPlayerNameMatch(
-  extractedText: string,
-  primaryName: string,
-  alternateNames: string[] = []
-): { matched: boolean; index: number } {
-  const candidates = [primaryName, ...alternateNames]
-    .map((n) => (n || '').trim())
-    .filter((n) => n.length > 0);
+/**
+ * Strips internal OCR metadata tags and bottom match-stats noise lines so player names
+ * are strictly verified only against valid top-banner / header lines.
+ */
+function extractCleanLinesForPlayerCheck(textBlock: string): string[] {
+  const cleanedBlock = (textBlock || '')
+    .replace(/\[SCOREBOARD_CROPPED:[^\]]*\]/g, '')
+    .replace(/\[PENALTY_SCORE_CROPPED:[^\]]*\]/g, '')
+    .replace(/\[LEFT_PLAYER_BANNER\]/gi, '')
+    .replace(/\[RIGHT_PLAYER_BANNER\]/gi, '')
+    .replaceAll(LEFT_BANNER_MARKER, '')
+    .replaceAll(RIGHT_BANNER_MARKER, '')
+    .replaceAll(HEADER_PASS_MARKER, '');
 
-  const normalizedExtracted = normalizeForStrictMatch(extractedText);
-  const compactExtracted = normalizeCompact(extractedText);
-  const homoglyphExtracted = normalizeHomoglyphsCompact(extractedText);
+  const statsNoiseRegex = /\b(?:SHOTS|POSSESSION|PASS\s*ACCURACY|FOULS|OFFSIDES|MATCH\s*HIGHLIGHTS|ADD\s*FRIEND|CONTINUE)\b/i;
 
-  for (const candidate of candidates) {
-    const normCandidate = normalizeForStrictMatch(candidate);
-    if (!normCandidate) continue;
+  return cleanedBlock
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length >= 2 && !statsNoiseRegex.test(l));
+}
 
-    // 1. Direct case-insensitive substring match
-    const directIdx = normalizedExtracted.indexOf(normCandidate);
+/**
+ * Checks whether a single candidate player name matches on any single OCR line in `lines`.
+ */
+function checkCandidateOnLines(
+  lines: string[],
+  candidate: string
+): { matched: boolean; lineIndex: number; charIndex: number } {
+  const normCandidate = normalizeForStrictMatch(candidate);
+  if (!normCandidate) return { matched: false, lineIndex: -1, charIndex: -1 };
+
+  const compactCandidate = normalizeCompact(candidate);
+  const homoglyphCandidate = normalizeHomoglyphsCompact(candidate);
+  const asciiCandidate = normalizeFancyUnicodeToAscii(candidate);
+
+  // Extract any pure numeric tokens (e.g. "88" in "Player 88") — these MUST match exact digits on the same line
+  const numericTokens = asciiCandidate
+    .split(/[^a-zA-Z0-9]+/)
+    .filter((t) => /^\d+$/.test(t));
+
+  const rawTokens = asciiCandidate
+    .split(/[^a-zA-Z0-9]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length >= 2);
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const rawLine = lines[lineIdx];
+    const normLine = normalizeForStrictMatch(rawLine);
+    const compactLine = normalizeCompact(rawLine);
+    const homoLine = normalizeHomoglyphsCompact(rawLine);
+
+    // If the candidate name contains pure numbers (like "88" or "77"), the line MUST contain those exact digits
+    if (numericTokens.length > 0) {
+      const allNumbersPresent = numericTokens.every((numTok) => compactLine.includes(numTok));
+      if (!allNumbersPresent) {
+        continue;
+      }
+    }
+
+    // 1. Direct case-insensitive substring match on the line
+    const directIdx = normLine.indexOf(normCandidate);
     if (directIdx !== -1) {
-      return { matched: true, index: directIdx };
+      return { matched: true, lineIndex: lineIdx, charIndex: directIdx };
     }
 
-    // 2. Compact alphanumeric case-insensitive match (ignores spaces, dots, underscores, hyphens, decorative symbols)
-    const compactCandidate = normalizeCompact(candidate);
-    if (compactCandidate.length >= 2) {
-      const compactIdx = compactExtracted.indexOf(compactCandidate);
+    // 2. Compact alphanumeric match on the line (ignores spaces, dots, underscores, hyphens)
+    if (compactCandidate.length >= 3) {
+      const compactIdx = compactLine.indexOf(compactCandidate);
       if (compactIdx !== -1) {
-        return { matched: true, index: compactIdx };
+        return { matched: true, lineIndex: lineIdx, charIndex: compactIdx };
       }
     }
 
-    // 3. Homoglyph-normalized compact match (resolves mixed-case l/I/L/1, O/0, S/5, B/8, Z/2 differences)
-    const homoglyphCandidate = normalizeHomoglyphsCompact(candidate);
-    if (homoglyphCandidate.length >= 2) {
-      const homoIdx = homoglyphExtracted.indexOf(homoglyphCandidate);
+    // 3. Homoglyph-normalized compact match on the line (only when candidate has no pure numeric tokens or numbers already verified)
+    if (homoglyphCandidate.length >= 3) {
+      const homoIdx = homoLine.indexOf(homoglyphCandidate);
       if (homoIdx !== -1) {
-        return { matched: true, index: homoIdx };
+        return { matched: true, lineIndex: lineIdx, charIndex: homoIdx };
       }
     }
 
-    // 4. Multi-token sequence match (handles names split by symbols/clan tags like "M.H_Bashar", "ALFHA-WALID", "𝘎𝘈𝘔𝘌𝘙乂𝘚𝘏𝘜𝘝𝘖彡")
-    // Allows up to 1-char OCR noise per token of length >= 4 (e.g. "GAMER" read as "CAMER" followed by "SHUVO")
-    const asciiCandidate = normalizeFancyUnicodeToAscii(candidate);
-    const rawTokens = asciiCandidate
-      .split(/[^a-zA-Z0-9]+/)
-      .map((t) => normalizeHomoglyphsCompact(t))
-      .filter((t) => t.length >= 2);
-
+    // 4. Multi-token in-order match on the SAME line (e.g. "M.H_Bashar", "YOUR.AYMAN", "ALFHA-WALID", "GAMER SHUVO")
     if (rawTokens.length >= 2) {
       let searchStart = 0;
-      let firstTokenIdx = -1;
-      let allTokensFoundInOrder = true;
+      let firstIdx = -1;
+      let allFound = true;
 
-      for (const token of rawTokens) {
-        const allowDist = token.length >= 4 ? 1 : 0;
-        const matchRes = findFuzzyTokenInText(homoglyphExtracted, token, searchStart, allowDist);
-        if (!matchRes.found || (firstTokenIdx !== -1 && matchRes.index - searchStart > 16)) {
-          allTokensFoundInOrder = false;
+      for (const tok of rawTokens) {
+        const res = findFuzzyTokenInLine(homoLine, compactLine, tok, searchStart);
+        if (!res.found || (firstIdx !== -1 && res.index - searchStart > 6)) {
+          allFound = false;
           break;
         }
-        if (firstTokenIdx === -1) firstTokenIdx = matchRes.index;
-        searchStart = matchRes.endIndex;
+        if (firstIdx === -1) firstIdx = res.index;
+        searchStart = res.endIndex;
       }
 
-      if (allTokensFoundInOrder && firstTokenIdx !== -1) {
-        return { matched: true, index: firstTokenIdx };
+      if (allFound && firstIdx !== -1) {
+        return { matched: true, lineIndex: lineIdx, charIndex: firstIdx };
       }
     }
 
-    // 5. Bounded sliding-window Levenshtein match on homoglyph-normalized text
-    // Tolerates 1-character OCR noise on 5..8 char names, or up to 2-char noise on >= 9 char names
-    // (including when a middle decorative symbol like '乂' adds 1 extra OCR character between tokens)
+    // 5. Bounded single-line Levenshtein match for long names (>= 6 chars) without numeric tokens
+    // Tolerates 1 char OCR noise on 6..9 char names (e.g. "vburAYMAN" -> "YOUR.AYMAN"), or 2 chars on >= 10 char names
     const targetLen = homoglyphCandidate.length;
-    if (targetLen >= 5 && homoglyphExtracted.length >= targetLen - 1) {
-      const maxAllowedDist = targetLen >= 9 ? 2 : 1;
-      const minWin = Math.max(4, targetLen - 1);
-      const maxWin = Math.min(homoglyphExtracted.length, targetLen + 2);
+    if (numericTokens.length === 0 && targetLen >= 6 && homoLine.length >= targetLen - 1) {
+      const maxAllowedDist = targetLen >= 10 ? 2 : 1;
+      const minWin = Math.max(5, targetLen - 1);
+      const maxWin = Math.min(homoLine.length, targetLen + 1);
 
       for (let winLen = minWin; winLen <= maxWin; winLen++) {
-        for (let i = 0; i <= homoglyphExtracted.length - winLen; i++) {
-          const sub = homoglyphExtracted.slice(i, i + winLen);
+        for (let i = 0; i <= homoLine.length - winLen; i++) {
+          const sub = homoLine.slice(i, i + winLen);
+          // Require at least the ending character or starting character to match
           if (
             sub[0] !== homoglyphCandidate[0] &&
             sub[sub.length - 1] !== homoglyphCandidate[targetLen - 1]
           ) {
             continue;
           }
-          const dist = computeEditDistance(homoglyphCandidate, sub);
-          if (dist <= maxAllowedDist) {
-            return { matched: true, index: i };
+          if (computeEditDistance(homoglyphCandidate, sub) <= maxAllowedDist) {
+            return { matched: true, lineIndex: lineIdx, charIndex: i };
           }
         }
       }
     }
   }
 
-  return { matched: false, index: -1 };
+  return { matched: false, lineIndex: -1, charIndex: -1 };
+}
+
+/**
+ * Splits `extractedText` into Left Banner, Right Banner, and Header sections (if structured markers exist)
+ * and checks whether a player name matches and on which side ('left' | 'right' | 'unknown').
+ */
+function checkStrictPlayerNameMatchWithSide(
+  extractedText: string,
+  primaryName: string,
+  alternateNames: string[] = []
+): { matched: boolean; side: 'left' | 'right' | 'unknown'; index: number } {
+  const candidates = [primaryName, ...alternateNames]
+    .map((n) => (n || '').trim())
+    .filter((n) => n.length > 0);
+
+  const leftIdx = extractedText.indexOf(LEFT_BANNER_MARKER);
+  const rightIdx = extractedText.indexOf(RIGHT_BANNER_MARKER);
+  const headerIdx = extractedText.indexOf(HEADER_PASS_MARKER);
+
+  if (leftIdx !== -1 && rightIdx !== -1) {
+    const leftBlock = extractedText.slice(leftIdx + LEFT_BANNER_MARKER.length, rightIdx);
+    const rightBlock = headerIdx !== -1
+      ? extractedText.slice(rightIdx + RIGHT_BANNER_MARKER.length, headerIdx)
+      : extractedText.slice(rightIdx + RIGHT_BANNER_MARKER.length);
+    const headerBlock = headerIdx !== -1
+      ? extractedText.slice(headerIdx + HEADER_PASS_MARKER.length)
+      : '';
+
+    const leftLines = extractCleanLinesForPlayerCheck(leftBlock);
+    const rightLines = extractCleanLinesForPlayerCheck(rightBlock);
+    const headerLines = extractCleanLinesForPlayerCheck(headerBlock);
+
+    for (const candidate of candidates) {
+      const leftMatch = checkCandidateOnLines(leftLines, candidate);
+      if (leftMatch.matched) {
+        return { matched: true, side: 'left', index: 0 };
+      }
+      const rightMatch = checkCandidateOnLines(rightLines, candidate);
+      if (rightMatch.matched) {
+        return { matched: true, side: 'right', index: 1000 };
+      }
+      const headerMatch = checkCandidateOnLines(headerLines, candidate);
+      if (headerMatch.matched) {
+        // Determine left vs right by character position on the header line
+        const lineLen = Math.max(1, (headerLines[headerMatch.lineIndex] || '').length);
+        const side = headerMatch.charIndex <= lineLen / 2 ? 'left' : 'right';
+        return {
+          matched: true,
+          side,
+          index: side === 'left' ? headerMatch.charIndex : 1000 + headerMatch.charIndex
+        };
+      }
+    }
+
+    return { matched: false, side: 'unknown', index: -1 };
+  }
+
+  // Fallback for raw text without section markers
+  const allCleanLines = extractCleanLinesForPlayerCheck(extractedText);
+  for (const candidate of candidates) {
+    const res = checkCandidateOnLines(allCleanLines, candidate);
+    if (res.matched) {
+      const lineLen = Math.max(1, (allCleanLines[res.lineIndex] || '').length);
+      const side = res.charIndex <= lineLen / 2 ? 'left' : 'right';
+      return {
+        matched: true,
+        side,
+        index: res.lineIndex * 100 + res.charIndex
+      };
+    }
+  }
+
+  return { matched: false, side: 'unknown', index: -1 };
 }
 
 /**
  * Extracts scoreboard pairs from the OCR output.
- * If a penalty shootout score is present (e.g. [PENALTY_SCORE_CROPPED: 4 - 3] or "(4) 1 - 1 (3)"),
- * penaltyPair is returned and checkStrictScoreMatch will strictly require ONLY the penalty score.
+ * Trusts `[SCOREBOARD_CROPPED: L - R]` as authoritative when present so noisy full-screen OCR
+ * (where the middle EA FC triangular logo is often misread as '7' or '4') never pollutes the score.
  */
 function extractCandidateScorePairs(extractedText: string): {
   pairs: Array<[number, number]>;
@@ -851,7 +979,7 @@ function extractCandidateScorePairs(extractedText: string): {
     }
   };
 
-  // 1. Check dedicated cropped main scoreboard tag
+  // 1. Check dedicated cropped main scoreboard tag (authoritative!)
   const croppedMatch = extractedText.match(/\[SCOREBOARD_CROPPED:\s*(\d{1,2})\s*-\s*(\d{1,2})\]/);
   if (croppedMatch) {
     const l = parseInt(croppedMatch[1], 10);
@@ -865,7 +993,14 @@ function extractCandidateScorePairs(extractedText: string): {
   if (penaltyMatch) {
     const pl = parseInt(penaltyMatch[1], 10);
     const pr = parseInt(penaltyMatch[2], 10);
-    penaltyPair = [pl, pr];
+    if (!mainPair || mainPair[0] === mainPair[1]) {
+      penaltyPair = [pl, pr];
+    }
+  }
+
+  // If the dedicated scoreboard crop succeeded, return immediately without parsing noisy full-screen text
+  if (mainPair) {
+    return { pairs, mainPair, penaltyPair };
   }
 
   const normalizeDigitChar = (ch: string): number => {
@@ -874,9 +1009,14 @@ function extractCandidateScorePairs(extractedText: string): {
     return parseInt(ch, 10);
   };
 
-  // Filter out match statistics lines (SHOTS, POSSESSION, PASS ACCURACY, FOULS, OFFSIDES, etc.)
-  const statKeywords = /SHOTS|POSSESSION|PASS|ACCURACY|FOULS|OFFSIDES|CORNERS|TACKLES|SAVES|HIGHLIGHTS|CONTINUE|FRIEND|%/i;
-  const lines = extractedText
+  // Filter out match statistics lines and banner sections
+  const statKeywords = /SHOTS|POSSESSION|PASS|ACCURACY|FOULS|OFFSIDES|CORNERS|TACKLES|SAVES|HIGHLIGHTS|CONTINUE|FRIEND|VANGUARD|FALCON|%/i;
+  const headerStartIdx = extractedText.indexOf(HEADER_PASS_MARKER);
+  const textForScoreFallback = headerStartIdx !== -1
+    ? extractedText.slice(headerStartIdx + HEADER_PASS_MARKER.length)
+    : extractedText;
+
+  const lines = textForScoreFallback
     .replace(/\[SCOREBOARD_CROPPED:[^\]]+\]/g, '')
     .replace(/\[PENALTY_SCORE_CROPPED:[^\]]+\]/g, '')
     .split(/\r?\n/)
@@ -884,10 +1024,9 @@ function extractCandidateScorePairs(extractedText: string): {
     .filter((l) => l.length > 0 && !statKeywords.test(l));
 
   for (const line of lines) {
-    // Skip lines that are just the match timer like "90:00", "45:00", or "120:00"
     const lineWithoutTimer = line.replace(/\b(?:90|45|120)\s*:\s*\d{2}\b/g, ' ');
 
-    // Check inline parenthesized penalty pattern: e.g. "(4) 1 - 1 (3)"
+    // Check inline parenthesized penalty pattern: e.g. "(4) 1 - 1 (3)" (only valid if main scores are equal)
     const inlinePenRegex = /\((\d{1,2})\)\s*([0-9OoQD])\s*[-=7VvTtYy/]\s*([0-9OoQD])\s*\((\d{1,2})\)/g;
     let pm: RegExpExecArray | null;
     while ((pm = inlinePenRegex.exec(lineWithoutTimer)) !== null) {
@@ -895,16 +1034,24 @@ function extractCandidateScorePairs(extractedText: string): {
       const mainL = normalizeDigitChar(pm[2]);
       const mainR = normalizeDigitChar(pm[3]);
       const penR = parseInt(pm[4], 10);
-      if (!penaltyPair) penaltyPair = [penL, penR];
       if (!mainPair) mainPair = [mainL, mainR];
+      if (mainL === mainR && !penaltyPair) {
+        penaltyPair = [penL, penR];
+      }
+      addPair(mainL, mainR);
     }
 
+    // Unwrap wide oval '0' when Tesseract wraps it in parentheses/brackets like "(0)" or "[0]" next to the middle FC icon (e.g. "PSG 4 7 (0) FC Barcelona" -> "PSG 4 7 0 FC Barcelona")
+    const lineNormalizedZero = lineWithoutTimer
+      .replace(/[\(\[\{]\s*([0OoQD])\s*[\)\]\}]/g, ' 0 ')
+      .replace(/\bLe\)/g, ' 0 ');
+
     // Compact 3-char token where the middle EA FC triangular icon is read as 7/V/v/T/Y/4/-/= between two scores:
-    // e.g. "1 7 1", "2 7 1", "O70", "O7O", "0V0", "1 = 1", "1 - 1"
+    // e.g. "4 7 0", "1 7 1", "2 7 1", "O70", "0V0", "1 - 1"
     const fcCompactRegex = /(?:^|\s|\)|“|@)([0-9OoQDIl|])\s*[=74VvTtYy/-]\s*([0-9OoQDIl|])(?:\s|\(|$)/g;
     let m: RegExpExecArray | null;
     let matchedThreeTokenScoreLine = false;
-    while ((m = fcCompactRegex.exec(lineWithoutTimer)) !== null) {
+    while ((m = fcCompactRegex.exec(lineNormalizedZero)) !== null) {
       const l = normalizeDigitChar(m[1]);
       const r = normalizeDigitChar(m[2]);
       if (!mainPair) mainPair = [l, r];
@@ -912,11 +1059,9 @@ function extractCandidateScorePairs(extractedText: string): {
       matchedThreeTokenScoreLine = true;
     }
 
-    // Two standalone score characters separated by spaces on the scoreboard line: e.g. "O   O" or "0   0" or "2   1"
-    // Only run if the line didn't already match the 3-token [LeftScore] [FC_Logo] [RightScore] pattern (preventing "1 7 1" -> "1 - 7")
     if (!matchedThreeTokenScoreLine) {
       const spacedScoreRegex = /(?:^|\s|\))([0-9Oo])\s{1,8}([0-9Oo])(?:\s|\(|$)/g;
-      while ((m = spacedScoreRegex.exec(lineWithoutTimer)) !== null) {
+      while ((m = spacedScoreRegex.exec(lineNormalizedZero)) !== null) {
         const l = normalizeDigitChar(m[1]);
         const r = normalizeDigitChar(m[2]);
         if (!mainPair) mainPair = [l, r];
@@ -932,8 +1077,8 @@ function checkStrictScoreMatch(
   extractedText: string,
   homeScore: number,
   awayScore: number,
-  homeIndex: number,
-  awayIndex: number
+  homeSide: 'left' | 'right' | 'unknown',
+  awaySide: 'left' | 'right' | 'unknown'
 ): { matched: boolean; detectedScoreText: string | null } {
   const h = Number(homeScore);
   const a = Number(awayScore);
@@ -944,9 +1089,10 @@ function checkStrictScoreMatch(
 
   const { pairs: candidatePairs, penaltyPair } = extractCandidateScorePairs(extractedText);
 
-  // Determine whether the Away player's name appears on the left side of the screenshot
+  // Determine whether the Away player's name is on the Left and Home player's name is on the Right
   const isAwayListedFirst =
-    homeIndex !== -1 && awayIndex !== -1 && awayIndex < homeIndex;
+    (awaySide === 'left' && homeSide !== 'left') ||
+    (homeSide === 'right' && awaySide !== 'right');
 
   // If the screenshot contains a Penalty Shootout score, ONLY accept the penalty score!
   if (penaltyPair) {
@@ -957,7 +1103,7 @@ function checkStrictScoreMatch(
     if (isAwayListedFirst && penLeft === a && penRight === h) {
       return { matched: true, detectedScoreText: `${h} - ${a}` };
     }
-    if ((penLeft === h && penRight === a) || (penLeft === a && penRight === h)) {
+    if (homeSide === 'unknown' && awaySide === 'unknown' && ((penLeft === h && penRight === a) || (penLeft === a && penRight === h))) {
       return { matched: true, detectedScoreText: `${h} - ${a}` };
     }
 
@@ -978,7 +1124,7 @@ function checkStrictScoreMatch(
     if (isAwayListedFirst && leftScore === a && rightScore === h) {
       return { matched: true, detectedScoreText: `${h} - ${a}` };
     }
-    if ((leftScore === h && rightScore === a) || (leftScore === a && rightScore === h)) {
+    if (homeSide === 'unknown' && awaySide === 'unknown' && ((leftScore === h && rightScore === a) || (leftScore === a && rightScore === h))) {
       return { matched: true, detectedScoreText: `${h} - ${a}` };
     }
   }
@@ -996,7 +1142,7 @@ function checkStrictScoreMatch(
 
 /**
  * Evaluates already-extracted OCR text against the match's expected player names and typed scores.
- * Requires strict exact match of BOTH player names and the entered scoreline.
+ * Requires strict exact match of BOTH player names (in distinct top banner positions) and the entered scoreline.
  */
 export function evaluateMatchOcrVerification(
   extractedText: string,
@@ -1014,13 +1160,13 @@ export function evaluateMatchOcrVerification(
     };
   }
 
-  const homeCheck = checkStrictPlayerNameMatch(
+  const homeCheck = checkStrictPlayerNameMatchWithSide(
     extractedText,
     params.expectedHomeName,
     params.alternateHomeNames
   );
 
-  const awayCheck = checkStrictPlayerNameMatch(
+  const awayCheck = checkStrictPlayerNameMatchWithSide(
     extractedText,
     params.expectedAwayName,
     params.alternateAwayNames
@@ -1030,8 +1176,8 @@ export function evaluateMatchOcrVerification(
     extractedText,
     params.enteredHomeScore,
     params.enteredAwayScore,
-    homeCheck.index,
-    awayCheck.index
+    homeCheck.side,
+    awayCheck.side
   );
 
   const isVerified = homeCheck.matched && awayCheck.matched && scoreCheck.matched;

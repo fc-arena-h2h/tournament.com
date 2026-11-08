@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
-import { APP_VERSION, APP_ID, DEFAULT_UPDATE_URL } from '@/src/lib/constants';
+import {
+  APP_VERSION,
+  APP_ID,
+  DEFAULT_UPDATE_URL,
+  DEFAULT_TELEGRAM_UPDATE_URL,
+  DEFAULT_CHROME_UPDATE_URL
+} from '@/src/lib/constants';
 
 export function useAppUpdate() {
   const [updateRequired, setUpdateRequired] = useState(false);
   const [serverVersion, setServerVersion] = useState(APP_VERSION);
   const [isMandatory, setIsMandatory] = useState(false);
   const [updateUrl, setUpdateUrl] = useState(DEFAULT_UPDATE_URL);
+  const [telegramUpdateUrl, setTelegramUpdateUrl] = useState(DEFAULT_TELEGRAM_UPDATE_URL);
+  const [chromeUpdateUrl, setChromeUpdateUrl] = useState(DEFAULT_CHROME_UPDATE_URL);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,18 +27,20 @@ export function useAppUpdate() {
         const remoteAppId = data.app_id || APP_ID;
         const forceUpdate = data.force_update ?? true;
         const remoteUpdateUrl = data.update_url || DEFAULT_UPDATE_URL;
+        const remoteTelegramUrl = data.telegram_update_url || remoteUpdateUrl || DEFAULT_TELEGRAM_UPDATE_URL;
+        const remoteChromeUrl = data.chrome_update_url || remoteUpdateUrl || DEFAULT_CHROME_UPDATE_URL;
 
         setServerVersion(minVersion);
         setIsMandatory(forceUpdate);
         setUpdateUrl(remoteUpdateUrl);
+        setTelegramUpdateUrl(remoteTelegramUrl);
+        setChromeUpdateUrl(remoteChromeUrl);
 
         // Check if local version or app ID is outdated
         const versionMismatch = APP_VERSION !== minVersion;
         const idMismatch = APP_ID !== remoteAppId;
         const needsUpdate = versionMismatch || idMismatch;
         
-        // Show update overlay if version or ID mismatch
-        // If forceUpdate is true, it's mandatory (handled by UI overlay)
         if (needsUpdate) {
           setUpdateRequired(true);
         } else {
@@ -46,5 +56,13 @@ export function useAppUpdate() {
     return () => unsub();
   }, []);
 
-  return { updateRequired, serverVersion, isMandatory, updateUrl, loading };
+  return {
+    updateRequired,
+    serverVersion,
+    isMandatory,
+    updateUrl,
+    telegramUpdateUrl,
+    chromeUpdateUrl,
+    loading
+  };
 }

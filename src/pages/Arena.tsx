@@ -385,7 +385,11 @@ export const ArenaPage: React.FC<ArenaProps> = ({
           )}
 
           {featuredTournaments.map((t, idx) => {
-            const isFinished = t.status === 'finished' || t.status === 'completed';
+            const isFinished =
+              t.status === 'finished' ||
+              t.status === 'completed' ||
+              Boolean((t as any).winnerId) ||
+              Boolean((t as any).winnerText);
             const isLive = t.status === 'ongoing' || (t.filledSlots >= t.totalSlots && !isFinished);
             const remainingSpots = Math.max(0, (t.totalSlots || 16) - (t.filledSlots || 0));
 
@@ -539,6 +543,104 @@ export const ArenaPage: React.FC<ArenaProps> = ({
               className="text-slate-300 dark:text-slate-300 group-hover:text-amber-500 dark:group-hover:text-[#ff7a45] transition-colors relative z-10"
             />
           </button>
+        </Reveal>
+
+        {/* Official Facebook Page Card */}
+        <Reveal direction="right" delay={100}>
+          <div className="nm-flat rounded-[2.5rem] p-6 sm:p-8 bg-white dark:!bg-gradient-to-b dark:!from-[#2b3056]/94 dark:!via-[#1f2340]/94 dark:!to-[#161930]/98 border-2 border-white dark:!border-white/22 shadow-xl dark:!shadow-[0_24px_55px_-12px_rgba(4,5,15,0.9),inset_0_1px_1.5px_rgba(255,255,255,0.25)] flex flex-col items-center relative overflow-hidden">
+            <div className="hidden dark:block absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br from-[#38bdf8]/20 via-[#6366f1]/15 to-transparent blur-2xl pointer-events-none" />
+
+            {/* Headline */}
+            <div className="text-center mb-4 relative z-10">
+              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:!text-white uppercase tracking-[0.22em] leading-snug">
+                Official Facebook Page
+              </h3>
+              {/* Decorative Zig-Zag Accent */}
+              <div className="flex justify-center mt-1.5">
+                <svg
+                  width="68"
+                  height="10"
+                  viewBox="0 0 68 10"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-[#7aa5f2] dark:text-[#38bdf8]"
+                >
+                  <path
+                    d="M2 8L8.4 2L14.8 8L21.2 2L27.6 8L34 2L40.4 8L46.8 2L53.2 8L59.6 2L66 8"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Facebook Page Plugin Box */}
+            <div className="w-full max-w-[360px] rounded-xl border border-[#dddfe2] dark:border-white/20 bg-white dark:bg-[#1c203b] shadow-sm overflow-hidden relative z-10">
+              {/* Top Profile Info Area */}
+              <div className="p-3.5 sm:p-4 flex items-start gap-3.5 bg-white dark:bg-[#1c203b]">
+                <a
+                  href="https://www.facebook.com/profile.php?id=61595965529079"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-md overflow-hidden border border-slate-300 dark:border-white/20 shrink-0 shadow-xs block hover:opacity-95 transition-opacity bg-[#0b1026]"
+                >
+                  <img
+                    src="/fc_arena_icon.jpg"
+                    alt="FC ARENA VS"
+                    className="w-full h-full object-cover"
+                  />
+                </a>
+                <div className="min-w-0 flex-1 pt-0.5 text-left">
+                  <a
+                    href="https://www.facebook.com/profile.php?id=61595965529079"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[17px] sm:text-lg font-bold text-[#385898] dark:text-[#60a5fa] hover:underline leading-tight block truncate"
+                  >
+                    FC ARENA VS
+                  </a>
+                  <p className="text-xs font-medium text-[#4b4f56] dark:text-slate-300 mt-0.5">
+                    Official Community • Follow for Updates
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom Action Bar (Follow Page & Share) */}
+              <div className="px-3.5 py-2.5 bg-[#f5f6f7] dark:bg-[#13162b] border-t border-[#e9ebee] dark:border-white/12 flex items-center justify-between gap-2">
+                <a
+                  href="https://www.facebook.com/profile.php?id=61595965529079"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#f5f6f7] hover:bg-[#ebedf0] dark:bg-[#252b4d] dark:hover:bg-[#2f3660] border border-[#ccd0d5] dark:border-white/20 text-[#4b4f56] dark:text-white text-xs font-bold shadow-2xs active:scale-95 transition-all"
+                >
+                  <span className="w-4 h-4 rounded-[3px] bg-[#1877f2] text-white flex items-center justify-center font-black text-[12px] leading-none">
+                    f
+                  </span>
+                  <span>Follow Page</span>
+                </a>
+
+                <a
+                  href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwww.facebook.com%2Fprofile.php%3Fid%3D61595965529079"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#f5f6f7] hover:bg-[#ebedf0] dark:bg-[#252b4d] dark:hover:bg-[#2f3660] border border-[#ccd0d5] dark:border-white/20 text-[#4b4f56] dark:text-white text-xs font-bold shadow-2xs active:scale-95 transition-all"
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-[#4b4f56] dark:text-slate-200"
+                  >
+                    <path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z" />
+                  </svg>
+                  <span>Share</span>
+                </a>
+              </div>
+            </div>
+          </div>
         </Reveal>
       </div>
     </div>

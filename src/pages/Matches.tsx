@@ -4,7 +4,7 @@ import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { subscribeToMatchesAcrossShards, getTournamentDbByTournamentId, findTournamentAcrossShards } from '@/src/lib/shardManager';
-import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle, Edit3, RotateCcw } from 'lucide-react';
+import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle, Edit3, RotateCcw, Phone } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { GameLoader } from '@/src/components/ui/GameLoader';
@@ -28,31 +28,63 @@ const getUserIdColor = (userId: string) => {
   return BUBBLE_COLORS[Math.abs(hash) % BUBBLE_COLORS.length];
 };
 
-const CountdownTimer = ({ targetTime }: { targetTime: Timestamp }) => {
-  const [timeLeft, setTimeLeft] = useState<string>('');
+const CountdownTimer = ({ targetTime, compact = false }: { targetTime: Timestamp; compact?: boolean }) => {
+  const [timeLeft, setTimeLeft] = useState<string>('LIVE');
+  const [isCountingDown, setIsCountingDown] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
+    const updateTimer = () => {
+      if (!targetTime || typeof targetTime.toMillis !== 'function') {
+        setTimeLeft('LIVE');
+        setIsCountingDown(false);
+        return false;
+      }
+      const now = Date.now();
       const target = targetTime.toMillis();
       const diff = target - now;
 
       if (diff <= 0) {
         setTimeLeft('LIVE');
-        clearInterval(timer);
-        return;
+        setIsCountingDown(false);
+        return false;
       }
 
-      const h = Math.floor(diff / (1000 * 60 * 60));
+      setIsCountingDown(true);
+      const totalHours = Math.floor(diff / (1000 * 60 * 60));
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const s = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft(`${h.toString().padStart(2, '0')} : ${m.toString().padStart(2, '0')} : ${s.toString().padStart(2, '0')}`);
+
+      if (totalHours >= 24) {
+        const d = Math.floor(totalHours / 24);
+        const remH = totalHours % 24;
+        setTimeLeft(`${d}D ${remH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      } else {
+        setTimeLeft(`${totalHours.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+      }
+      return true;
+    };
+
+    const hasRemaining = updateTimer();
+    if (!hasRemaining) return;
+
+    const timer = setInterval(() => {
+      if (!updateTimer()) {
+        clearInterval(timer);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
   }, [targetTime]);
 
-  return <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">{timeLeft}</span>;
+  return (
+    <span className={cn(
+      "font-black uppercase italic block font-mono",
+      compact ? "text-[6.5px] sm:text-[7.5px] tracking-wider" : "text-[8px] sm:text-[9.5px] tracking-widest",
+      isCountingDown ? "text-amber-500 dark:!text-amber-400" : "text-slate-400 dark:!text-slate-300"
+    )}>
+      {isCountingDown ? `⏳ ${timeLeft}` : timeLeft}
+    </span>
+  );
 };
 
 interface Match {
@@ -95,6 +127,38 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
   const isAdminUser = profile?.role === 'admin';
   const canEditMatch = (match: Match) =>
     isAdminUser || (Boolean(auth.currentUser?.uid) && (tournaments[match.tournamentId]?.publisherId === auth.currentUser?.uid || (match as any).publisherId === auth.currentUser?.uid));
+
+  const openPlayerProfile = async (userId?: string | null, fallbackName?: string) => {
+    const cleanUid = (userId || '').trim();
+    if (!cleanUid && !fallbackName) return;
+
+    if (cleanUid && profiles[cleanUid]) {
+      setSelectedPlayerProfile(profiles[cleanUid]);
+      return;
+    }
+
+    if (cleanUid && !cleanUid.startsWith('demo')) {
+      try {
+        const pDoc = await getDoc(doc(db, 'users', cleanUid));
+        if (pDoc.exists()) {
+          const fetched = { uid: pDoc.id, ...pDoc.data() } as UserProfile;
+          setProfiles(prev => ({ ...prev, [cleanUid]: fetched }));
+          setSelectedPlayerProfile(fetched);
+          return;
+        }
+      } catch (e) {
+        console.error('Error fetching player profile on demand:', e);
+      }
+    }
+
+    setSelectedPlayerProfile({
+      uid: cleanUid || 'unknown',
+      inGameName: fallbackName || 'Player',
+      inGameUID: 'Not Set',
+      role: 'player',
+      email: '',
+    });
+  };
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -296,6 +360,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         reporterId: auth.currentUser?.uid,
         updatedAt: serverTimestamp()
       });
+      if (isDirectFinalize) {
+        const updatedMatch: Match = {
+          ...reportingMatch,
+          homeScore: reportFormData.home,
+          awayScore: reportFormData.away,
+          status: 'completed'
+        };
+        await checkAndFinalizeTournamentIfGrandFinal(targetDb, updatedMatch);
+      }
       alert(isDirectFinalize ? 'Match result updated and finalized!' : 'Result reported!');
       closeReportResultModal();
     } catch (err) {
@@ -310,7 +383,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     const isKnockout = match.stage !== 'group' || match.groupId === 'knockout';
     const homeScore = match.homeScore || 0;
     const awayScore = match.awayScore || 0;
-    if (isKnockout && homeScore === awayScore) {
+    if (isKnockout && homeScore === awayScore && !(match as any).penaltyWinnerId) {
       alert('Knockout stage matches cannot end in a draw!');
       return;
     }
@@ -323,6 +396,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         status: 'completed',
         updatedAt: serverTimestamp()
       });
+      const updatedMatch: Match = { ...match, status: 'completed' };
+      await checkAndFinalizeTournamentIfGrandFinal(targetDb, updatedMatch);
       const winnerName = homeScore > awayScore ? match.homePlayerName : (awayScore > homeScore ? match.awayPlayerName : 'Draw');
       notifyMatchParticipants({
         homePlayerId: match.homePlayerId,
@@ -403,6 +478,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     let p1Agg = 0;
     let p2Agg = 0;
     let completedLegs = 0;
+    let penaltyWinnerId: string | undefined;
 
     pairMatches.forEach((m) => {
       if (m.status === 'completed') {
@@ -416,6 +492,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           p2Agg += hScore;
           p1Agg += aScore;
         }
+        if ((m as any).penaltyWinnerId) {
+          penaltyWinnerId = (m as any).penaltyWinnerId;
+        }
       }
     });
 
@@ -425,6 +504,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
     if (isTieCompleted) {
       if (p1Agg > p2Agg) winnerId = p1Id;
       else if (p2Agg > p1Agg) winnerId = p2Id;
+      else if (penaltyWinnerId) winnerId = penaltyWinnerId;
     }
 
     const p1Name =
@@ -448,6 +528,39 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
       winnerId,
       winnerName: winnerId === p1Id ? p1Name : winnerId === p2Id ? p2Name : undefined,
     };
+  };
+
+  const checkAndFinalizeTournamentIfGrandFinal = async (targetDb: any, completedMatch: Match) => {
+    const isGrandFinal =
+      completedMatch.stage === 'FINAL' &&
+      completedMatch.matchId !== 'FINAL_M2' &&
+      !completedMatch.matchId?.startsWith('3RD_PLACE');
+    if (!isGrandFinal || !completedMatch.tournamentId) return;
+
+    try {
+      const updatedAll = matches.map((m) => (m.id === completedMatch.id ? completedMatch : m));
+      const finalMatches = updatedAll.filter(
+        (m) =>
+          m.tournamentId === completedMatch.tournamentId &&
+          m.stage === 'FINAL' &&
+          m.matchId !== 'FINAL_M2' &&
+          !m.matchId?.startsWith('3RD_PLACE')
+      );
+      if (finalMatches.length === 0) return;
+
+      const tieInfo = getPairTieInfo(finalMatches);
+      if (tieInfo && tieInfo.isTieCompleted && tieInfo.winnerId) {
+        const winnerName = tieInfo.winnerName || 'Champion';
+        await updateDoc(doc(targetDb, 'tournaments', completedMatch.tournamentId), {
+          status: 'finished',
+          winnerId: tieInfo.winnerId,
+          winnerText: winnerName,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.warn('Could not mark tournament finished from Matches:', err);
+    }
   };
 
   const renderMatchCard = (
@@ -636,8 +749,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           >
             {/* Home Player */}
             <div
+              onClick={(e) => {
+                e.stopPropagation();
+                openPlayerProfile(match.homePlayerId, homeProfile?.inGameName || match.homePlayerName);
+              }}
+              title="Click to view player profile"
               className={cn(
-                "flex flex-col items-center flex-1 min-w-0 transition-all",
+                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/player",
                 isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
                 isCompleted && awayWin ? "opacity-60 scale-95" : ""
               )}
@@ -673,7 +791,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </div>
               <div
                 className={cn(
-                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
                   isSideBySide
                     ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                     : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
@@ -685,7 +803,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               <div className="text-center w-full px-0.5">
                 <h5
                   className={cn(
-                    "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                    "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/player:text-indigo-500 dark:group-hover/player:!text-[#ff7a45] group-hover/player:underline",
                     isSideBySide
                       ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]"
                       : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
@@ -744,8 +862,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                   isSideBySide ? "px-1.5 py-0.5" : "px-2.5 sm:px-4 py-1 sm:py-2 sm:rounded-xl"
                 )}
               >
-                {match.status === 'scheduled' && match.scheduledTime && !isSideBySide ? (
-                  <CountdownTimer targetTime={match.scheduledTime} />
+                {match.status === 'scheduled' && match.scheduledTime ? (
+                  <CountdownTimer targetTime={match.scheduledTime} compact={isSideBySide} />
                 ) : (
                   <span
                     className={cn(
@@ -761,8 +879,13 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
             {/* Away Player */}
             <div
+              onClick={(e) => {
+                e.stopPropagation();
+                openPlayerProfile(match.awayPlayerId, awayProfile?.inGameName || match.awayPlayerName);
+              }}
+              title="Click to view player profile"
               className={cn(
-                "flex flex-col items-center flex-1 min-w-0 transition-all",
+                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/player",
                 isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
                 isCompleted && homeWin ? "opacity-60 scale-95" : ""
               )}
@@ -798,7 +921,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               </div>
               <div
                 className={cn(
-                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative",
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
                   isSideBySide
                     ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
                     : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
@@ -810,7 +933,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               <div className="text-center w-full px-0.5">
                 <h5
                   className={cn(
-                    "font-black uppercase italic tracking-tight transition-colors truncate mx-auto",
+                    "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/player:text-indigo-500 dark:group-hover/player:!text-[#ff7a45] group-hover/player:underline",
                     isSideBySide
                       ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]"
                       : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
@@ -1067,7 +1190,27 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                     PAIR #{pairIdx + 1} · 2 MATCHES
                   </span>
                   <span className="text-[8.5px] sm:text-[10px] font-black uppercase italic text-white truncate">
-                    {p1Name} <span className="text-indigo-400 not-italic px-0.5">⇄</span> {p2Name}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPlayerProfile(leg1.homePlayerId, p1Name);
+                      }}
+                      className="hover:text-amber-300 hover:underline transition-colors cursor-pointer"
+                    >
+                      {p1Name}
+                    </button>{' '}
+                    <span className="text-indigo-400 not-italic px-0.5">⇄</span>{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPlayerProfile(leg1.awayPlayerId, p2Name);
+                      }}
+                      className="hover:text-amber-300 hover:underline transition-colors cursor-pointer"
+                    >
+                      {p2Name}
+                    </button>
                   </span>
                 </div>
 
@@ -1077,9 +1220,16 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                       AGG: {koTieInfo.player1AggScore} - {koTieInfo.player2AggScore}
                     </span>
                     {koTieInfo.isTieCompleted && koTieInfo.winnerName && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[7px] sm:text-[8px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPlayerProfile(koTieInfo.winnerId, koTieInfo.winnerName || undefined);
+                        }}
+                        className="px-2 py-0.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-[7px] sm:text-[8px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                      >
                         <Trophy size={8} fill="currentColor" /> {koTieInfo.winnerName}
-                      </span>
+                      </button>
                     )}
                   </div>
                 ) : (
@@ -1140,9 +1290,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         const isSubmitDisabled = isSubmittingReport || isOcrBlocked;
 
         return createPortal(
-          <div className="fixed inset-0 z-[8000] flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in">
-            <div className="w-full max-w-md max-h-[92vh] bg-white rounded-[2.5rem] border border-slate-200 overflow-y-auto shadow-[0_25px_70px_-15px_rgba(15,23,42,0.28)] relative my-auto">
-              <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xs z-20">
+          <div className="fixed inset-0 z-[8000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in">
+            <div className="w-full max-w-md max-h-[92vh] solid-modal-surface bg-white rounded-[2.5rem] border border-slate-200 overflow-y-auto shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] relative my-auto">
+              <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 sticky top-0 solid-modal-header bg-white z-20">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
                     <Upload size={20} className="text-amber-600" />
@@ -1162,12 +1312,24 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               <div className="p-6 sm:p-8 space-y-6">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 space-y-3">
-                    <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{reportingMatch.homePlayerName}</label>
+                    <button
+                      type="button"
+                      onClick={() => openPlayerProfile(reportingMatch.homePlayerId, reportingMatch.homePlayerName)}
+                      className="text-[9px] font-black text-slate-700 hover:text-indigo-600 hover:underline uppercase tracking-[0.15em] text-center block truncate w-full px-2 cursor-pointer transition-colors"
+                    >
+                      {reportingMatch.homePlayerName}
+                    </button>
                     <input type="number" min="0" value={reportFormData.home} onChange={(e) => setReportFormData({...reportFormData, home: Math.max(0, parseInt(e.target.value) || 0)})} className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all" />
                   </div>
                   <span className="text-xl font-black text-slate-400 italic pt-6">VS</span>
                   <div className="flex-1 space-y-3">
-                    <label className="text-[9px] font-black text-slate-700 uppercase tracking-[0.15em] text-center block truncate w-full px-2">{reportingMatch.awayPlayerName}</label>
+                    <button
+                      type="button"
+                      onClick={() => openPlayerProfile(reportingMatch.awayPlayerId, reportingMatch.awayPlayerName)}
+                      className="text-[9px] font-black text-slate-700 hover:text-indigo-600 hover:underline uppercase tracking-[0.15em] text-center block truncate w-full px-2 cursor-pointer transition-colors"
+                    >
+                      {reportingMatch.awayPlayerName}
+                    </button>
                     <input type="number" min="0" value={reportFormData.away} onChange={(e) => setReportFormData({...reportFormData, away: Math.max(0, parseInt(e.target.value) || 0)})} className="w-full h-20 rounded-3xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white text-3xl font-black text-center text-slate-900 outline-none transition-all" />
                   </div>
                 </div>
@@ -1362,10 +1524,77 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           document.body
         );
       })()}
+      {selectedPlayerProfile && createPortal(
+        <div
+          onClick={() => setSelectedPlayerProfile(null)}
+          className="fixed inset-0 z-[10000] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-6"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm"
+          >
+            <Card className="w-full p-0 overflow-hidden border-2 border-white shadow-2xl">
+              <div className="relative h-32 bg-fc-dark overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-fc-green/40 to-transparent" />
+                <button 
+                  onClick={() => setSelectedPlayerProfile(null)}
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-95"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="px-8 pb-10 -mt-12 relative z-10">
+                <div className="flex flex-col items-center text-center space-y-6">
+                  <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white flex items-center justify-center">
+                    <UserIcon size={40} className="text-slate-300" />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
+                      {selectedPlayerProfile.inGameName}
+                    </h3>
+                    {(profile?.role === 'admin' || selectedPlayerProfile.email === auth.currentUser?.email) && (
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+                    )}
+                  </div>
 
+                  <div className="w-full grid grid-cols-1 gap-3">
+                    <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
+                        <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID || 'Not Set'}</span>
+                      </div>
+                    </div>
 
-
-
+                    {selectedPlayerProfile.fbUrl && (
+                      <a href={selectedPlayerProfile.fbUrl} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                        <Facebook size={18} className="text-blue-600" />
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Facebook Profile</span>
+                      </a>
+                    )}
+                    
+                    {selectedPlayerProfile.messengerLink && (
+                      <a href={selectedPlayerProfile.messengerLink} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                        <MessageSquare size={18} className="text-indigo-500" />
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Messenger Chat</span>
+                      </a>
+                    )}
+                    
+                    {selectedPlayerProfile.whatsappNumber && (
+                      <a href={`https://wa.me/${selectedPlayerProfile.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 rounded-2xl nm-flat bg-white flex items-center justify-center gap-3 border border-slate-100 hover:bg-slate-50 transition-colors">
+                        <Phone size={18} className="text-emerald-500" />
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">WhatsApp Chat</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

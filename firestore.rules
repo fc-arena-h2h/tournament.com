@@ -187,6 +187,11 @@ service cloud.firestore {
         isPublisher() && isNotFrozen() &&
         existing().publisherId == request.auth.uid &&
         incoming().publisherId == existing().publisherId
+      ) || (
+        isSignedIn() && isNotFrozen() &&
+        incoming().publisherId == existing().publisherId &&
+        incoming().status in ['finished', 'completed'] &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'winnerId', 'winnerText', 'updatedAt'])
       );
       allow delete: if isAdmin() || (isPublisher() && isNotFrozen() && existing().publisherId == request.auth.uid);
     }
