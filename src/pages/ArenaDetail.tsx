@@ -4069,26 +4069,26 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
         </div>
 
         <div className={cn(
-          " relative z-10 flex flex-col justify-between h-full",
-          isSideBySide ? "p-2.5 xs:p-3 sm:p-5 space-y-2.5 sm:space-y-4" : "p-4 sm:p-8 space-y-4 sm:space-y-6"
+          "relative z-10 flex flex-col justify-between h-full",
+          isSideBySide ? "p-2 xs:p-2.5 sm:p-5 space-y-2 sm:space-y-4" : "p-4 sm:p-8 space-y-4 sm:space-y-6"
         )}>
           {/* Top Header */}
-          <div className="flex items-start justify-between gap-1.5 relative z-10">
+          <div className="flex items-start justify-between gap-1 relative z-10">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                   <div className={cn("w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0", isCompleted ? "bg-emerald-500 dark:bg-emerald-400 shadow-md dark:shadow-[0_0_8px_rgba(52,211,153,0.9)]" : "bg-amber-500 dark:bg-amber-400 dark:shadow-[0_0_8px_rgba(251,191,36,0.9)]")} />
                   <span className={cn(
                     "font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-wider truncate",
-                    isSideBySide ? "text-[7px] sm:text-[9px]" : "text-[8.5px] sm:text-[10px] tracking-widest"
+                    isSideBySide ? "text-[6.5px] sm:text-[9px]" : "text-[8.5px] sm:text-[10px] tracking-widest"
                   )}>
                     {getStageLabel()}
                   </span>
                   {(effectiveTotalLegs && effectiveTotalLegs >= 2) && (
                     <span className={cn(
                       "rounded-full bg-indigo-50 dark:!bg-indigo-500/22 text-indigo-600 dark:!text-indigo-200 border border-indigo-200 dark:!border-indigo-400/35 font-black uppercase tracking-wider shrink-0",
-                      isSideBySide ? "px-1.5 py-0.2 text-[6.5px] sm:text-[7.5px]" : "px-2 py-0.5 text-[7.5px] sm:text-[8.5px] tracking-widest"
+                      isSideBySide ? "px-1.5 py-0.2 text-[6px] sm:text-[7.5px]" : "px-2 py-0.5 text-[7.5px] sm:text-[8.5px] tracking-widest"
                     )}>
-                      MATCH {effectiveLegNum} ({effectiveLegNum === 1 ? 'LEG 1' : `LEG ${effectiveLegNum}`})
+                      {isSideBySide ? `LEG ${effectiveLegNum}` : `MATCH ${effectiveLegNum} (LEG ${effectiveLegNum})`}
                     </span>
                   )}
                 </div>
@@ -4096,7 +4096,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                   <div className="flex items-center gap-1 mt-0.5">
                     <span className={cn(
                       "font-bold text-slate-400 dark:!text-slate-300 truncate",
-                      isSideBySide ? "text-[7px] sm:text-[8.5px] max-w-[85px] sm:max-w-none" : "text-[9px]"
+                      isSideBySide ? "text-[6.5px] sm:text-[8.5px] max-w-[90px] sm:max-w-none" : "text-[9px]"
                     )}>
                       ID: {match.matchId}
                     </span>
@@ -4190,167 +4190,181 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
           )}
 
           {/* Players & Scoreline */}
-          <div className={cn(
-            "flex items-center justify-between px-0 relative z-10",
-            isSideBySide ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-2"
-          )}>
-            {/* Home Player */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                openPlayerProfile(match.homePlayerId, homeProfile?.inGameName || match.homePlayerName);
-              }}
-              title="Click to view player profile"
-              className={cn(
-                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/pcard",
-                isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
-                isCompleted && awayWin ? "opacity-60 scale-95" : ""
-              )}
-            >
-              <div className={cn(
-                "flex flex-col items-center gap-0.5",
-                isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
-              )}>
-                <span className={cn(
-                  "font-black uppercase",
-                  isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
-                  homeWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
-                )}>
-                  HOME
-                </span>
-                {isCompleted && homeWin && (
-                  <div className="flex items-center gap-0.5 px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
-                    <Trophy size={isSideBySide ? 7 : 9} fill="currentColor" />
-                    <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5.5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
-                      Win
-                    </span>
-                  </div>
+          <div className="space-y-1.5 relative z-10">
+            <div className={cn(
+              "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-0",
+              isSideBySide ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-3"
+            )}>
+              {/* Home Player */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPlayerProfile(match.homePlayerId, homeProfile?.inGameName || match.homePlayerName);
+                }}
+                title="Click to view player profile"
+                className={cn(
+                  "flex flex-col items-center min-w-0 w-full transition-all cursor-pointer group/pcard",
+                  isSideBySide ? "gap-1 sm:gap-2" : "gap-2.5 sm:gap-4",
+                  isCompleted && awayWin ? "opacity-60 scale-95" : ""
                 )}
-              </div>
-              <div className={cn(
-                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400",
-                isSideBySide
-                  ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
-                  : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
-              )}>
-                 <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
-              </div>
-              <div className="text-center w-full px-0.5">
-                <h5 className={cn(
-                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
-                  isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
-                  homeWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
+              >
+                <div className={cn(
+                  "flex flex-col items-center gap-0.5",
+                  isSideBySide ? "min-h-[14px] sm:min-h-[24px]" : "min-h-[26px] sm:min-h-[32px]"
                 )}>
-                  {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
-                </h5>
+                  <span className={cn(
+                    "font-black uppercase",
+                    isSideBySide ? "text-[6px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
+                    homeWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
+                  )}>
+                    HOME
+                  </span>
+                  {isCompleted && homeWin && (
+                    <div className="flex items-center gap-0.5 px-1 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
+                      <Trophy size={isSideBySide ? 6 : 9} fill="currentColor" />
+                      <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
+                        Win
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className={cn(
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400 shrink-0",
+                  isSideBySide
+                    ? "w-8 h-8 xs:w-9 xs:h-9 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border-2"
+                    : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
+                  isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
+                )}>
+                   <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
+                </div>
+                <div className="text-center w-full min-w-0 px-0.5">
+                  <h5 className={cn(
+                    "font-black uppercase italic tracking-tight transition-colors truncate w-full mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
+                    isSideBySide ? "text-[7.5px] xs:text-[8.5px] sm:text-xs" : "text-xs sm:text-sm max-w-[95px] sm:max-w-[130px]",
+                    homeWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-600 dark:!text-slate-100"
+                  )}>
+                    {homeProfile?.inGameName || match.homePlayerName || 'Loading...'}
+                  </h5>
+                </div>
+              </div>
+
+              {/* Score Box / VS Badge */}
+              <div className={cn(
+                "flex flex-col items-center justify-center shrink-0",
+                isSideBySide ? "gap-1 px-0.5" : "gap-2 sm:gap-4 px-1 sm:px-2"
+              )}>
+                 {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
+                   <div className={cn("flex items-center", isSideBySide ? "gap-1 sm:gap-2" : "gap-2 sm:gap-4")}>
+                       <span 
+                         className={cn(
+                           "font-black italic tracking-tighter",
+                           isSideBySide ? "text-sm xs:text-base sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
+                           homeWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
+                         )}
+                       >
+                         {match.homeScore || 0}
+                       </span>
+                       <div className={cn("bg-slate-200 dark:!bg-white/25 rounded-full", isSideBySide ? "w-1 sm:w-2.5 h-0.5" : "w-2.5 sm:w-4 h-0.5 sm:h-1")} />
+                       <span 
+                         className={cn(
+                           "font-black italic tracking-tighter",
+                           isSideBySide ? "text-sm xs:text-base sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
+                           awayWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
+                         )}
+                       >
+                         {match.awayScore || 0}
+                       </span>
+                   </div>
+                 ) : (
+                   <div className={cn(
+                     "bg-fc-dark dark:bg-gradient-to-br dark:from-[#ff7a45] dark:to-[#8b5cf6] border border-white dark:border-white/25 flex items-center justify-center shadow-md",
+                     isSideBySide ? "w-5 h-5 xs:w-6 xs:h-6 sm:w-10 sm:h-10 rounded-md sm:rounded-xl" : "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border-2"
+                   )}>
+                     <span className={cn("font-black text-white italic leading-none", isSideBySide ? "text-[7.5px] xs:text-[8.5px] sm:text-xs" : "text-sm sm:text-lg")}>VS</span>
+                   </div>
+                 )}
+
+                 {!isSideBySide && (
+                   <div className="bg-slate-50 dark:!bg-[#131629]/90 rounded-lg sm:rounded-xl border border-slate-100 dark:!border-white/12 px-2.5 sm:px-4 py-1 sm:py-2">
+                     {match.status === 'scheduled' && match.scheduledTime ? (
+                       <CountdownTimer targetTime={match.scheduledTime} compact={false} />
+                     ) : (
+                       <span className="font-black text-slate-400 dark:!text-slate-300 uppercase tracking-widest italic block text-[7px] sm:text-[8px]">
+                         {match.status === 'scheduled' ? 'LIVE' : match.status === 'reported' ? 'VERIFYING' : 'ARCHIVED'}
+                       </span>
+                     )}
+                   </div>
+                 )}
+              </div>
+
+              {/* Away Player */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPlayerProfile(match.awayPlayerId, awayProfile?.inGameName || match.awayPlayerName);
+                }}
+                title="Click to view player profile"
+                className={cn(
+                  "flex flex-col items-center min-w-0 w-full transition-all cursor-pointer group/pcard",
+                  isSideBySide ? "gap-1 sm:gap-2" : "gap-2.5 sm:gap-4",
+                  isCompleted && homeWin ? "opacity-60 scale-95" : ""
+                )}
+              >
+                <div className={cn(
+                  "flex flex-col items-center gap-0.5",
+                  isSideBySide ? "min-h-[14px] sm:min-h-[24px]" : "min-h-[26px] sm:min-h-[32px]"
+                )}>
+                  <span className={cn(
+                    "font-black uppercase",
+                    isSideBySide ? "text-[6px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
+                    awayWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
+                  )}>
+                    AWAY
+                  </span>
+                  {isCompleted && awayWin && (
+                    <div className="flex items-center gap-0.5 px-1 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
+                      <Trophy size={isSideBySide ? 6 : 9} fill="currentColor" />
+                      <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
+                        Win
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className={cn(
+                  "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400 shrink-0",
+                  isSideBySide
+                    ? "w-8 h-8 xs:w-9 xs:h-9 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border-2"
+                    : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
+                  isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
+                )}>
+                   <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
+                </div>
+                <div className="text-center w-full min-w-0 px-0.5">
+                  <h5 className={cn(
+                    "font-black uppercase italic tracking-tight transition-colors truncate w-full mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
+                    isSideBySide ? "text-[7.5px] xs:text-[8.5px] sm:text-xs" : "text-xs sm:text-sm max-w-[95px] sm:max-w-[130px]",
+                    awayWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-600 dark:!text-slate-100"
+                  )}>
+                    {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
+                  </h5>
+                </div>
               </div>
             </div>
 
-            {/* Score Box */}
-            <div className={cn(
-              "flex flex-col items-center shrink-0",
-              isSideBySide ? "gap-1 sm:gap-2 px-0.5" : "gap-2 sm:gap-4 px-1 sm:px-2"
-            )}>
-               {isCompleted || match.status === 'reported' || match.status === 'disputed' ? (
-                 <div className={cn("flex items-center", isSideBySide ? "gap-1 sm:gap-2" : "gap-2 sm:gap-4")}>
-                     <span 
-                       className={cn(
-                         "font-black italic tracking-tighter",
-                         isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
-                         homeWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : homeWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
-                       )}
-                     >
-                       {match.homeScore || 0}
-                     </span>
-                     <div className={cn("bg-slate-200 dark:!bg-white/25 rounded-full", isSideBySide ? "w-1.5 sm:w-2.5 h-0.5" : "w-2.5 sm:w-4 h-0.5 sm:h-1")} />
-                     <span 
-                       className={cn(
-                         "font-black italic tracking-tighter",
-                         isSideBySide ? "text-lg xs:text-xl sm:text-3xl" : "text-3xl xs:text-4xl sm:text-5xl",
-                         awayWin && isCompleted ? "text-amber-500 dark:!text-amber-300 drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-300 dark:!text-slate-200"
-                       )}
-                     >
-                       {match.awayScore || 0}
-                     </span>
-                 </div>
-               ) : (
-                 <div className={cn(
-                   "bg-fc-dark dark:bg-gradient-to-br dark:from-[#ff7a45] dark:to-[#8b5cf6] border-2 border-white dark:border-white/25 flex items-center justify-center shadow-md",
-                   isSideBySide ? "w-7 h-7 xs:w-8 xs:h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl" : "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl"
-                 )}>
-                   <span className={cn("font-black text-white italic", isSideBySide ? "text-[10px] sm:text-sm" : "text-sm sm:text-lg")}>VS</span>
-                 </div>
-               )}
-               <div className={cn(
-                 "bg-slate-50 dark:!bg-[#131629]/90 rounded-lg border border-slate-100 dark:!border-white/12",
-                 isSideBySide ? "px-1.5 py-0.5" : "px-2.5 sm:px-4 py-1 sm:py-2 sm:rounded-xl"
-               )}>
+            {/* Dedicated Centered Timer / Status Bar for Side-by-Side Cards */}
+            {isSideBySide && (
+              <div className="flex justify-center pt-0.5">
+                <div className="bg-slate-50 dark:!bg-[#131629]/90 rounded-md border border-slate-100 dark:!border-white/12 px-2 py-0.5">
                   {match.status === 'scheduled' && match.scheduledTime ? (
-                    <CountdownTimer targetTime={match.scheduledTime} compact={isSideBySide} />
+                    <CountdownTimer targetTime={match.scheduledTime} compact={true} />
                   ) : (
-                    <span className={cn(
-                      "font-black text-slate-400 dark:!text-slate-300 uppercase tracking-widest italic block",
-                      isSideBySide ? "text-[6px] sm:text-[7px]" : "text-[7px] sm:text-[8px]"
-                    )}>
+                    <span className="font-black text-slate-400 dark:!text-slate-300 uppercase tracking-widest italic block text-[6px] sm:text-[7px]">
                       {match.status === 'scheduled' ? 'LIVE' : match.status === 'reported' ? 'VERIFYING' : 'ARCHIVED'}
                     </span>
                   )}
-               </div>
-            </div>
-
-            {/* Away Player */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                openPlayerProfile(match.awayPlayerId, awayProfile?.inGameName || match.awayPlayerName);
-              }}
-              title="Click to view player profile"
-              className={cn(
-                "flex flex-col items-center flex-1 min-w-0 transition-all cursor-pointer group/pcard",
-                isSideBySide ? "gap-1.5 sm:gap-2.5" : "gap-2.5 sm:gap-4",
-                isCompleted && homeWin ? "opacity-60 scale-95" : ""
-              )}
-            >
-              <div className={cn(
-                "flex flex-col items-center gap-0.5",
-                isSideBySide ? "min-h-[20px] sm:min-h-[26px]" : "min-h-[26px] sm:min-h-[32px]"
-              )}>
-                <span className={cn(
-                  "font-black uppercase",
-                  isSideBySide ? "text-[6.5px] sm:text-[8.5px] tracking-wider" : "text-[8.5px] sm:text-[10px] tracking-[0.2em]",
-                  awayWin ? "text-amber-500 dark:!text-amber-400 font-black" : "text-slate-400 dark:!text-slate-300"
-                )}>
-                  AWAY
-                </span>
-                {isCompleted && awayWin && (
-                  <div className="flex items-center gap-0.5 px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300">
-                    <Trophy size={isSideBySide ? 7 : 9} fill="currentColor" />
-                    <span className={cn("uppercase tracking-wider", isSideBySide ? "text-[5.5px] sm:text-[6.5px]" : "text-[6.5px] sm:text-[7.5px]")}>
-                      Win
-                    </span>
-                  </div>
-                )}
+                </div>
               </div>
-              <div className={cn(
-                "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-300 shadow-lg relative group-hover/pcard:scale-105 group-hover/pcard:border-indigo-400",
-                isSideBySide
-                  ? "w-10 h-10 xs:w-11 xs:h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border-2"
-                  : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
-              )}>
-                 <UserIcon size={isSideBySide ? 18 : 24} className="text-slate-700 dark:text-slate-200 sm:w-7 sm:h-7" />
-              </div>
-              <div className="text-center w-full px-0.5">
-                <h5 className={cn(
-                  "font-black uppercase italic tracking-tight transition-colors truncate mx-auto group-hover/pcard:text-indigo-500 dark:group-hover/pcard:!text-[#ff7a45] underline-offset-2 group-hover/pcard:underline",
-                  isSideBySide ? "text-[9px] xs:text-[10px] sm:text-xs max-w-[58px] xs:max-w-[68px] sm:max-w-[110px]" : "text-xs sm:text-sm max-w-[85px] sm:max-w-[130px]",
-                  awayWin && isCompleted ? "text-amber-600 dark:!text-amber-300 font-black" : awayWin ? "text-fc-dark dark:!text-white" : "text-slate-500 dark:!text-slate-100"
-                )}>
-                  {awayProfile?.inGameName || match.awayPlayerName || 'Loading...'}
-                </h5>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Action Buttons & Two-Step Verification */}
@@ -4605,7 +4619,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             </div>
 
             {/* Side-by-Side (পাশাপাশি) Match Cards Grid */}
-            <div className="grid grid-cols-2 gap-2 xs:gap-2.5 sm:gap-4 items-stretch">
+            <div className="grid grid-cols-2 gap-1.5 xs:gap-2 sm:gap-4 items-stretch">
               {pairMatches.map((m, idx) => renderMatchCard(m, true, idx + 1, pairMatches.length))}
             </div>
           </div>

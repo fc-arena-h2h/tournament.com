@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Reveal } from '@/src/components/ui/Reveal';
+import { FootballTacticsAnimation } from '@/src/components/ui/FootballTacticsAnimation';
 import { getDemoTournaments, getDemoMatches } from '@/src/lib/localTournaments';
 import {
   subscribeToAllTournamentsAcrossShards,
@@ -235,16 +236,12 @@ export const ArenaPage: React.FC<ArenaProps> = ({
         <div className="nm-flat rounded-[2.5rem] p-3 sm:p-4 border-2 border-white dark:border-white/18 dark:!bg-[#1b1f3a]/85">
           <div className="relative h-40 sm:h-56 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group fc-card-bg bg-fc-dark/80">
             <div className="absolute inset-0 bg-gradient-to-r from-fc-dark via-fc-dark/60 to-transparent" />
-            <div className="absolute top-0 right-0 w-1/2 h-full opacity-40 group-hover:scale-110 transition-transform duration-1000">
-              <img
-                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop"
-                className="w-full h-full object-cover"
-                alt=""
-              />
+            <div className="absolute top-0 right-0 w-1/2 h-full overflow-hidden border-l border-white/15">
+              <FootballTacticsAnimation />
             </div>
             <div className="absolute inset-0 border-2 border-white/10 rounded-[2rem] sm:rounded-[2.5rem] pointer-events-none" />
 
-            <div className="absolute top-6 sm:top-8 left-6 sm:left-8">
+            <div className="absolute top-6 sm:top-8 left-6 sm:left-8 z-10 pointer-events-none">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <div className="w-2 h-2 rounded-full bg-fc-green animate-pulse" />
                 <span className="text-[8px] sm:text-[9px] font-black text-fc-green uppercase tracking-[0.3em]">
