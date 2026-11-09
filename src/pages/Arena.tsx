@@ -484,10 +484,30 @@ export const ArenaPage: React.FC<ArenaProps> = ({
 
                     {/* Recessed Glass Prize Pool & Action Bar */}
                     <div className="flex items-center justify-between gap-3 relative z-10 p-3.5 sm:p-4 rounded-[1.5rem] bg-slate-50/80 border border-slate-100 dark:!bg-gradient-to-br dark:!from-[#121528]/92 dark:!to-[#1a1f3a]/90 dark:!backdrop-blur-2xl dark:!border-white/16 dark:!shadow-[inset_0_2px_12px_rgba(0,0,0,0.65),0_1px_0_rgba(255,255,255,0.12)]">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 dark:!text-indigo-200/90 uppercase tracking-[0.2em] mb-0.5">
-                          TOTAL REWARDS · {remainingSpots} SPOTS LEFT
-                        </span>
+                      <div className="flex flex-col min-w-0 gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[8px] sm:text-[9px] font-black text-slate-400 dark:!text-indigo-200/90 uppercase tracking-[0.2em]">
+                            TOTAL REWARDS · {remainingSpots} SPOTS LEFT
+                          </span>
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-black uppercase tracking-wider border shrink-0 flex items-center gap-1",
+                              t.rewardType === 'top3'
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:!bg-emerald-500/20 dark:!text-emerald-300 dark:!border-emerald-400/35"
+                                : "bg-amber-50 text-amber-600 border-amber-200 dark:!bg-amber-500/20 dark:!text-amber-300 dark:!border-amber-400/35"
+                            )}
+                          >
+                            {t.rewardType === 'top3' ? (
+                              <>
+                                <CheckCircle size={8} /> TOP 3 WINNERS (1ST–3RD)
+                              </>
+                            ) : (
+                              <>
+                                <Trophy size={8} /> SINGLE WINNER (1ST ONLY)
+                              </>
+                            )}
+                          </span>
+                        </div>
                         <span className="text-lg sm:text-2xl font-black text-fc-dark dark:!text-amber-300 tracking-tight flex items-center gap-2 truncate dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.3)]">
                           <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-fc-gold dark:bg-gradient-to-tr dark:from-amber-500 dark:to-yellow-300 flex items-center justify-center text-white dark:text-slate-950 text-[9px] sm:text-[10px] font-black shadow-sm dark:shadow-[0_0_12px_rgba(251,191,36,0.55)] shrink-0">
                             C

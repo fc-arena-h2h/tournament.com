@@ -114,7 +114,7 @@ export const AdminDashboard = ({
     facebookLink: ''
   });
   const [appSettings, setAppSettings] = useState({
-    min_version: '2.4.4',
+    min_version: '2.4.5',
     app_id: 'fc-arena-vs-2025',
     force_update: true,
     update_url: 'https://t.me/fcarenavsofficial',
@@ -328,7 +328,7 @@ export const AdminDashboard = ({
         if (snap.exists()) {
           const data = snap.data() as any;
           setAppSettings({
-            min_version: data.min_version || '2.4.4',
+            min_version: data.min_version || '2.4.5',
             app_id: data.app_id || 'fc-arena-vs-2025',
             force_update: data.force_update ?? true,
             update_url: data.update_url || data.telegram_update_url || 'https://t.me/fcarenavsofficial',
@@ -337,7 +337,7 @@ export const AdminDashboard = ({
           });
         } else {
           setDoc(doc(db, 'settings', 'app_update'), {
-            min_version: '2.4.4',
+            min_version: '2.4.5',
             app_id: 'fc-arena-vs-2025',
             force_update: true,
             update_url: 'https://t.me/fcarenavsofficial',

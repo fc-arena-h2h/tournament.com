@@ -138,6 +138,11 @@ export const CreateTournamentPage = ({
           entryType: formData.entryType,
           prizePool: normalizedPrizePool,
           rewardType: formData.rewardType,
+          prizes: formData.rewardType === 'top3' ? {
+            first: Number(formData.firstPrize) || 0,
+            second: Number(formData.secondPrize) || 0,
+            third: Number(formData.thirdPrize) || 0
+          } : null,
           messengerGroupLink: formData.messengerGroupLink.trim(),
           publisherId: auth.currentUser.uid,
           isDemo: true,

@@ -25,6 +25,12 @@ interface Tournament {
   activationKey?: string;
   status: 'open' | 'registration_closed' | 'ongoing' | 'finished' | 'completed';
   prizePool: string;
+  rewardType?: 'winner_only' | 'top3';
+  prizes?: {
+    first?: number;
+    second?: number;
+    third?: number;
+  } | null;
   totalSlots: number;
   filledSlots: number;
   publisherId?: string;
@@ -321,17 +327,55 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
                   <div className="grid grid-cols-2 gap-3 sm:gap-5 pt-1 sm:pt-2">
                     {/* Guaranteed Pool */}
                     <div className="nm-flat rounded-[1.6rem] sm:rounded-[2.2rem] p-3.5 sm:p-5 border border-white/40 dark:!bg-gradient-to-br dark:!from-[#15182c]/92 dark:!to-[#1d213b]/88 dark:!border-white/14 dark:!shadow-[inset_0_2px_12px_rgba(0,0,0,0.65),0_1px_0_rgba(255,255,255,0.1)] space-y-2 sm:space-y-3">
-                      <span className="text-[8px] sm:text-[9px] font-black text-slate-400 dark:!text-indigo-300/80 uppercase tracking-[0.15em] block">
-                        PRIZE POOL
-                      </span>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[8px] sm:text-[9px] font-black text-slate-400 dark:!text-indigo-300/80 uppercase tracking-[0.15em] block">
+                          PRIZE POOL
+                        </span>
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] font-black uppercase tracking-wider border shrink-0",
+                            t.rewardType === 'top3'
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:!bg-emerald-500/20 dark:!text-emerald-300 dark:!border-emerald-400/35"
+                              : "bg-amber-50 text-amber-600 border-amber-200 dark:!bg-amber-500/20 dark:!text-amber-300 dark:!border-amber-400/35"
+                          )}
+                        >
+                          {t.rewardType === 'top3' ? 'TOP 3' : '1 WINNER'}
+                        </span>
+                      </div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-xl sm:text-2xl font-black text-slate-900 dark:!text-amber-300 tracking-tighter dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.25)]">{t.prizePool}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100/70 dark:!border-white/10">
-                        <div className="nm-inset w-4 h-4 rounded-full flex items-center justify-center border border-white/20 dark:!bg-emerald-500/20 dark:!border-emerald-400/35">
-                          <CheckCircle size={9} className="text-slate-800 dark:!text-emerald-300" />
+                      <div className="space-y-1 pt-1.5 border-t border-slate-100/70 dark:!border-white/10">
+                        <div className="flex items-center gap-1.5">
+                          {t.rewardType === 'top3' ? (
+                            <>
+                              <div className="nm-inset w-4 h-4 rounded-full flex items-center justify-center border border-white/20 dark:!bg-emerald-500/20 dark:!border-emerald-400/35 shrink-0">
+                                <CheckCircle size={9} className="text-emerald-600 dark:!text-emerald-300" />
+                              </div>
+                              <span className="text-[8px] sm:text-[9px] font-black text-emerald-600 dark:!text-emerald-300 uppercase tracking-wider truncate">
+                                Top 3 Winners (1st, 2nd, 3rd)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="nm-inset w-4 h-4 rounded-full flex items-center justify-center border border-white/20 dark:!bg-amber-500/20 dark:!border-amber-400/35 shrink-0">
+                                <Trophy size={9} className="text-amber-600 dark:!text-amber-300" />
+                              </div>
+                              <span className="text-[8px] sm:text-[9px] font-black text-amber-600 dark:!text-amber-300 uppercase tracking-wider truncate">
+                                Single Winner (1st Only)
+                              </span>
+                            </>
+                          )}
                         </div>
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-500 dark:!text-slate-300 uppercase tracking-wider truncate">Top 3 Rewarded</span>
+                        {t.rewardType === 'top3' && t.prizes && (Boolean(t.prizes.first) || Boolean(t.prizes.second) || Boolean(t.prizes.third)) && (
+                          <div className="flex items-center gap-1.5 flex-wrap text-[7px] sm:text-[8px] font-black text-slate-400 dark:!text-slate-300 uppercase tracking-tight">
+                            <span>1st: {t.prizes.first || 0}</span>
+                            <span>·</span>
+                            <span>2nd: {t.prizes.second || 0}</span>
+                            <span>·</span>
+                            <span>3rd: {t.prizes.third || 0}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

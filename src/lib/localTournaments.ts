@@ -10,6 +10,11 @@ export interface DemoTournament {
   entryType: 'public' | 'invited';
   prizePool: string;
   rewardType: 'winner_only' | 'top3';
+  prizes?: {
+    first?: number;
+    second?: number;
+    third?: number;
+  } | null;
   messengerGroupLink: string;
   publisherId: string;
   isDemo: true;
