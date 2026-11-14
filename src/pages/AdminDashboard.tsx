@@ -17,6 +17,7 @@ import {
   Unsubscribe
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { subscribeToUserProfile } from '@/src/lib/userDbManager';
 import {
   Users,
   CheckCircle,
@@ -362,14 +363,18 @@ export const AdminDashboard = ({
     setDemoTournaments(getDemoTournaments());
   }, [activeSection]);
 
-  // Separate effect to fetch the profile itself from Master DB
+  // Separate effect to fetch the profile itself from User DB (for Publisher) or Master DB (for Admin)
   useEffect(() => {
     if (!auth.currentUser) return;
-    const unsub = onSnapshot(doc(db, 'users', auth.currentUser.uid), (snap) => {
-      if (snap.exists()) {
-        setUserProfile(snap.data() as UserProfile);
+    const unsub = subscribeToUserProfile(
+      auth.currentUser.uid,
+      auth.currentUser.email,
+      (pData) => {
+        if (pData) {
+          setUserProfile(pData);
+        }
       }
-    });
+    );
     return () => unsub();
   }, [auth.currentUser?.uid]);
 

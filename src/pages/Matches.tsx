@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { getUserProfileById } from '@/src/lib/userDbManager';
 import { subscribeToMatchesAcrossShards, getTournamentDbByTournamentId, findTournamentAcrossShards } from '@/src/lib/shardManager';
 import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle, Edit3, RotateCcw, Phone } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -139,9 +140,8 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
     if (cleanUid && !cleanUid.startsWith('demo')) {
       try {
-        const pDoc = await getDoc(doc(db, 'users', cleanUid));
-        if (pDoc.exists()) {
-          const fetched = { uid: pDoc.id, ...pDoc.data() } as UserProfile;
+        const fetched = await getUserProfileById(cleanUid);
+        if (fetched) {
           setProfiles(prev => ({ ...prev, [cleanUid]: fetched }));
           setSelectedPlayerProfile(fetched);
           return;
@@ -190,7 +190,7 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
         }));
         if (tChanged) setTournaments(tData);
 
-        // Fetch player profiles from Master DB
+        // Fetch player profiles from 2nd User DB (sperk-play)
         const uids = new Set<string>();
         matchData.forEach(m => {
           if (m.homePlayerId) uids.add(m.homePlayerId);
@@ -202,9 +202,9 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
           let pChanged = false;
           await Promise.all(missing.map(async (uid) => {
             try {
-              const pSnap = await getDoc(doc(db, 'users', uid));
-              if (pSnap.exists()) {
-                pData[uid] = pSnap.data() as UserProfile;
+              const fetched = await getUserProfileById(uid);
+              if (fetched) {
+                pData[uid] = fetched;
                 pChanged = true;
               }
             } catch (e) {

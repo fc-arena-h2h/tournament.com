@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, onSnapshot, addDoc, Timestamp, where, getDocs, doc, getDoc, updateDoc, orderBy, limit, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { getUserProfileById } from '@/src/lib/userDbManager';
 import { Trophy, Users, Shield, ArrowRight, Clock, Target, CheckCircle, Hash } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -80,18 +81,18 @@ export const TournamentListPage = ({ profile, onEnter }: TournamentListPageProps
           localStorage.setItem('fc_arena_tournaments', JSON.stringify(merged));
         } catch {}
 
-        // Fetch publisher profiles from Master DB for tournaments that have a publisherId
+        // Fetch publisher profiles from 2nd User DB (sperk-play) or Master DB for admin
         const pubIds = Array.from(new Set(tData.map((t) => t.publisherId))).filter(
           Boolean
         ) as string[];
         pubIds.forEach(async (pId) => {
           if (!pId || typeof pId !== 'string' || !pId.trim()) return;
           try {
-            const uSnap = await getDoc(doc(db, 'users', pId.trim()));
-            if (uSnap.exists()) {
+            const fetched = await getUserProfileById(pId.trim());
+            if (fetched) {
               setPublisherProfiles((prev) => ({
                 ...prev,
-                [pId]: uSnap.data() as UserProfile
+                [pId]: fetched
               }));
             }
           } catch (e) {

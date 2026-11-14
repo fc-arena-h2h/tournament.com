@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '@/src/lib/firebase';
+import { auth } from '@/src/lib/firebase';
+import {
+  subscribeToUserProfile,
+  getCachedUserProfile
+} from '@/src/lib/userDbManager';
 
 export interface UserProfile {
   uid: string;
@@ -20,6 +23,7 @@ export interface UserProfile {
   isFrozen?: boolean;
   status?: string;
   fraudReason?: string | null;
+  profileCompleted?: boolean;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -41,33 +45,36 @@ export function useAuth() {
 
       if (firebaseUser) {
         // Load cached profile immediately for instant UI
-        try {
-          const cached = localStorage.getItem('fc_arena_profile_' + firebaseUser.uid);
-          if (cached) {
-            setProfile(JSON.parse(cached));
-            setLoading(false);
-          }
-        } catch {}
-
-        unsubProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), 
-          (docSnap) => {
-            if (docSnap.exists()) {
-              const pData = docSnap.data() as UserProfile;
-              setProfile(pData);
-              try {
-                localStorage.setItem('fc_arena_profile_' + firebaseUser.uid, JSON.stringify(pData));
-              } catch {}
-            } else {
-              setProfile(null);
+        const cached = getCachedUserProfile(firebaseUser.uid);
+        if (cached) {
+          setProfile(cached);
+          setLoading(false);
+        } else {
+          try {
+            const rawLegacy = localStorage.getItem('fc_arena_profile_' + firebaseUser.uid);
+            if (rawLegacy) {
+              setProfile(JSON.parse(rawLegacy));
+              setLoading(false);
             }
+          } catch {}
+        }
+
+        unsubProfile = subscribeToUserProfile(
+          firebaseUser.uid,
+          firebaseUser.email,
+          (pData) => {
+            setProfile(pData);
             setLoading(false);
           },
           (error: any) => {
-            // Graceful handling for quota exceeded or offline errors
-            if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota') || error?.message?.includes('quota')) {
-              console.warn("Firestore quota limit reached. Operating from local cache.");
+            if (
+              error?.code === 'resource-exhausted' ||
+              error?.message?.includes('Quota') ||
+              error?.message?.includes('quota')
+            ) {
+              console.warn('Firestore quota limit reached. Operating from local cache.');
             } else {
-              console.warn("Auth profile sync notice:", error?.message || error);
+              console.warn('Auth profile sync notice:', error?.message || error);
             }
             setLoading(false);
           }
@@ -86,3 +93,4 @@ export function useAuth() {
 
   return { user, profile, loading };
 }
+

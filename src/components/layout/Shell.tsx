@@ -313,7 +313,7 @@ export const Header = ({
                    <div className="w-36 h-36 rounded-[2.5rem] p-1.5 nm-flat bg-white border-4 border-white shadow-2xl relative">
                       <div className="w-full h-full rounded-[2rem] overflow-hidden bg-slate-100 flex items-center justify-center">
                         <img 
-                          src="assets/aistudio/1778263780155-01_c4dd739c.jpeg" 
+                          src="/fc_arena_icon.jpg" 
                           alt="Developer" 
                           className="w-full h-full object-cover"
                         />

@@ -5,14 +5,19 @@ import {
   ArrowRight, Sparkles, ChevronRight, UserPlus, LogIn, Key, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { auth, db } from '@/src/lib/firebase';
+import { auth } from '@/src/lib/firebase';
+import {
+  saveUserProfileToDb,
+  isSystemAdminEmail,
+  saveSelectedUserRole,
+  setCachedUserProfile
+} from '@/src/lib/userDbManager';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendEmailVerification,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AuthPage = () => {
@@ -116,40 +121,52 @@ export const AuthPage = () => {
           throw new Error('Passwords do not match');
         }
 
-        if (!formData.inGameName.trim()) {
-          throw new Error(role === 'player' ? 'Please enter your in game name.' : 'Please enter your name.');
-        }
+        const cleanEmail = formData.email.trim().toLowerCase();
+        const isSystemAdmin = isSystemAdminEmail(cleanEmail);
+        const effectiveRole: 'player' | 'publisher' | 'admin' = isSystemAdmin ? 'admin' : role;
 
-        if (role === 'player') {
-          const cleanUid = formData.inGameUID.trim();
-          if (!cleanUid || !/^\d+$/.test(cleanUid)) {
-            throw new Error('In-Game UID must contain numbers only (no letters or words allowed).');
-          }
-        }
+        // Save the chosen role immediately before Firebase Auth triggers onAuthStateChanged
+        saveSelectedUserRole(effectiveRole, cleanEmail);
 
-        const fbValidation = validateFacebookLink(formData.fbUrl);
-        if (!fbValidation.valid) {
-          throw new Error(fbValidation.message);
-        }
-
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          cleanEmail,
+          formData.password
+        );
         const user = userCredential.user;
-        
-        await sendEmailVerification(user).catch(() => {});
-        
-        const isSystemAdmin = formData.email.trim().toLowerCase() === 'sperkplay@gmail.com';
-        await setDoc(doc(db, 'users', user.uid), {
+
+        // Immediately bind role & initial profile in local cache with the 28-char UID
+        saveSelectedUserRole(effectiveRole, cleanEmail, user.uid);
+        const initialProfile = {
           uid: user.uid,
-          email: user.email?.toLowerCase() || formData.email.trim().toLowerCase(),
-          role: isSystemAdmin ? 'admin' : role,
-          inGameName: formData.inGameName.trim(),
-          inGameUID: formData.inGameUID.trim(),
-          fbUrl: formData.fbUrl.trim(),
-          messengerLink: formData.fbUrl.trim(),
-          leagueMessengerGroupLink: formData.leagueMessengerGroupLink.trim(),
-          whatsappNumber: formData.whatsappNumber.trim(),
-          leagueName: formData.leagueName.trim(),
+          email: user.email?.toLowerCase() || cleanEmail,
+          role: effectiveRole,
+          inGameName: '',
+          inGameUID: '',
+          fbUrl: '',
+          messengerLink: '',
+          leagueMessengerGroupLink: '',
+          whatsappNumber: '',
+          leagueName: '',
+          profileCompleted: false,
           createdAt: new Date().toISOString()
+        };
+        setCachedUserProfile(user.uid, initialProfile);
+
+        try {
+          sessionStorage.setItem('fc_arena_open_profile_after_signup', '1');
+        } catch {}
+
+        // Send verification email in background without blocking profile storage
+        sendEmailVerification(user).catch(() => {});
+
+        // Save Admin in 1st DB (Master DB), or Player/Publisher in 2nd DB (sperk-play User DB)
+        await saveUserProfileToDb(user.uid, initialProfile, {
+          isAdmin: isSystemAdmin,
+          email: cleanEmail,
+          merge: false
+        }).catch((dbErr) => {
+          console.warn('Initial profile write notice (will complete on SetupProfile):', dbErr);
         });
       } else {
         if (!formData.email.trim() || !formData.password) {
@@ -416,7 +433,7 @@ export const AuthPage = () => {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="space-y-6 overflow-hidden pt-2"
+                          className="space-y-4 overflow-hidden pt-2"
                         >
                           <div className="space-y-3">
                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Repeat Password</label>
@@ -430,82 +447,11 @@ export const AuthPage = () => {
                             />
                           </div>
 
-                          <div className="h-px bg-slate-100 dark:bg-gradient-to-r dark:from-transparent dark:via-white/15 dark:to-transparent my-8" />
-
-                          <div className="space-y-5">
-                            <div className="space-y-3">
-                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-                                {role === 'player' ? 'Your in game name' : 'Your Name'}
-                              </label>
-                              <Input 
-                                placeholder={role === 'player' ? 'Your in game name' : 'Your Name'}
-                                required
-                                value={formData.inGameName}
-                                onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
-                                className="h-16 auth-rgb-input"
-                              />
-                            </div>
-                            
-                            {role === 'player' ? (
-                              <>
-                                <div className="space-y-3">
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">In-Game UID</label>
-                                  <Input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    placeholder="FC Mobile UID"
-                                    required
-                                    value={formData.inGameUID}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      const digitsOnly = raw.replace(/\D/g, '');
-                                      if (raw !== digitsOnly) {
-                                        setUidHint('Only numbers (0-9) are allowed in Game UID.');
-                                      } else {
-                                        setUidHint('');
-                                      }
-                                      setFormData({...formData, inGameUID: digitsOnly});
-                                    }}
-                                    className="h-16 auth-rgb-input font-mono"
-                                  />
-                                  {uidHint && (
-                                    <p className="text-[9px] font-black text-amber-500 dark:text-amber-400 uppercase tracking-wider ml-2 flex items-center gap-1">
-                                      <AlertCircle size={11} /> {uidHint}
-                                    </p>
-                                  )}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="space-y-3">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Organization/League Name</label>
-                                <Input placeholder="Official Title" required value={formData.leagueName} onChange={(e) => setFormData({...formData, leagueName: e.target.value})} className="h-16 auth-rgb-input" />
-                              </div>
-                            )}
-
-                            <div className="space-y-3">
-                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Facebook/Messenger</label>
-                              <Input
-                                type="url"
-                                placeholder="https://facebook.com/username"
-                                required
-                                value={formData.fbUrl}
-                                onChange={(e) => setFormData({...formData, fbUrl: e.target.value, messengerLink: e.target.value})}
-                                className={cn(
-                                  "h-16 auth-rgb-input",
-                                  fbStatus && !fbStatus.valid ? "border-rose-400/70" : fbStatus && fbStatus.valid ? "border-emerald-400/70" : ""
-                                )}
-                              />
-                              {fbStatus && (
-                                <p className={cn(
-                                  "text-[9px] font-black uppercase tracking-wider ml-2 flex items-center gap-1",
-                                  fbStatus.valid ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
-                                )}>
-                                  {fbStatus.valid ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                                  <span>{fbStatus.message}</span>
-                                </p>
-                              )}
-                            </div>
+                          <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-white/5 border border-indigo-100 dark:border-white/10 flex items-start gap-2.5">
+                            <CheckCircle2 size={15} className="text-indigo-500 dark:text-cyan-400 shrink-0 mt-0.5" />
+                            <p className="text-[9.5px] font-bold text-slate-600 dark:text-slate-300 leading-relaxed">
+                              Quick Registration: Create your <span className="font-black uppercase text-indigo-600 dark:text-cyan-300">{role === 'player' ? 'Player' : 'Host'}</span> account with Email & Password now, then complete your profile details inside the <span className="font-black uppercase text-indigo-600 dark:text-cyan-300">Profile</span> tab after login.
+                            </p>
                           </div>
                         </motion.div>
                       )}

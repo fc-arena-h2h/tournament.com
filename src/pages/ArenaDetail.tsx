@@ -6,6 +6,7 @@ import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
 import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, arrayUnion, getDocs, deleteDoc, arrayRemove, runTransaction, Timestamp, setDoc } from 'firebase/firestore';
 import { db as masterDb, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { getUserProfileById } from '@/src/lib/userDbManager';
 import { getTournamentDbByTournamentId } from '@/src/lib/shardManager';
 import { removeTournamentFromLocalDb } from '@/src/lib/localDbManager';
 import { sendAppNotification, notifyMatchParticipants } from '@/src/lib/notifications';
@@ -263,9 +264,8 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
     if (userId && !userId.startsWith('demo_')) {
       try {
-        const snap = await getDoc(doc(masterDb, 'users', userId.trim()));
-        if (snap.exists()) {
-          const fetched = snap.data() as UserProfile;
+        const fetched = await getUserProfileById(userId.trim());
+        if (fetched) {
           setProfiles((prev) => ({ ...prev, [userId]: fetched }));
           setSelectedPlayerProfile(fetched);
           return;
@@ -309,6 +309,49 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   };
 
   const [matchSearchQuery, setMatchSearchQuery] = useState('');
+
+  // Automatically navigate to the Group or Knockout Stage where a searched Match ID belongs
+  useEffect(() => {
+    const cleanQ = matchSearchQuery.trim().toUpperCase();
+    if (!cleanQ || cleanQ.length < 2 || matches.length === 0) return;
+
+    // 1. Prefer exact match (with or without 'M-' prefix), then fallback to partial match
+    const exactMatch = matches.find((m) => {
+      const mId = (m.matchId || '').trim().toUpperCase();
+      return mId === cleanQ || mId === `M-${cleanQ}`;
+    });
+
+    const partialMatch =
+      exactMatch ||
+      matches.find((m) => {
+        const mId = (m.matchId || '').trim().toUpperCase();
+        return Boolean(mId) && mId.includes(cleanQ);
+      });
+
+    if (!partialMatch) return;
+
+    if (partialMatch.stage === 'group' && partialMatch.groupId) {
+      if (activeTab !== 'group') {
+        setActiveTab('group');
+      }
+      if (activeGroup !== partialMatch.groupId) {
+        setActiveGroup(partialMatch.groupId);
+      }
+    } else if (partialMatch.stage && partialMatch.stage !== 'group') {
+      if (activeTab !== 'knockout') {
+        setActiveTab('knockout');
+      }
+      const targetKoStage =
+        partialMatch.stage === '3RD_PLACE' ||
+        partialMatch.matchId?.startsWith('3RD_PLACE') ||
+        partialMatch.matchId === 'FINAL_M2'
+          ? 'FINAL'
+          : partialMatch.stage;
+      if (activeKnockoutStage !== targetKoStage) {
+        setActiveKnockoutStage(targetKoStage);
+      }
+    }
+  }, [matchSearchQuery, matches]);
 
   const generateMatchId = () => {
     return 'M-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1457,9 +1500,9 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       await Promise.all(missing.map(async (uid) => {
         if (!uid || typeof uid !== 'string' || !uid.trim()) return;
         try {
-          const userSnap = await getDoc(doc(masterDb, 'users', uid.trim()));
-          if (userSnap.exists()) {
-            newProfiles[uid] = userSnap.data() as UserProfile;
+          const fetched = await getUserProfileById(uid.trim());
+          if (fetched) {
+            newProfiles[uid] = fetched;
             changed = true;
           }
         } catch (err) {
@@ -6253,11 +6296,24 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
             <div className="px-2 pt-4">
               <h4 className="text-[10px] font-black text-slate-400 dark:!text-indigo-200/85 uppercase tracking-[0.25em] italic">GROUP FIXTURES</h4>
               <div className="space-y-4 pt-6">
-                 {renderPairedFixturesList(
-                   matches
+                 {(() => {
+                   const cleanSearch = matchSearchQuery.trim().toUpperCase();
+                   const filteredGroupMatches = matches
                      .filter(m => m.stage === 'group' && m.groupId === activeGroup)
-                     .filter(m => !matchSearchQuery || (m.matchId && m.matchId.toUpperCase().includes(matchSearchQuery.toUpperCase())))
-                 )}
+                     .filter(m => !cleanSearch || (m.matchId && m.matchId.toUpperCase().includes(cleanSearch)));
+
+                   if (cleanSearch && filteredGroupMatches.length === 0) {
+                     return (
+                       <div className="nm-flat rounded-[2rem] p-8 text-center border border-slate-200/60 dark:border-white/12">
+                         <p className="text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-[0.2em] italic">
+                           No match found with ID "{matchSearchQuery.trim()}"
+                         </p>
+                       </div>
+                     );
+                   }
+
+                   return renderPairedFixturesList(filteredGroupMatches);
+                 })()}
               </div>
             </div>
           </div>

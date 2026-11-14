@@ -140,6 +140,16 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [activeTab, selectedTournament]);
 
+  // Redirect new signups directly to the Profile tab so they can complete their profile in the 2nd Database
+  useEffect(() => {
+    if (!user || !profile) return;
+    try {
+      if (sessionStorage.getItem('fc_arena_open_profile_after_signup') === '1') {
+        setActiveTab('profile');
+      }
+    } catch {}
+  }, [user?.uid, profile?.uid]);
+
   // Lock body scroll when global modals are open
   useEffect(() => {
     if (showNotificationCenter || selectedTournament) {
@@ -254,10 +264,14 @@ export default function App() {
     );
   }
 
-  if (!profile && !loading) {
+  const isProfileSetupNeeded =
+    !profile ||
+    (!profile.profileCompleted && !profile.inGameName?.trim());
+
+  if (isProfileSetupNeeded && !loading) {
     return (
       <ThemeProvider>
-        <SetupProfile user={user} />
+        <SetupProfile user={user} profile={profile} />
       </ThemeProvider>
     );
   }

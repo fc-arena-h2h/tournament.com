@@ -1,42 +1,156 @@
 import React, { useState } from 'react';
 import { Card, Button, Input } from '@/src/components/ui/Primitives';
-import { Shield, ArrowRight, Phone } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
-import { db, auth } from '@/src/lib/firebase';
-import { cn } from '@/src/lib/utils';
+import {
+  Shield,
+  ArrowRight,
+  Phone,
+  User,
+  Hash,
+  Award,
+  Facebook,
+  MessageSquare,
+  AlertCircle,
+  CheckCircle2
+} from 'lucide-react';
+import { auth } from '@/src/lib/firebase';
+import {
+  saveUserProfileToDb,
+  isSystemAdminEmail,
+  getSavedUserRole,
+  setCachedUserProfile
+} from '@/src/lib/userDbManager';
+import type { UserProfile } from '@/src/hooks/useAuth';
 import { signOut } from 'firebase/auth';
 
-export const SetupProfile = ({ user }: { user: any }) => {
-  const [role, setRole] = useState<'player' | 'publisher'>('player');
+interface SetupProfileProps {
+  user: any;
+  profile?: UserProfile | null;
+}
+
+export const SetupProfile = ({ user, profile }: SetupProfileProps) => {
+  // Automatically lock to the role the user selected when creating their account
+  const resolvedRole: 'player' | 'publisher' | 'admin' = isSystemAdminEmail(user?.email)
+    ? 'admin'
+    : profile?.role || getSavedUserRole(user?.uid, user?.email);
+
   const [formData, setFormData] = useState({
-    inGameName: '',
-    inGameUID: '',
-    fbUrl: '',
-    phone: '',
-    leagueName: '',
+    inGameName: profile?.inGameName || '',
+    inGameUID: profile?.inGameUID || '',
+    fbUrl: profile?.fbUrl || '',
+    leagueMessengerGroupLink: profile?.leagueMessengerGroupLink || '',
+    phone: profile?.whatsappNumber || profile?.phone || '',
+    leagueName:
+      profile?.leagueName || (resolvedRole === 'admin' ? 'FC Arena Official' : ''),
   });
 
+  const [uidHint, setUidHint] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const validateFacebookLink = (rawUrl: string): { valid: boolean; message: string } => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      return { valid: false, message: 'Facebook profile or Messenger link is required.' };
+    }
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith('https://')) {
+      return {
+        valid: false,
+        message: 'Link must start with https:// (e.g., https://facebook.com/username)'
+      };
+    }
+    const hasFbDomain =
+      lower.includes('facebook.com/') ||
+      lower.includes('fb.com/') ||
+      lower.includes('fb.me/') ||
+      lower.includes('m.me/') ||
+      lower.includes('messenger.com/');
+    if (!hasFbDomain) {
+      return {
+        valid: false,
+        message: 'Link must contain facebook.com or m.me (e.g., https://facebook.com/username)'
+      };
+    }
+    return { valid: true, message: 'Valid link' };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    if (!formData.inGameName.trim()) {
+      setError(
+        resolvedRole === 'player'
+          ? 'Please enter your In-Game Name.'
+          : resolvedRole === 'publisher'
+          ? 'Please enter your Host / Organizer Name.'
+          : 'Please enter your Admin Display Name.'
+      );
+      return;
+    }
+
+    if (resolvedRole === 'player') {
+      const cleanUid = formData.inGameUID.trim();
+      if (!cleanUid || !/^\d+$/.test(cleanUid)) {
+        setError('In-Game UID must contain numbers only (0-9).');
+        return;
+      }
+    }
+
+    if (resolvedRole === 'publisher' && !formData.leagueName.trim()) {
+      setError('Please enter your Organization or League Name.');
+      return;
+    }
+
+    const fbValidation = validateFacebookLink(formData.fbUrl);
+    if (!fbValidation.valid) {
+      setError(fbValidation.message);
+      return;
+    }
+
     setLoading(true);
     try {
-      const isSystemAdmin = user.email === 'sperkplay@gmail.com';
+      const isSystemAdmin = resolvedRole === 'admin' || isSystemAdminEmail(user?.email);
+      const finalRole: 'player' | 'publisher' | 'admin' = isSystemAdmin
+        ? 'admin'
+        : resolvedRole;
 
-      await setDoc(doc(db, 'users', user.uid), {
+      const updatedProfile: UserProfile = {
         uid: user.uid,
-        email: user.email,
-        role: isSystemAdmin ? 'admin' : role,
+        email: (user.email || profile?.email || '').toLowerCase(),
+        role: finalRole,
         inGameName: formData.inGameName.trim(),
-        inGameUID: formData.inGameUID.trim(),
+        inGameUID:
+          finalRole === 'player'
+            ? formData.inGameUID.trim().replace(/\D/g, '')
+            : '',
         fbUrl: formData.fbUrl.trim(),
+        messengerLink: formData.fbUrl.trim(),
+        leagueMessengerGroupLink:
+          finalRole === 'publisher' ? formData.leagueMessengerGroupLink.trim() : '',
         phone: formData.phone.trim(),
-        leagueName: formData.leagueName.trim(),
-        createdAt: new Date().toISOString()
+        whatsappNumber: formData.phone.trim(),
+        leagueName:
+          finalRole === 'publisher'
+            ? formData.leagueName.trim()
+            : finalRole === 'admin'
+            ? formData.leagueName.trim() || 'FC Arena Official'
+            : '',
+        profileCompleted: true,
+        createdAt: profile?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Update local cache immediately so the app transitions smoothly
+      setCachedUserProfile(user.uid, updatedProfile);
+      try {
+        sessionStorage.removeItem('fc_arena_open_profile_after_signup');
+      } catch {}
+
+      await saveUserProfileToDb(user.uid, updatedProfile, {
+        isAdmin: isSystemAdmin,
+        email: user.email,
+        merge: true
       });
     } catch (err: any) {
       console.error(err);
@@ -46,115 +160,190 @@ export const SetupProfile = ({ user }: { user: any }) => {
     }
   };
 
+  const roleBadgeLabel =
+    resolvedRole === 'admin'
+      ? 'System Admin Profile'
+      : resolvedRole === 'publisher'
+      ? 'Host / Publisher Profile'
+      : 'Player Profile';
+
+  const roleSubtitle =
+    resolvedRole === 'admin'
+      ? 'Complete your administrator details'
+      : resolvedRole === 'publisher'
+      ? 'Set up your tournament organizer identity'
+      : 'Register your FC Mobile player identity';
+
   return (
     <div className="min-h-screen bg-soft-bg p-4 sm:p-8 flex flex-col items-center justify-center">
-      <div className="max-w-md w-full space-y-8 my-6">
+      <div className="max-w-md w-full space-y-7 my-6">
         <div className="flex flex-col items-center text-center space-y-3">
           <div className="w-20 h-20 rounded-[2rem] nm-flat flex items-center justify-center text-indigo-500">
-             <Shield size={34} />
+            <Shield size={34} />
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight">Complete Setup</h2>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Register your game identity</p>
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-cyan-400">
+              <CheckCircle2 size={12} />
+              <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                {roleBadgeLabel}
+              </span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 dark:text-white uppercase italic tracking-tight">
+              Complete Setup
+            </h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {roleSubtitle}
+            </p>
           </div>
         </div>
 
         <Card className="p-6 sm:p-8 space-y-6">
-          <div className="flex nm-inset p-2 rounded-[2rem] relative border border-white/20">
-            <button
-              onClick={() => setRole('player')}
-              className={cn(
-                "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                role === 'player' ? "nm-flat text-indigo-500" : "text-slate-400"
-              )}
-            >
-              Player
-            </button>
-            <button
-              onClick={() => setRole('publisher')}
-              className={cn(
-                "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] transition-all relative z-10",
-                role === 'publisher' ? "nm-flat text-indigo-500" : "text-slate-400"
-              )}
-            >
-              Host
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="nm-inset p-3.5 rounded-2xl border border-rose-200 text-rose-600 text-[10px] font-bold text-center">
-                {error}
+              <div className="nm-inset p-3.5 rounded-2xl border border-rose-200 text-rose-600 dark:text-rose-400 text-[10px] font-bold text-center flex items-center justify-center gap-2">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Mobile Number Field (Simple input, no SMS verification required) */}
+            {/* Name Field (Role-specific label) */}
             <div className="space-y-2">
-              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-4 flex items-center gap-1.5">
-                <Phone size={12} className="text-indigo-500" />
-                Mobile / WhatsApp Number
+              <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                <User size={12} className="text-indigo-500" />
+                {resolvedRole === 'player'
+                  ? 'Your In-Game Name'
+                  : resolvedRole === 'publisher'
+                  ? 'Your Name (Host Name)'
+                  : 'Admin Display Name'}
               </label>
-              <Input 
-                placeholder="017XXXXXXXX or +880..."
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              <Input
+                placeholder={
+                  resolvedRole === 'player'
+                    ? 'Enter your FC Mobile In-Game Name'
+                    : resolvedRole === 'publisher'
+                    ? 'Enter your full name or host handle'
+                    : 'Enter admin display name'
+                }
+                required
+                value={formData.inGameName}
+                onChange={(e) => setFormData({ ...formData, inGameName: e.target.value })}
               />
             </div>
 
-            {role === 'player' ? (
-              <>
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">In-Game Name</label>
-                  <Input 
-                    placeholder="Game ID"
-                    required
-                    value={formData.inGameName}
-                    onChange={(e) => setFormData({...formData, inGameName: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Facebook URL</label>
-                  <Input 
-                    placeholder="https://facebook.com/..."
-                    required
-                    value={formData.fbUrl}
-                    onChange={(e) => setFormData({...formData, fbUrl: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">UID</label>
-                  <Input 
-                    placeholder="ID"
-                    required
-                    value={formData.inGameUID}
-                    onChange={(e) => setFormData({...formData, inGameUID: e.target.value})}
-                  />
-                </div>
-              </>
+            {/* Role-Specific Primary Field: Numeric UID for Player OR Organization/League Name for Host/Admin */}
+            {resolvedRole === 'player' ? (
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                  <Hash size={12} className="text-emerald-500" />
+                  In-Game UID (Numbers Only)
+                </label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Enter your numeric FC Mobile UID"
+                  required
+                  value={formData.inGameUID}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const digitsOnly = raw.replace(/\D/g, '');
+                    if (raw !== digitsOnly) {
+                      setUidHint('Only numbers (0-9) are allowed in Game UID.');
+                    } else {
+                      setUidHint('');
+                    }
+                    setFormData({ ...formData, inGameUID: digitsOnly });
+                  }}
+                />
+                {uidHint && (
+                  <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-4">
+                    {uidHint}
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Organization Name</label>
-                <Input 
-                  placeholder="League Name"
-                  required
+                <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                  <Award size={12} className="text-emerald-500" />
+                  {resolvedRole === 'publisher'
+                    ? 'Organization / League Name'
+                    : 'Official Organization Title'}
+                </label>
+                <Input
+                  placeholder={
+                    resolvedRole === 'publisher'
+                      ? 'Enter your League or Club Name'
+                      : 'FC Arena Official'
+                  }
+                  required={resolvedRole === 'publisher'}
                   value={formData.leagueName}
-                  onChange={(e) => setFormData({...formData, leagueName: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, leagueName: e.target.value })}
                 />
               </div>
             )}
 
-            <Button 
-              type="submit" 
-              disabled={loading} 
+            {/* Facebook / Messenger Profile Link (Required for all roles for match/tournament contact) */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                <Facebook size={12} className="text-blue-500" />
+                {resolvedRole === 'publisher'
+                  ? 'Facebook Profile / Page URL'
+                  : 'Facebook Profile / Messenger URL'}
+              </label>
+              <Input
+                type="url"
+                placeholder="https://facebook.com/your.profile"
+                required
+                value={formData.fbUrl}
+                onChange={(e) => setFormData({ ...formData, fbUrl: e.target.value })}
+              />
+            </div>
+
+            {/* Optional League Messenger Group Link for Publishers */}
+            {resolvedRole === 'publisher' && (
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                  <MessageSquare size={12} className="text-indigo-500" />
+                  League Messenger Group Link (Optional)
+                </label>
+                <Input
+                  type="url"
+                  placeholder="https://m.me/j/..."
+                  value={formData.leagueMessengerGroupLink}
+                  onChange={(e) =>
+                    setFormData({ ...formData, leagueMessengerGroupLink: e.target.value })
+                  }
+                />
+              </div>
+            )}
+
+            {/* Mobile / WhatsApp Number */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                <Phone size={12} className="text-emerald-500" />
+                Mobile / WhatsApp Number (Optional)
+              </label>
+              <Input
+                type="tel"
+                placeholder="017XXXXXXXX or +880..."
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
               className="w-full h-16 rounded-[2.2rem] mt-4 font-black uppercase text-[11px]"
             >
-              {loading ? 'Processing...' : 'Complete Profile'}
+              {loading ? 'Saving Profile...' : 'Complete Profile'}
               <ArrowRight size={18} className="ml-2" />
             </Button>
           </form>
 
           <div className="text-center">
-            <button 
+            <button
+              type="button"
               onClick={async () => {
                 await signOut(auth);
                 window.location.reload();
@@ -169,3 +358,4 @@ export const SetupProfile = ({ user }: { user: any }) => {
     </div>
   );
 };
+

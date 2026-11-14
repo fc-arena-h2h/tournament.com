@@ -3,12 +3,16 @@ import { createPortal } from 'react-dom';
 import { 
   User, Facebook, Phone, ShieldCheck, LogOut, Edit3, X, 
   CheckCircle, BellRing, ExternalLink, MessageCircle,
-  Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette
+  Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db, auth } from '@/src/lib/firebase';
+import { auth } from '@/src/lib/firebase';
+import {
+  subscribeToUserProfile,
+  saveUserProfileToDb,
+  getSavedUserRole
+} from '@/src/lib/userDbManager';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
 import { useTheme } from '@/src/lib/theme';
@@ -29,6 +33,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [uidHint, setUidHint] = useState('');
   const [editData, setEditData] = useState({
     inGameName: '',
     inGameUID: '',
@@ -42,13 +48,68 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) {
-        setProfile(snap.data() as UserProfile);
+    const unsub = subscribeToUserProfile(user.uid, user.email, (pData) => {
+      if (pData) {
+        setProfile(pData);
       }
     });
     return () => unsub();
   }, [user]);
+
+  const effectiveRole: 'player' | 'publisher' | 'admin' =
+    profile?.role || getSavedUserRole(user?.uid, user?.email);
+
+  const isProfileIncomplete =
+    Boolean(profile) &&
+    (!profile?.inGameName?.trim() ||
+      !profile?.fbUrl?.trim() ||
+      (effectiveRole === 'player' && !profile?.inGameUID?.trim()) ||
+      (effectiveRole === 'publisher' && !profile?.leagueName?.trim()));
+
+  // Auto-open Edit Profile modal right after new account registration
+  useEffect(() => {
+    if (!profile) return;
+    try {
+      const shouldOpen = sessionStorage.getItem('fc_arena_open_profile_after_signup');
+      if (shouldOpen === '1') {
+        sessionStorage.removeItem('fc_arena_open_profile_after_signup');
+        setEditData({
+          inGameName: profile.inGameName || '',
+          inGameUID: profile.inGameUID || '',
+          fbUrl: profile.fbUrl || '',
+          messengerLink: profile.messengerLink || '',
+          leagueMessengerGroupLink: profile.leagueMessengerGroupLink || '',
+          phone: profile.phone || '',
+          whatsappNumber: profile.whatsappNumber || '',
+          leagueName: profile.leagueName || '',
+        });
+        setSaveError('');
+        setUidHint('');
+        setIsEditing(true);
+      }
+    } catch {}
+  }, [profile]);
+
+  const validateFacebookLink = (rawUrl: string): { valid: boolean; message: string } => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      return { valid: false, message: 'Facebook profile or Messenger link is required.' };
+    }
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith('https://')) {
+      return { valid: false, message: 'Link must start with https:// (e.g., https://facebook.com/username)' };
+    }
+    const hasFbDomain =
+      lower.includes('facebook.com/') ||
+      lower.includes('fb.com/') ||
+      lower.includes('fb.me/') ||
+      lower.includes('m.me/') ||
+      lower.includes('messenger.com/');
+    if (!hasFbDomain) {
+      return { valid: false, message: 'Link must contain facebook.com or m.me (e.g., https://facebook.com/username)' };
+    }
+    return { valid: true, message: 'Valid Facebook / Messenger link' };
+  };
 
   const handleEditClick = () => {
     if (profile) {
@@ -62,19 +123,75 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         whatsappNumber: profile.whatsappNumber || '',
         leagueName: profile.leagueName || '',
       });
+      setSaveError('');
+      setUidHint('');
       setIsEditing(true);
     }
   };
 
   const handleSave = async () => {
     if (!user) return;
+    setSaveError('');
+
+    if (!editData.inGameName.trim()) {
+      setSaveError(
+        effectiveRole === 'player'
+          ? 'Please enter your in game name.'
+          : 'Please enter your name.'
+      );
+      return;
+    }
+
+    if (effectiveRole === 'player') {
+      const cleanUid = editData.inGameUID.trim();
+      if (!cleanUid || !/^\d+$/.test(cleanUid)) {
+        setSaveError('In-Game UID must contain numbers only (no letters or words allowed).');
+        return;
+      }
+    }
+
+    if (effectiveRole === 'publisher' && !editData.leagueName.trim()) {
+      setSaveError('Please enter your Organization or League Name.');
+      return;
+    }
+
+    const fbCheck = validateFacebookLink(editData.fbUrl);
+    if (!fbCheck.valid) {
+      setSaveError(fbCheck.message);
+      return;
+    }
+
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'users', user.uid), editData, { merge: true });
+      const normalizedFb = editData.fbUrl.trim();
+      const normalizedMessenger = editData.messengerLink.trim() || normalizedFb;
+
+      await saveUserProfileToDb(
+        user.uid,
+        {
+          uid: user.uid,
+          email: profile?.email || user.email || '',
+          role: effectiveRole,
+          inGameName: editData.inGameName.trim(),
+          inGameUID: editData.inGameUID.trim().replace(/\D/g, ''),
+          fbUrl: normalizedFb,
+          messengerLink: normalizedMessenger,
+          leagueMessengerGroupLink: editData.leagueMessengerGroupLink.trim(),
+          phone: editData.phone.trim(),
+          whatsappNumber: editData.whatsappNumber.trim(),
+          leagueName: editData.leagueName.trim(),
+          profileCompleted: true
+        },
+        {
+          isAdmin: effectiveRole === 'admin',
+          email: profile?.email || user.email,
+          merge: true
+        }
+      );
       setIsEditing(false);
     } catch (err) {
       console.error('Error updating profile:', err);
-      alert('Failed to update profile');
+      setSaveError('Failed to update profile. Please check your connection.');
     } finally {
       setIsSaving(false);
     }
@@ -95,6 +212,33 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         animate={{ opacity: 1, y: 0 }}
         className="space-y-7"
       >
+        {isProfileIncomplete && (
+          <div className="p-4 sm:p-5 rounded-3xl bg-amber-50 dark:bg-amber-500/15 border-2 border-amber-300/80 dark:border-amber-400/35 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-amber-900 dark:text-amber-200 uppercase italic tracking-wide">
+                  Complete Your Arena Profile
+                </h4>
+                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                  {profile?.role === 'player'
+                    ? 'Please add your In-Game Name, numeric FC Mobile UID, and Facebook link to join tournaments.'
+                    : 'Please add your Name, League/Organization Name, and Facebook link to host tournaments.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleEditClick}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[9.5px] uppercase tracking-widest shrink-0 shadow-sm active:scale-95 transition-all"
+            >
+              Complete Now
+            </button>
+          </div>
+        )}
+
         {/* Main Identity Hero Card */}
         <div className="nm-flat rounded-[2.5rem] p-6 sm:p-8 space-y-7 relative overflow-hidden border border-white/60 dark:border-white/15">
           {/* Subtle Ambient Glow */}
@@ -479,6 +623,13 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 </div>
               </div>
 
+              {saveError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-400/30 text-rose-600 dark:text-rose-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{saveError}</span>
+                </div>
+              )}
+
               {/* Section 1: Core Identity */}
               <div className="space-y-3.5">
                 <div className="flex items-center gap-2 px-1">
@@ -491,7 +642,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 {/* Full Handle */}
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
-                    Full Handle (In-Game Name)
+                    {profile?.role === 'player' ? 'Your in game name' : 'Your Name'}
                   </label>
                   <div className="relative">
                     <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -499,7 +650,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                     </div>
                     <input
                       type="text"
-                      placeholder="Enter your in-game name..."
+                      placeholder={profile?.role === 'player' ? 'Your in game name' : 'Your Name'}
                       value={editData.inGameName}
                       onChange={(e) => setEditData({ ...editData, inGameName: e.target.value })}
                       className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
@@ -510,7 +661,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 {/* In-Game UID / League Name */}
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
-                    {profile?.role === 'player' ? 'In-Game UID' : 'League Name'}
+                    {profile?.role === 'player' ? 'In-Game UID' : 'Organization/League Name'}
                   </label>
                   <div className="relative">
                     <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -518,15 +669,32 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                     </div>
                     <input
                       type="text"
-                      placeholder={profile?.role === 'player' ? 'Enter your FC Mobile UID...' : 'Enter your League / Org name...'}
+                      inputMode={profile?.role === 'player' ? 'numeric' : 'text'}
+                      pattern={profile?.role === 'player' ? '[0-9]*' : undefined}
+                      placeholder={profile?.role === 'player' ? 'FC Mobile UID' : 'Official Title'}
                       value={profile?.role === 'player' ? editData.inGameUID : editData.leagueName}
                       onChange={(e) => {
-                        if (profile?.role === 'player') setEditData({ ...editData, inGameUID: e.target.value });
-                        else setEditData({ ...editData, leagueName: e.target.value });
+                        if (profile?.role === 'player') {
+                          const raw = e.target.value;
+                          const digitsOnly = raw.replace(/\D/g, '');
+                          if (raw !== digitsOnly) {
+                            setUidHint('Only numbers (0-9) are allowed in Game UID.');
+                          } else {
+                            setUidHint('');
+                          }
+                          setEditData({ ...editData, inGameUID: digitsOnly });
+                        } else {
+                          setEditData({ ...editData, leagueName: e.target.value });
+                        }
                       }}
                       className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                     />
                   </div>
+                  {profile?.role === 'player' && uidHint && (
+                    <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-1 flex items-center gap-1">
+                      <AlertCircle size={11} /> {uidHint}
+                    </p>
+                  )}
                 </div>
               </div>
 

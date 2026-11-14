@@ -1,7 +1,8 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { arrayUnion } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
-import { db, auth, firebaseConfig } from '@/src/lib/firebase';
+import { auth, firebaseConfig } from '@/src/lib/firebase';
+import { updateUserProfileInDb } from '@/src/lib/userDbManager';
 import { showSystemNotification, playNotificationSound } from '@/src/lib/notifications';
 
 let messagingInstance: any = null;
@@ -91,10 +92,14 @@ export async function requestPushNotificationToken(userId?: string): Promise<{ s
     const targetUid = userId || auth.currentUser?.uid;
     if (targetUid && token) {
       try {
-        await updateDoc(doc(db, 'users', targetUid), {
-          fcmTokens: arrayUnion(token),
-          pushEnabled: true
-        });
+        await updateUserProfileInDb(
+          targetUid,
+          {
+            fcmTokens: arrayUnion(token),
+            pushEnabled: true
+          },
+          { email: auth.currentUser?.email }
+        );
       } catch (dbErr) {
         console.warn('Could not save FCM token to user document:', dbErr);
       }
