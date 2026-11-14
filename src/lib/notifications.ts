@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   onSnapshot,
+  getDocs,
   Unsubscribe,
   Firestore
 } from 'firebase/firestore';
@@ -45,6 +46,78 @@ export interface AppNotification {
   read: boolean;
   createdAt: any;
   extra?: Record<string, any>;
+}
+
+/**
+ * Send message reliably to the active Service Worker (even if controller isn't claimed yet)
+ */
+export function postMessageToServiceWorker(message: Record<string, any>) {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage(message);
+    }
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        if (reg && reg.active && reg.active !== navigator.serviceWorker.controller) {
+          reg.active.postMessage(message);
+        }
+      })
+      .catch(() => {});
+  } catch {
+    // Ignore SW postMessage errors
+  }
+}
+
+/**
+ * Sync the current logged-in user and known notification IDs with the Service Worker's IndexedDB
+ * and register Background Sync / Periodic Sync for continuous background delivery.
+ */
+export async function syncUserWithServiceWorker(
+  userId: string | null,
+  isAdmin: boolean = false,
+  knownIds: string[] = []
+) {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  postMessageToServiceWorker({
+    type: 'SET_USER_ID',
+    userId,
+    isAdmin,
+    knownIds
+  });
+
+  if (!userId) return;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg?.active) {
+      reg.active.postMessage({
+        type: 'SET_USER_ID',
+        userId,
+        isAdmin,
+        knownIds
+      });
+    }
+
+    // Register One-Shot Background Sync (triggers automatically on network reconnect)
+    if ('sync' in reg && (reg as any).sync?.register) {
+      try {
+        await (reg as any).sync.register('fc-arena-notif-sync');
+      } catch {}
+    }
+
+    // Register Periodic Background Sync (triggers periodically in background on Android PWA/WebView)
+    if ('periodicSync' in reg && (reg as any).periodicSync?.register) {
+      try {
+        await (reg as any).periodicSync.register('fc-arena-notif-periodic', {
+          minInterval: 60 * 1000
+        });
+      } catch {}
+    }
+  } catch {
+    // Ignore if unsupported
+  }
 }
 
 /**
@@ -130,7 +203,17 @@ export function updateAppBadge(count: number) {
  */
 export function showSystemNotification(
   title: string,
-  options?: { body?: string; icon?: string; tag?: string; url?: string }
+  options?: {
+    body?: string;
+    icon?: string;
+    tag?: string;
+    url?: string;
+    linkTab?: string;
+    tournamentId?: string;
+    matchId?: string;
+    shardId?: ShardId;
+    compositeKey?: string;
+  }
 ) {
   if (
     typeof window === 'undefined' ||
@@ -140,16 +223,32 @@ export function showSystemNotification(
     return;
   }
 
+  const effectiveTag = options?.compositeKey || options?.tag || 'fc-arena-' + Date.now();
+
+  if (options?.compositeKey) {
+    postMessageToServiceWorker({
+      type: 'MARK_NOTIF_SHOWN',
+      compositeKey: options.compositeKey
+    });
+  }
+
   const notificationOptions: NotificationOptions = {
     body: options?.body || '',
     icon: options?.icon || 'pwa-192x192.png',
     badge: 'fc_arena_icon.jpg',
-    tag: options?.tag || 'fc-arena-' + Date.now(),
+    tag: effectiveTag,
     renotify: true,
     requireInteraction: false,
     ...({
       vibrate: [200, 100, 200, 100, 200],
-      data: { url: options?.url || './' }
+      data: {
+        url: options?.url || './',
+        linkTab: options?.linkTab || 'matches',
+        tournamentId: options?.tournamentId || null,
+        matchId: options?.matchId || null,
+        shardId: options?.shardId || 'master'
+      },
+      actions: [{ action: 'open', title: 'Open Match / View' }]
     } as any)
   };
 
@@ -199,14 +298,16 @@ export async function sendTestPhoneNotification(): Promise<{ success: boolean; m
     }
 
     playNotificationSound();
-    showSystemNotification('FC Arena VS – Test Notification 🏆', {
-      body: 'Background notifications are successfully active on your device! Tournament & match updates will arrive directly.',
+    showSystemNotification('FC Arena VS – Background Service Active 🏆', {
+      body: 'Phone notifications are active! You will receive match & tournament updates whenever your phone has internet.',
       tag: 'test-phone-' + Date.now()
     });
 
+    postMessageToServiceWorker({ type: 'HEARTBEAT_CHECK' });
+
     return {
       success: true,
-      message: 'Test notification successfully sent to device notification bar!'
+      message: 'Test notification sent! Background notification service is active.'
     };
   } catch (err: any) {
     return {
@@ -428,7 +529,6 @@ export async function markAllNotificationsAsRead(
     );
     if (targets.length === 0) return;
 
-    // Group notifications by their shard DB instance
     const byShard = new Map<Firestore, AppNotification[]>();
     for (const n of targets) {
       const targetDb = getNotificationDbForShard(n.shardId);
@@ -514,6 +614,50 @@ function getCreatedAtMillis(item: any): number {
 }
 
 /**
+ * One-time active fetch of unread notifications across all shards (used on network reconnect / wake-up)
+ */
+export async function fetchLatestNotificationsAcrossShards(
+  userId: string,
+  isAdmin: boolean
+): Promise<AppNotification[]> {
+  const recipientIds = [userId, 'all'];
+  if (isAdmin) recipientIds.push('admin');
+
+  const allTargets = getAllTournamentDbs(true);
+  const merged: AppNotification[] = [];
+  const seen = new Set<string>();
+
+  await Promise.allSettled(
+    allTargets.map(async (target) => {
+      try {
+        const q = query(
+          collection(target.notifDb, 'notifications'),
+          where('recipientId', 'in', recipientIds),
+          limit(25)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          const shardId = data.shardId || target.shardId;
+          const compositeKey = `${shardId}_${d.id}`;
+          if (!seen.has(compositeKey)) {
+            seen.add(compositeKey);
+            merged.push({
+              id: d.id,
+              ...data,
+              shardId
+            } as AppNotification);
+          }
+        });
+      } catch {}
+    })
+  );
+
+  merged.sort((a, b) => getCreatedAtMillis(b) - getCreatedAtMillis(a));
+  return merged.slice(0, 40);
+}
+
+/**
  * Subscribe to user notifications across all Notification Databases:
  * - Notification DB 1 (`App v1` / `app-v1-20fdf`)
  * - Notification DB 2 (`MY App 1` / `my-app-1-3aadf`)
@@ -550,23 +694,12 @@ export function subscribeToUserNotificationsAcrossShards(
   };
 
   for (const target of allTargets) {
-    // Wait: on new Notification DBs (App v1, MY App 1), composite index (recipientId + createdAt desc)
-    // might not be created manually by the user yet!
-    // If we query `where('recipientId', 'in', recipientIds)` WITHOUT `orderBy('createdAt', 'desc')` on external shards
-    // and sort in memory, it NEVER requires a manual composite index in Firebase Console!
-    const q =
-      target.shardId === 'master'
-        ? query(
-            collection(target.notifDb, 'notifications'),
-            where('recipientId', 'in', recipientIds),
-            orderBy('createdAt', 'desc'),
-            limit(30)
-          )
-        : query(
-            collection(target.notifDb, 'notifications'),
-            where('recipientId', 'in', recipientIds),
-            limit(30)
-          );
+    // Use index-free query across all shards and sort in memory so it never fails due to missing Composite Index
+    const q = query(
+      collection(target.notifDb, 'notifications'),
+      where('recipientId', 'in', recipientIds),
+      limit(30)
+    );
 
     const unsub = onSnapshot(
       q,
@@ -598,5 +731,68 @@ export function subscribeToUserNotificationsAcrossShards(
         u();
       } catch {}
     });
+  };
+}
+
+/**
+ * Background Keep-Alive & Reconnect Engine for Mobile WebView / PWA:
+ * Ensures that when the app goes into background or when the phone reconnects to the internet,
+ * the Service Worker and foreground catch-up engine immediately check all 3 Notification Shards.
+ */
+export function startBackgroundNotificationEngine(
+  userId: string,
+  isAdmin: boolean,
+  onCatchUpNotifications: (notifications: AppNotification[]) => void
+): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const triggerCheck = async () => {
+    if (!navigator.onLine) return;
+    postMessageToServiceWorker({ type: 'HEARTBEAT_CHECK' });
+    try {
+      const latest = await fetchLatestNotificationsAcrossShards(userId, isAdmin);
+      if (latest.length > 0) {
+        onCatchUpNotifications(latest);
+      }
+    } catch {}
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      postMessageToServiceWorker({ type: 'APP_BACKGROUNDED' });
+      syncUserWithServiceWorker(userId, isAdmin);
+    } else if (document.visibilityState === 'visible') {
+      triggerCheck();
+    }
+  };
+
+  const handleOnline = () => {
+    syncUserWithServiceWorker(userId, isAdmin);
+    triggerCheck();
+  };
+
+  const handleFocus = () => {
+    triggerCheck();
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('focus', handleFocus);
+
+  // Heartbeat every 25 seconds to keep Service Worker & WebView listener responsive
+  const heartbeatInterval = window.setInterval(() => {
+    if (navigator.onLine) {
+      postMessageToServiceWorker({ type: 'HEARTBEAT_CHECK' });
+      if (document.visibilityState === 'hidden') {
+        triggerCheck();
+      }
+    }
+  }, 25000);
+
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('focus', handleFocus);
+    window.clearInterval(heartbeatInterval);
   };
 }

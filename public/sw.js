@@ -1,7 +1,7 @@
 // FC Arena VS standalone service worker
 importScripts('/sw-push-handler.js');
 
-const CACHE_NAME = 'fc-arena-cache-v2';
+const CACHE_NAME = 'fc-arena-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -27,21 +27,32 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
-    }).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) => {
+        return Promise.all(
+          keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        );
+      })
+      .then(() => self.clients.claim())
+      .then(() => {
+        if (typeof pollAllShardsOnce === 'function') {
+          return pollAllShardsOnce(true);
+        }
+      })
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests that are http/https
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
     return;
   }
 
-  // Network-first strategy for dynamic content, fallback to cache
+  // Opportunistically wake up notification check if Service Worker was idle
+  if (typeof pollAllShardsOnce === 'function') {
+    pollAllShardsOnce(false).catch(() => {});
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {

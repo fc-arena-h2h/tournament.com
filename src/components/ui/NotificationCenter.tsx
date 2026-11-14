@@ -15,7 +15,8 @@ import {
   requestPhoneNotificationPermission,
   playNotificationSound,
   sendTestPhoneNotification,
-  showSystemNotification
+  showSystemNotification,
+  syncUserWithServiceWorker
 } from '@/src/lib/notifications';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
@@ -41,10 +42,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'announcements'>('all');
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [pushLoading, setPushLoading] = useState(false);
+  const [pushStatusMsg, setPushStatusMsg] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [permGranted, setPermGranted] = useState<boolean>(
+    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+  );
 
   // Sync announcements from db
   useEffect(() => {
     if (!isOpen) return;
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPermGranted(Notification.permission === 'granted');
+    }
     const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(15));
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -141,9 +150,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleClearAll = () => {
     if (!userId) return;
-    if (window.confirm('Clear all personal notifications?')) {
-      clearAllNotifications(notifications, userId, isAdmin);
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 3500);
+      return;
     }
+    setConfirmClear(false);
+    clearAllNotifications(notifications, userId, isAdmin);
   };
 
   return (
@@ -191,31 +204,47 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           {/* Quick Push Access */}
-          <div className="nm-inset p-3.5 rounded-[1.8rem] bg-white/30 flex items-center justify-between border border-white/40">
-             <div className="flex items-center gap-3 pl-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">SYSTEM CHANNEL ACTIVE</span>
-             </div>
-             <button
+          <div className="nm-inset p-3.5 rounded-[1.8rem] bg-white/30 flex flex-col gap-2 border border-white/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 pl-2">
+                <div className={cn("w-2 h-2 rounded-full animate-pulse", permGranted ? "bg-emerald-500" : "bg-amber-500")} />
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                  {permGranted ? 'BACKGROUND SERVICE ACTIVE' : 'ENABLE BACKGROUND ALERTS'}
+                </span>
+              </div>
+              <button
                 onClick={async () => {
                   setPushLoading(true);
+                  setPushStatusMsg(null);
                   try {
                     const res = await requestPushNotificationToken(userId);
+                    if (userId) {
+                      await syncUserWithServiceWorker(userId, isAdmin);
+                    }
                     if (res.success) {
-                      await sendTestPhoneNotification();
+                      setPermGranted(true);
+                      const testRes = await sendTestPhoneNotification();
+                      setPushStatusMsg(testRes.message);
                     } else {
-                      alert(res.error || 'Permission Denied');
+                      setPushStatusMsg(res.error || 'Please allow notifications in browser/phone settings.');
                     }
                   } finally {
                     setPushLoading(false);
+                    setTimeout(() => setPushStatusMsg(null), 5000);
                   }
                 }}
                 disabled={pushLoading}
                 className="px-5 py-2.5 rounded-[1.2rem] nm-flat bg-white text-indigo-600 active:nm-pressed text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm"
               >
                 <ShieldAlert size={14} className={pushLoading ? 'animate-spin' : ''} />
-                <span>{pushLoading ? 'WAIT...' : 'ENABLE PUSH'}</span>
+                <span>{pushLoading ? 'WAIT...' : permGranted ? 'TEST PUSH' : 'ENABLE PUSH'}</span>
               </button>
+            </div>
+            {pushStatusMsg && (
+              <p className="text-[9px] font-bold text-indigo-600 px-2 tracking-wide">
+                {pushStatusMsg}
+              </p>
+            )}
           </div>
         </div>
 
@@ -279,7 +308,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   className="flex items-center gap-1.5 text-rose-500 hover:text-rose-600 text-[10px] font-black uppercase tracking-widest transition-colors group"
                 >
                   <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
-                  Clear all
+                  {confirmClear ? 'Confirm Clear?' : 'Clear all'}
                 </button>
              </div>
           </div>

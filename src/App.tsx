@@ -28,6 +28,8 @@ import {
   requestPhoneNotificationPermission,
   updateAppBadge,
   subscribeToUserNotificationsAcrossShards,
+  syncUserWithServiceWorker,
+  startBackgroundNotificationEngine
 } from './lib/notifications';
 import { findTournamentAcrossShards } from './lib/shardManager';
 import { runLocalDbGarbageCollection } from './lib/localDbManager';
@@ -75,21 +77,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      knownNotifIdsRef.current.clear();
+      initialNotifLoadRef.current = false;
+      syncUserWithServiceWorker(null, false);
+      return;
+    }
 
     const isAdmin = profile?.role === 'admin' || user?.email === 'sperkplay@gmail.com';
 
-    // Notify Service Worker about current user for background Firestore listening
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      setTimeout(() => {
-        navigator.serviceWorker.controller?.postMessage({
-          type: 'SET_USER_ID',
-          userId: user.uid
-        });
-      }, 2000);
-    }
+    // Immediately sync user ID & role with Service Worker IndexedDB for background listening
+    syncUserWithServiceWorker(user.uid, isAdmin, Array.from(knownNotifIdsRef.current));
 
-    const unsub = subscribeToUserNotificationsAcrossShards(user.uid, isAdmin, (list) => {
+    const processNotificationList = (list: AppNotification[]) => {
       const newItems: AppNotification[] = [];
 
       list.forEach((n) => {
@@ -105,20 +105,96 @@ export default function App() {
       if (!initialNotifLoadRef.current) {
         list.forEach((item) => knownNotifIdsRef.current.add(`${item.shardId || 'master'}_${item.id}`));
         initialNotifLoadRef.current = true;
+        syncUserWithServiceWorker(user.uid, isAdmin, Array.from(knownNotifIdsRef.current));
       } else if (newItems.length > 0) {
         const newest = newItems[0];
+        const compositeKey = `${newest.shardId || 'master'}_${newest.id}`;
         setToastNotification(newest);
         playNotificationSound();
-        showSystemNotification(newest.title, { 
-          body: newest.message, 
-          tag: newest.id,
+        showSystemNotification(newest.title, {
+          body: newest.message,
+          tag: compositeKey,
+          compositeKey,
+          linkTab: newest.linkTab || (newest.tournamentId ? 'arena' : 'matches'),
+          tournamentId: newest.tournamentId,
+          matchId: newest.matchId,
+          shardId: newest.shardId,
           url: import.meta.env.BASE_URL
         });
       }
-    });
+    };
 
-    return () => unsub();
+    const unsub = subscribeToUserNotificationsAcrossShards(user.uid, isAdmin, processNotificationList);
+    const stopEngine = startBackgroundNotificationEngine(user.uid, isAdmin, processNotificationList);
+
+    return () => {
+      unsub();
+      stopEngine();
+    };
   }, [user?.uid, profile?.role]);
+
+  // Listen for Service Worker notification click events and URL deep-link params
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleDeepLinkData = async (data: {
+      linkTab?: string;
+      tournamentId?: string;
+      shardId?: any;
+      notifId?: string;
+    }) => {
+      if (data.notifId) {
+        markNotificationAsRead(data.notifId, data.shardId).catch(() => {});
+      }
+      if (data.tournamentId) {
+        try {
+          const found = await findTournamentAcrossShards(data.tournamentId, data.shardId);
+          if (found.exists && found.data) {
+            setSelectedTournament(found.data);
+            setShowNotificationCenter(false);
+            return;
+          }
+        } catch {}
+      }
+      if (data.linkTab) {
+        setSelectedTournament(null);
+        setActiveTab(data.linkTab as NavTab);
+        setShowNotificationCenter(false);
+      }
+    };
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTIFICATION_CLICKED' && event.data.data) {
+        handleDeepLinkData(event.data.data);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    // Check URL query params if opened from cold start via notification click
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const notifTab = params.get('notifTab');
+      const tournamentId = params.get('tournamentId');
+      const shardId = params.get('shardId');
+      if (notifTab || tournamentId) {
+        handleDeepLinkData({
+          linkTab: notifTab || undefined,
+          tournamentId: tournamentId || undefined,
+          shardId: shardId || undefined
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch {}
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, [user?.uid]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
