@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   User, Facebook, Phone, ShieldCheck, LogOut, Edit3, X, 
   CheckCircle, BellRing, ExternalLink, MessageCircle,
-  Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette, AlertCircle
+  Camera, ChevronRight, Mail, Hash, MessageSquare, Award, Sun, Moon, Sparkles, Palette, AlertCircle, Search, Shield, Zap
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { UserProfile } from '@/src/hooks/useAuth';
@@ -11,8 +11,16 @@ import { auth } from '@/src/lib/firebase';
 import {
   subscribeToUserProfile,
   saveUserProfileToDb,
-  getSavedUserRole
+  updateUserProfileInDb,
+  getSavedUserRole,
+  setCachedUserProfile
 } from '@/src/lib/userDbManager';
+import {
+  FC_MOBILE_CLUBS,
+  CLUB_LEAGUE_FILTERS,
+  getClubByCode,
+  getClubLogoUrl
+} from '@/src/lib/fcClubs';
 import { signOut } from 'firebase/auth';
 import { useI18n } from '@/src/lib/i18n';
 import { useTheme } from '@/src/lib/theme';
@@ -31,13 +39,20 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   const { theme, isDark, setTheme } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
+  const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+  const [clubSearchQuery, setClubSearchQuery] = useState('');
+  const [selectedLeagueFilter, setSelectedLeagueFilter] = useState<string>('ALL');
+  const [isSavingClub, setIsSavingClub] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [uidHint, setUidHint] = useState('');
+  const [ovrHint, setOvrHint] = useState('');
   const [editData, setEditData] = useState({
     inGameName: '',
     inGameUID: '',
+    ovr: '',
+    clubId: '',
     fbUrl: '',
     messengerLink: '',
     leagueMessengerGroupLink: '',
@@ -76,6 +91,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         setEditData({
           inGameName: profile.inGameName || '',
           inGameUID: profile.inGameUID || '',
+          ovr: profile.ovr || '',
+          clubId: profile.clubId || '',
           fbUrl: profile.fbUrl || '',
           messengerLink: profile.messengerLink || '',
           leagueMessengerGroupLink: profile.leagueMessengerGroupLink || '',
@@ -85,6 +102,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
         });
         setSaveError('');
         setUidHint('');
+        setOvrHint('');
         setIsEditing(true);
       }
     } catch {}
@@ -116,6 +134,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
       setEditData({
         inGameName: profile.inGameName || '',
         inGameUID: profile.inGameUID || '',
+        ovr: profile.ovr || '',
+        clubId: profile.clubId || '',
         fbUrl: profile.fbUrl || '',
         messengerLink: profile.messengerLink || '',
         leagueMessengerGroupLink: profile.leagueMessengerGroupLink || '',
@@ -125,7 +145,33 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
       });
       setSaveError('');
       setUidHint('');
+      setOvrHint('');
       setIsEditing(true);
+    }
+  };
+
+  const handleSelectClub = async (clubCode: string) => {
+    if (!user) return;
+    setIsSavingClub(true);
+    try {
+      const updated: UserProfile = {
+        ...(profile || { uid: user.uid, email: user.email || '', role: effectiveRole }),
+        clubId: clubCode
+      };
+      setProfile(updated);
+      setEditData((prev) => ({ ...prev, clubId: clubCode }));
+      setCachedUserProfile(user.uid, updated);
+
+      await updateUserProfileInDb(
+        user.uid,
+        { clubId: clubCode },
+        { isAdmin: effectiveRole === 'admin', email: profile?.email || user.email }
+      );
+      setIsClubModalOpen(false);
+    } catch (err) {
+      console.error('Error saving club crest:', err);
+    } finally {
+      setIsSavingClub(false);
     }
   };
 
@@ -146,6 +192,12 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
       const cleanUid = editData.inGameUID.trim();
       if (!cleanUid || !/^\d+$/.test(cleanUid)) {
         setSaveError('In-Game UID must contain numbers only (no letters or words allowed).');
+        return;
+      }
+
+      const cleanOvr = editData.ovr.trim();
+      if (cleanOvr && !/^\d{1,3}$/.test(cleanOvr)) {
+        setSaveError('Team OVR must be a valid number (e.g., 98, 105, 112).');
         return;
       }
     }
@@ -174,6 +226,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
           role: effectiveRole,
           inGameName: editData.inGameName.trim(),
           inGameUID: editData.inGameUID.trim().replace(/\D/g, ''),
+          ovr: effectiveRole === 'player' ? editData.ovr.trim().replace(/\D/g, '') : (profile?.ovr || ''),
+          clubId: editData.clubId || profile?.clubId || '',
           fbUrl: normalizedFb,
           messengerLink: normalizedMessenger,
           leagueMessengerGroupLink: editData.leagueMessengerGroupLink.trim(),
@@ -198,6 +252,8 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
   };
 
   const displayName = profile?.inGameName || 'Recruit';
+  const selectedClub = getClubByCode(profile?.clubId);
+  const selectedClubLogo = getClubLogoUrl(profile?.clubId);
   const initials = displayName
     .split(/[\s._-]+/)
     .filter(Boolean)
@@ -261,19 +317,34 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
           {/* Center Avatar & Player Identity */}
           <div className="flex flex-col items-center text-center space-y-4 relative z-10">
             <div className="relative">
-              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-[2.4rem] p-1 bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-400 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] shadow-xl shadow-indigo-500/15 dark:shadow-purple-500/20">
-                <div className="w-full h-full rounded-[2.15rem] bg-gradient-to-b from-white to-slate-100 dark:from-[#2b3052] dark:to-[#1e223d] flex flex-col items-center justify-center relative overflow-hidden border border-white/80 dark:border-white/15">
-                  <span className="text-3xl sm:text-4xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-white dark: via-orange-100 dark:to-[#ff7a45]">
-                    {initials}
-                  </span>
-                  <span className="text-[7px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-300 mt-0.5">
-                    FC ARENA
-                  </span>
+              <div
+                onClick={() => setIsClubModalOpen(true)}
+                title="Click to select your FC Mobile Club Crest"
+                className="w-28 h-28 sm:w-32 sm:h-32 rounded-[2.4rem] p-1 bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-400 dark:from-[#ff7a45] dark:via-[#ec4899] dark:to-[#8b5cf6] shadow-xl shadow-indigo-500/15 dark:shadow-purple-500/20 cursor-pointer group/avatar active:scale-95 transition-transform"
+              >
+                <div className="w-full h-full rounded-[2.15rem] bg-gradient-to-b from-white to-slate-100 dark:from-[#2b3052] dark:to-[#1e223d] flex flex-col items-center justify-center relative overflow-hidden border border-white/80 dark:border-white/15 p-3">
+                  {selectedClubLogo ? (
+                    <img
+                      src={selectedClubLogo}
+                      alt={selectedClub?.name || 'Club Crest'}
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md group-hover/avatar:scale-105 transition-transform"
+                    />
+                  ) : (
+                    <>
+                      <span className="text-3xl sm:text-4xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-white dark:via-orange-100 dark:to-[#ff7a45]">
+                        {initials}
+                      </span>
+                      <span className="text-[7px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-300 mt-0.5">
+                        FC ARENA
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <button 
-                onClick={handleEditClick}
-                title="Edit Profile"
+                type="button"
+                onClick={() => setIsClubModalOpen(true)}
+                title="Select FC Club Crest"
                 className="absolute -bottom-1.5 -right-1.5 w-10 h-10 rounded-xl bg-white dark:bg-[#31365c] border border-slate-200 dark:border-white/20 flex items-center justify-center text-indigo-600 dark:text-[#ff7a45] shadow-lg active:scale-95 transition-transform"
               >
                 <Camera size={17} />
@@ -281,11 +352,31 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             </div>
 
             <div className="space-y-1.5 w-full">
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase italic leading-none tracking-tighter">
-                {displayName}
-              </h2>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white uppercase italic leading-none tracking-tighter">
+                  {displayName}
+                </h2>
+                {effectiveRole === 'player' && profile?.ovr && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase italic tracking-wider shadow-md shadow-amber-500/20">
+                    <Zap size={11} className="fill-current" />
+                    OVR {profile.ovr}
+                  </span>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-slate-500 dark:text-slate-300">
+                {selectedClub && (
+                  <button
+                    type="button"
+                    onClick={() => setIsClubModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-cyan-300 hover:bg-indigo-500/15 transition-colors"
+                  >
+                    <Shield size={11} />
+                    <span className="text-[9.5px] font-black uppercase tracking-widest">
+                      {selectedClub.name}
+                    </span>
+                  </button>
+                )}
                 {profile?.email && (
                   <div className="inline-flex items-center gap-1.5">
                     <Mail size={12} className="text-slate-400" />
@@ -430,7 +521,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
               )}
             </div>
 
-            {/* UID / League Code Card */}
+            {/* UID & OVR / League Code Card */}
             <div className="nm-flat rounded-3xl p-4.5 flex items-center justify-between border border-white/60 dark:border-white/12">
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className="w-11 h-11 rounded-2xl bg-purple-500/12 border border-purple-500/25 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
@@ -438,13 +529,23 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 </div>
                 <div className="min-w-0">
                   <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">
-                    {profile?.role === 'player' ? 'In-Game UID' : 'League Code'}
+                    {effectiveRole === 'player' ? 'In-Game UID & OVR' : 'League Code'}
                   </span>
                   <span className="text-xs font-mono font-black text-slate-800 dark:text-white truncate block">
-                    {profile?.role === 'player' ? (profile?.inGameUID || 'Pending') : (profile?.leagueName || 'Verified')}
+                    {effectiveRole === 'player'
+                      ? `${profile?.inGameUID || 'Pending'}${profile?.ovr ? ` • OVR ${profile.ovr}` : ''}`
+                      : (profile?.leagueName || 'Verified')}
                   </span>
                 </div>
               </div>
+              {effectiveRole === 'player' && (
+                <button
+                  onClick={handleEditClick}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-[8px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 shrink-0"
+                >
+                  {profile?.ovr ? `OVR ${profile.ovr}` : 'Set OVR'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -600,27 +701,53 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
             {/* Scrollable Form Body */}
             <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
               {/* Live Identity Preview Banner */}
-              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-[#141729] text-white flex items-center gap-3.5 shadow-md border border-slate-800 dark:border-white/12">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 dark:from-[#ff7a45] dark:to-[#a855f7] p-0.5 shrink-0">
-                  <div className="w-full h-full rounded-[0.9rem] bg-slate-950 flex items-center justify-center text-white font-black text-base uppercase italic">
-                    {(editData.inGameName || profile?.inGameName || 'P').charAt(0)}
+              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-[#141729] text-white flex items-center justify-between gap-3 shadow-md border border-slate-800 dark:border-white/12">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsClubModalOpen(true)}
+                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 dark:from-[#ff7a45] dark:to-[#a855f7] p-0.5 shrink-0"
+                  >
+                    <div className="w-full h-full rounded-[0.9rem] bg-slate-950 flex items-center justify-center text-white font-black text-base uppercase italic overflow-hidden p-1.5">
+                      {getClubLogoUrl(editData.clubId || profile?.clubId) ? (
+                        <img
+                          src={getClubLogoUrl(editData.clubId || profile?.clubId)!}
+                          alt="Club"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        (editData.inGameName || profile?.inGameName || 'P').charAt(0)
+                      )}
+                    </div>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-black uppercase italic tracking-tight text-white truncate">
+                        {editData.inGameName || 'Your Handle'}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[7px] font-black uppercase tracking-wider shrink-0">
+                        {effectiveRole}
+                      </span>
+                      {effectiveRole === 'player' && editData.ovr && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-400/35 text-[7px] font-black uppercase tracking-wider shrink-0">
+                          OVR {editData.ovr}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 truncate mt-0.5">
+                      {effectiveRole === 'player'
+                        ? `UID: ${editData.inGameUID || 'Not set'} • ${getClubByCode(editData.clubId || profile?.clubId)?.name || 'No Club Selected'}`
+                        : `League: ${editData.leagueName || 'Official Host'}`}
+                    </p>
                   </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black uppercase italic tracking-tight text-white truncate">
-                      {editData.inGameName || 'Your Handle'}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[7px] font-black uppercase tracking-wider shrink-0">
-                      {profile?.role || 'Player'}
-                    </span>
-                  </div>
-                  <p className="text-[9px] font-bold text-slate-400 truncate mt-0.5">
-                    {profile?.role === 'player'
-                      ? `UID: ${editData.inGameUID || 'Not set'}`
-                      : `League: ${editData.leagueName || 'Official Host'}`}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsClubModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-[8px] font-black uppercase tracking-wider text-cyan-300 shrink-0"
+                >
+                  Change Club
+                </button>
               </div>
 
               {saveError && (
@@ -642,7 +769,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 {/* Full Handle */}
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
-                    {profile?.role === 'player' ? 'Your in game name' : 'Your Name'}
+                    {effectiveRole === 'player' ? 'Your in game name' : 'Your Name'}
                   </label>
                   <div className="relative">
                     <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -650,7 +777,7 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                     </div>
                     <input
                       type="text"
-                      placeholder={profile?.role === 'player' ? 'Your in game name' : 'Your Name'}
+                      placeholder={effectiveRole === 'player' ? 'Your in game name' : 'Your Name'}
                       value={editData.inGameName}
                       onChange={(e) => setEditData({ ...editData, inGameName: e.target.value })}
                       className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
@@ -658,44 +785,93 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                   </div>
                 </div>
 
-                {/* In-Game UID / League Name */}
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
-                    {profile?.role === 'player' ? 'In-Game UID' : 'Organization/League Name'}
-                  </label>
-                  <div className="relative">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                      {profile?.role === 'player' ? <Hash size={16} /> : <Award size={16} />}
+                {/* In-Game UID & Team OVR for Players OR League Name for Publishers */}
+                {effectiveRole === 'player' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
+                        In-Game UID
+                      </label>
+                      <div className="relative">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <Hash size={16} />
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="FC Mobile UID"
+                          value={editData.inGameUID}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const digitsOnly = raw.replace(/\D/g, '');
+                            if (raw !== digitsOnly) {
+                              setUidHint('Only numbers (0-9) are allowed in Game UID.');
+                            } else {
+                              setUidHint('');
+                            }
+                            setEditData({ ...editData, inGameUID: digitsOnly });
+                          }}
+                          className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        />
+                      </div>
                     </div>
-                    <input
-                      type="text"
-                      inputMode={profile?.role === 'player' ? 'numeric' : 'text'}
-                      pattern={profile?.role === 'player' ? '[0-9]*' : undefined}
-                      placeholder={profile?.role === 'player' ? 'FC Mobile UID' : 'Official Title'}
-                      value={profile?.role === 'player' ? editData.inGameUID : editData.leagueName}
-                      onChange={(e) => {
-                        if (profile?.role === 'player') {
-                          const raw = e.target.value;
-                          const digitsOnly = raw.replace(/\D/g, '');
-                          if (raw !== digitsOnly) {
-                            setUidHint('Only numbers (0-9) are allowed in Game UID.');
-                          } else {
-                            setUidHint('');
-                          }
-                          setEditData({ ...editData, inGameUID: digitsOnly });
-                        } else {
-                          setEditData({ ...editData, leagueName: e.target.value });
-                        }
-                      }}
-                      className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
-                    />
+
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest ml-1 block">
+                        FC Team OVR
+                      </label>
+                      <div className="relative">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <Zap size={16} />
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={3}
+                          placeholder="e.g. 108"
+                          value={editData.ovr}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const digitsOnly = raw.replace(/\D/g, '').slice(0, 3);
+                            if (raw !== digitsOnly) {
+                              setOvrHint('OVR must be numbers only.');
+                            } else {
+                              setOvrHint('');
+                            }
+                            setEditData({ ...editData, ovr: digitsOnly });
+                          }}
+                          className="w-full h-13 pl-14 pr-3 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-amber-500 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  {profile?.role === 'player' && uidHint && (
-                    <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-1 flex items-center gap-1">
-                      <AlertCircle size={11} /> {uidHint}
-                    </p>
-                  )}
-                </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest ml-1 block">
+                      Organization/League Name
+                    </label>
+                    <div className="relative">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Award size={16} />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Official Title"
+                        value={editData.leagueName}
+                        onChange={(e) => setEditData({ ...editData, leagueName: e.target.value })}
+                        className="w-full h-13 pl-14 pr-4 rounded-2xl bg-slate-50 border-2 border-slate-200/90 focus:border-indigo-600 focus:bg-white text-xs sm:text-sm font-black text-slate-900 placeholder:text-slate-400 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {effectiveRole === 'player' && (uidHint || ovrHint) && (
+                  <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-1 flex items-center gap-1">
+                    <AlertCircle size={11} /> {uidHint || ovrHint}
+                  </p>
+                )}
               </div>
 
               {/* Section 2: Social & Match Coordination Channels */}
@@ -806,6 +982,256 @@ export const ProfilePage = ({ user, profile: initialProfile }: ProfileProps) => 
                 <CheckCircle size={15} className="text-emerald-400 dark:text-white shrink-0" />
                 <span>{isSaving ? 'Saving...' : 'Confirm Changes'}</span>
               </button>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
+
+      {/* FC Mobile Licensed Club Crest Picker Modal */}
+      {isClubModalOpen && createPortal(
+        <div className="fixed inset-0 z-[10000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="w-full max-w-lg solid-modal-surface bg-white rounded-[2.5rem] border border-slate-200 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] overflow-hidden flex flex-col max-h-[88vh] my-auto"
+          >
+            {/* Modal Header */}
+            <div className="px-6 pt-6 pb-4 solid-modal-header bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 dark:from-[#ff7a45] dark:to-[#8b5cf6] text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
+                  <Shield size={22} />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
+                    <ShieldCheck size={10} /> FC Mobile Licensed Clubs
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight mt-0.5">
+                    Select Your Club Crest
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClubModalOpen(false)}
+                disabled={isSavingClub}
+                className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center active:scale-95 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search & League Filter Bar */}
+            <div className="px-6 pt-4 pb-3 bg-slate-50/80 dark:bg-[#14172b] border-b border-slate-100 dark:border-white/10 space-y-3 shrink-0">
+              <div className="relative">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search club or country (e.g. Bangladesh, India, Real Madrid)..."
+                  value={clubSearchQuery}
+                  onChange={(e) => setClubSearchQuery(e.target.value)}
+                  className="w-full h-11 pl-11 pr-9 rounded-2xl bg-white dark:bg-[#1d213b] border border-slate-200 dark:border-white/15 text-xs font-bold text-slate-800 dark:text-white placeholder:text-slate-400 outline-none focus:border-indigo-500"
+                />
+                {clubSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setClubSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex overflow-x-auto gap-1.5 pb-1 no-scrollbar">
+                {CLUB_LEAGUE_FILTERS.map((lg) => (
+                  <button
+                    key={lg}
+                    type="button"
+                    onClick={() => setSelectedLeagueFilter(lg)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-wider whitespace-nowrap transition-all shrink-0 border",
+                      selectedLeagueFilter === lg
+                        ? "bg-slate-900 text-white border-slate-900 dark:bg-gradient-to-r dark:from-[#ff7a45] dark:to-[#8b5cf6] dark:border-white/25 shadow-sm"
+                        : "bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-white/10 hover:bg-slate-100"
+                    )}
+                  >
+                    {lg === 'ALL' ? 'All Clubs' : lg}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scrollable Grid of Licensed & Unofficial Clubs */}
+            <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+              {(() => {
+                const q = clubSearchQuery.trim().toLowerCase();
+                const filteredClubs = FC_MOBILE_CLUBS.filter((club) => {
+                  const matchesLeague =
+                    selectedLeagueFilter === 'ALL'
+                      ? true
+                      : selectedLeagueFilter === 'Unofficial'
+                        ? Boolean(club.isUnofficial)
+                        : selectedLeagueFilter === 'National Clubs'
+                          ? Boolean(club.isNational)
+                          : !club.isUnofficial && !club.isNational && club.league === selectedLeagueFilter;
+                  const matchesQuery =
+                    !q ||
+                    club.name.toLowerCase().includes(q) ||
+                    club.shortName.toLowerCase().includes(q) ||
+                    club.league.toLowerCase().includes(q) ||
+                    (club.country && club.country.toLowerCase().includes(q)) ||
+                    club.code.toLowerCase().includes(q);
+                  return matchesLeague && matchesQuery;
+                });
+
+                if (filteredClubs.length === 0) {
+                  return (
+                    <div className="py-12 text-center space-y-2">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">
+                        No matching clubs found
+                      </p>
+                    </div>
+                  );
+                }
+
+                const officialClubs = filteredClubs.filter((c) => !c.isUnofficial && !c.isNational);
+                const unofficialClubs = filteredClubs.filter((c) => c.isUnofficial);
+                const nationalClubs = filteredClubs.filter((c) => c.isNational);
+                const activeClubCode = (editData.clubId || profile?.clubId || '').toUpperCase();
+
+                const renderClubCard = (club: typeof FC_MOBILE_CLUBS[number]) => {
+                  const isSelected = activeClubCode === club.code;
+                  const logoUrl = getClubLogoUrl(club.code);
+                  return (
+                    <button
+                      key={club.code}
+                      type="button"
+                      disabled={isSavingClub}
+                      onClick={() => handleSelectClub(club.code)}
+                      className={cn(
+                        "p-3 rounded-2xl flex flex-col items-center text-center gap-2 transition-all border-2 relative group active:scale-95",
+                        isSelected
+                          ? "bg-indigo-50/90 dark:bg-indigo-500/20 border-indigo-600 dark:border-[#ff7a45] shadow-md"
+                          : "bg-slate-50/80 dark:bg-[#1b1f38]/80 border-slate-200/70 dark:border-white/10 hover:border-indigo-300 dark:hover:border-white/25 hover:bg-white"
+                      )}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-indigo-600 dark:bg-[#ff7a45] text-white flex items-center justify-center shadow-xs">
+                          <CheckCircle size={12} />
+                        </div>
+                      )}
+                      <div className="w-14 h-14 rounded-xl bg-white dark:bg-white/95 border border-slate-100 dark:border-white/20 flex items-center justify-center p-2 shadow-xs">
+                        {logoUrl && (
+                          <img
+                            src={logoUrl}
+                            alt={club.name}
+                            loading="lazy"
+                            className="w-full h-full object-contain group-hover:scale-110 transition-transform"
+                          />
+                        )}
+                      </div>
+                      <div className="space-y-0.5 w-full min-w-0">
+                        <span className="text-[9.5px] font-black text-slate-900 dark:text-white uppercase tracking-tight line-clamp-1 block">
+                          {club.name}
+                        </span>
+                        <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider truncate block">
+                          {club.league}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                };
+
+                return (
+                  <div className="space-y-6">
+                    {officialClubs.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 dark:text-slate-200">
+                              Official FC Mobile Clubs
+                            </span>
+                          </div>
+                          <span className="text-[8.5px] font-black uppercase tracking-wider text-slate-400">
+                            {officialClubs.length} Clubs
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {officialClubs.map(renderClubCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {unofficialClubs.length > 0 && (
+                      <div className={cn("space-y-3", officialClubs.length > 0 && "pt-5 border-t border-slate-200/80 dark:border-white/12")}>
+                        <div className="flex items-center justify-between px-1">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span className="text-[10.5px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400 italic">
+                                Unofficial Clubs
+                              </span>
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 ml-4">
+                              Bangladesh • India • Indonesia • Japan • Malaysia & Global
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/12 border border-amber-500/25 text-[8px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-300">
+                            {unofficialClubs.length} Clubs
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {unofficialClubs.map(renderClubCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {nationalClubs.length > 0 && (
+                      <div className={cn("space-y-3", (officialClubs.length > 0 || unofficialClubs.length > 0) && "pt-5 border-t border-slate-200/80 dark:border-white/12")}>
+                        <div className="flex items-center justify-between px-1">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                              <span className="text-[10.5px] font-black uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-400 italic">
+                                National Clubs
+                              </span>
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 ml-4">
+                              World & Asian National Football Teams
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-lg bg-cyan-500/12 border border-cyan-500/25 text-[8px] font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-300">
+                            {nationalClubs.length} Teams
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {nationalClubs.map(renderClubCard)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 solid-modal-header bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                Tap any club crest to set as your profile picture
+              </span>
+              {profile?.clubId && (
+                <button
+                  type="button"
+                  disabled={isSavingClub}
+                  onClick={() => handleSelectClub('')}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[8.5px] font-black uppercase tracking-wider hover:bg-rose-500/20 transition-colors"
+                >
+                  Reset Initials
+                </button>
+              )}
             </div>
           </motion.div>
         </div>,

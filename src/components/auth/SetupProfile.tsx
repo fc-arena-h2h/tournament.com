@@ -36,6 +36,7 @@ export const SetupProfile = ({ user, profile }: SetupProfileProps) => {
   const [formData, setFormData] = useState({
     inGameName: profile?.inGameName || '',
     inGameUID: profile?.inGameUID || '',
+    ovr: profile?.ovr || '',
     fbUrl: profile?.fbUrl || '',
     leagueMessengerGroupLink: profile?.leagueMessengerGroupLink || '',
     phone: profile?.whatsappNumber || profile?.phone || '',
@@ -124,6 +125,11 @@ export const SetupProfile = ({ user, profile }: SetupProfileProps) => {
           finalRole === 'player'
             ? formData.inGameUID.trim().replace(/\D/g, '')
             : '',
+        ovr:
+          finalRole === 'player'
+            ? formData.ovr.trim().replace(/\D/g, '').slice(0, 3)
+            : '',
+        clubId: profile?.clubId || '',
         fbUrl: formData.fbUrl.trim(),
         messengerLink: formData.fbUrl.trim(),
         leagueMessengerGroupLink:
@@ -230,36 +236,56 @@ export const SetupProfile = ({ user, profile }: SetupProfileProps) => {
               />
             </div>
 
-            {/* Role-Specific Primary Field: Numeric UID for Player OR Organization/League Name for Host/Admin */}
+            {/* Role-Specific Primary Field: Numeric UID + OVR for Player OR Organization/League Name for Host/Admin */}
             {resolvedRole === 'player' ? (
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
-                  <Hash size={12} className="text-emerald-500" />
-                  In-Game UID (Numbers Only)
-                </label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="Enter your numeric FC Mobile UID"
-                  required
-                  value={formData.inGameUID}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const digitsOnly = raw.replace(/\D/g, '');
-                    if (raw !== digitsOnly) {
-                      setUidHint('Only numbers (0-9) are allowed in Game UID.');
-                    } else {
-                      setUidHint('');
-                    }
-                    setFormData({ ...formData, inGameUID: digitsOnly });
-                  }}
-                />
-                {uidHint && (
-                  <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-4">
-                    {uidHint}
-                  </p>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                    <Hash size={12} className="text-emerald-500" />
+                    In-Game UID (Numbers Only)
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Numeric FC Mobile UID"
+                    required
+                    value={formData.inGameUID}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const digitsOnly = raw.replace(/\D/g, '');
+                      if (raw !== digitsOnly) {
+                        setUidHint('Only numbers (0-9) are allowed in Game UID.');
+                      } else {
+                        setUidHint('');
+                      }
+                      setFormData({ ...formData, inGameUID: digitsOnly });
+                    }}
+                  />
+                  {uidHint && (
+                    <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-4">
+                      {uidHint}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest ml-4 flex items-center gap-1.5">
+                    Team OVR
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={3}
+                    placeholder="e.g. 108"
+                    value={formData.ovr}
+                    onChange={(e) => {
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 3);
+                      setFormData({ ...formData, ovr: digitsOnly });
+                    }}
+                  />
+                </div>
               </div>
             ) : (
               <div className="space-y-2">

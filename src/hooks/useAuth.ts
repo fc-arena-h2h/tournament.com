@@ -12,6 +12,8 @@ export interface UserProfile {
   role: 'player' | 'publisher' | 'admin';
   inGameName?: string;
   inGameUID?: string;
+  ovr?: string;
+  clubId?: string;
   leagueName?: string;
   fbUrl?: string;
   messengerLink?: string;

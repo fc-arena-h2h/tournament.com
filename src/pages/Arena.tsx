@@ -18,6 +18,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { Reveal } from '@/src/components/ui/Reveal';
 import { FootballTacticsAnimation } from '@/src/components/ui/FootballTacticsAnimation';
+import { getClubByCode, getClubLogoUrl } from '@/src/lib/fcClubs';
 import { getDemoTournaments, getDemoMatches } from '@/src/lib/localTournaments';
 import {
   subscribeToAllTournamentsAcrossShards,
@@ -290,8 +291,20 @@ export const ArenaPage: React.FC<ArenaProps> = ({
           <div className="flex items-start justify-between relative z-10">
             <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
               <div className="relative shrink-0">
-                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green dark:from-[#ff7a45] dark:via-[#a855f7] dark:to-[#38bdf8] shadow-xl border border-white dark:border-white/25 flex items-center justify-center bg-white dark:bg-[#161930]">
-                  <UserIcon size={32} className="text-slate-400 dark:text-white" />
+                <div
+                  onClick={() => onNavigate('profile')}
+                  title="Tap to change Club Crest or Profile"
+                  className="w-18 h-18 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-white to-fc-green dark:from-[#ff7a45] dark:via-[#a855f7] dark:to-[#38bdf8] shadow-xl border border-white dark:border-white/25 flex items-center justify-center bg-white dark:bg-[#161930] cursor-pointer overflow-hidden"
+                >
+                  {getClubLogoUrl(profile?.clubId) ? (
+                    <img
+                      src={getClubLogoUrl(profile?.clubId)!}
+                      alt={getClubByCode(profile?.clubId)?.name || 'Club'}
+                      className="w-12 h-12 sm:w-15 sm:h-15 object-contain drop-shadow-sm"
+                    />
+                  ) : (
+                    <UserIcon size={32} className="text-slate-400 dark:text-white" />
+                  )}
                 </div>
               </div>
 
@@ -314,9 +327,16 @@ export const ArenaPage: React.FC<ArenaProps> = ({
                   <div className="px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-500/22 border border-indigo-100/80 dark:border-indigo-400/35 text-indigo-700 dark:text-indigo-200 flex items-center gap-1 shadow-xs">
                     <Shield size={10} className="text-indigo-600 dark:text-indigo-300 shrink-0" />
                     <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-                      {profile?.leagueName || 'Elite League'}
+                      {getClubByCode(profile?.clubId)?.name || profile?.leagueName || 'Elite League'}
                     </span>
                   </div>
+                  {profile?.role === 'player' && profile?.ovr && (
+                    <div className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-1 shadow-xs">
+                      <span className="text-[8px] sm:text-[9px] font-black uppercase italic tracking-wider">
+                        OVR {profile.ovr}
+                      </span>
+                    </div>
+                  )}
                   <div className="px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-500/22 border border-emerald-100/80 dark:border-emerald-400/35 text-emerald-700 dark:text-emerald-200 flex items-center gap-1 shadow-xs">
                     <Activity
                       size={10}

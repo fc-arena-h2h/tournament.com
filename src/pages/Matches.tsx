@@ -4,6 +4,7 @@ import { Card, Button } from '@/src/components/ui/Primitives';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, addDoc, deleteDoc, deleteField, getDoc, orderBy, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { getUserProfileById } from '@/src/lib/userDbManager';
+import { getClubByCode, getClubLogoUrl } from '@/src/lib/fcClubs';
 import { subscribeToMatchesAcrossShards, getTournamentDbByTournamentId, findTournamentAcrossShards } from '@/src/lib/shardManager';
 import { Trophy, Clock, CheckCircle, AlertCircle, Camera, Swords, Plus, User, ArrowRight, Zap, Trash2, X, MessageSquare, XCircle, UserPlus, Search, User as UserIcon, Upload, Send, Lock, Copy, Facebook, Calendar, MessageCircle, Edit3, RotateCcw, Phone } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -218,6 +219,15 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
     return () => unsubMatches();
   }, [auth.currentUser?.uid]);
+
+  useEffect(() => {
+    if (profile?.uid) {
+      setProfiles((prev) => ({
+        ...prev,
+        [profile.uid]: { ...(prev[profile.uid] || {}), ...profile }
+      }));
+    }
+  }, [profile]);
 
 
 
@@ -792,14 +802,25 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 </div>
                 <div
                   className={cn(
-                    "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
+                    "flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
+                    getClubLogoUrl(homeProfile?.clubId || (isHome ? profile?.clubId : undefined))
+                      ? "bg-white dark:bg-white/95 p-1 sm:p-2"
+                      : "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121]",
                     isSideBySide
                       ? "w-8 h-8 xs:w-9 xs:h-9 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border"
                       : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                    isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
+                    isCompleted && homeWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-slate-200/80 dark:border-white/20"
                   )}
                 >
-                  <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-6 sm:h-6" />
+                  {getClubLogoUrl(homeProfile?.clubId || (isHome ? profile?.clubId : undefined)) ? (
+                    <img
+                      src={getClubLogoUrl(homeProfile?.clubId || (isHome ? profile?.clubId : undefined))!}
+                      alt={homeProfile?.inGameName || match.homePlayerName || 'Home'}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-6 sm:h-6" />
+                  )}
                 </div>
                 <div className="text-center w-full min-w-0 px-0.5">
                   <h5
@@ -915,14 +936,25 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                 </div>
                 <div
                   className={cn(
-                    "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121] flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
+                    "flex items-center justify-center overflow-hidden transition-all duration-700 shadow-lg relative group-hover/player:ring-2 group-hover/player:ring-indigo-400 group-active/player:scale-95",
+                    getClubLogoUrl(awayProfile?.clubId || (isAway ? profile?.clubId : undefined))
+                      ? "bg-white dark:bg-white/95 p-1 sm:p-2"
+                      : "bg-slate-900 dark:bg-gradient-to-b dark:from-[#16192e] dark:to-[#0f1121]",
                     isSideBySide
                       ? "w-8 h-8 xs:w-9 xs:h-9 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border"
                       : "w-14 h-14 xs:w-16 xs:h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[2.5rem] border-2 sm:border-4",
-                    isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-white/50 dark:border-white/15"
+                    isCompleted && awayWin ? "border-amber-400 ring-2 ring-amber-400/80 shadow-md dark:shadow-[0_0_20px_rgba(251,191,36,0.35)] scale-105" : "border-slate-200/80 dark:border-white/20"
                   )}
                 >
-                  <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-6 sm:h-6" />
+                  {getClubLogoUrl(awayProfile?.clubId || (isAway ? profile?.clubId : undefined)) ? (
+                    <img
+                      src={getClubLogoUrl(awayProfile?.clubId || (isAway ? profile?.clubId : undefined))!}
+                      alt={awayProfile?.inGameName || match.awayPlayerName || 'Away'}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <UserIcon size={isSideBySide ? 14 : 24} className="text-slate-700 dark:text-slate-200 sm:w-6 sm:h-6" />
+                  )}
                 </div>
                 <div className="text-center w-full min-w-0 px-0.5">
                   <h5
@@ -1556,16 +1588,36 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
               
               <div className="px-8 pb-10 -mt-12 relative z-10">
                 <div className="flex flex-col items-center text-center space-y-6">
-                  <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl border-4 border-white flex items-center justify-center">
-                    <UserIcon size={40} className="text-slate-300" />
+                  <div className="w-24 h-24 rounded-[2rem] bg-white p-2 shadow-xl border-4 border-white flex items-center justify-center overflow-hidden">
+                    {getClubLogoUrl(selectedPlayerProfile.clubId) ? (
+                      <img
+                        src={getClubLogoUrl(selectedPlayerProfile.clubId)!}
+                        alt={getClubByCode(selectedPlayerProfile.clubId)?.name || 'Club'}
+                        className="w-16 h-16 object-contain"
+                      />
+                    ) : (
+                      <UserIcon size={40} className="text-slate-300" />
+                    )}
                   </div>
                   
-                  <div className="space-y-1">
-                    <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
-                      {selectedPlayerProfile.inGameName}
-                    </h3>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
+                        {selectedPlayerProfile.inGameName}
+                      </h3>
+                      {selectedPlayerProfile.ovr && (
+                        <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black uppercase italic tracking-wider">
+                          OVR {selectedPlayerProfile.ovr}
+                        </span>
+                      )}
+                    </div>
+                    {getClubByCode(selectedPlayerProfile.clubId) && (
+                      <span className="text-[9.5px] font-black text-indigo-600 uppercase tracking-widest block">
+                        {getClubByCode(selectedPlayerProfile.clubId)?.name}
+                      </span>
+                    )}
                     {(profile?.role === 'admin' || selectedPlayerProfile.email === auth.currentUser?.email) && (
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPlayerProfile.email}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{selectedPlayerProfile.email}</span>
                     )}
                   </div>
 
@@ -1573,7 +1625,10 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
                     <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
-                        <span className="text-xs font-black text-slate-800">{selectedPlayerProfile.inGameUID || 'Not Set'}</span>
+                        <span className="text-xs font-black text-slate-800">
+                          {selectedPlayerProfile.inGameUID || 'Not Set'}
+                          {selectedPlayerProfile.ovr ? ` • OVR ${selectedPlayerProfile.ovr}` : ''}
+                        </span>
                       </div>
                     </div>
 
