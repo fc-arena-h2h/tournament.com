@@ -16,6 +16,11 @@ export interface DemoTournament {
     third?: number;
   } | null;
   messengerGroupLink: string;
+  whatsappContact?: string;
+  discordLink?: string;
+  telegramContact?: string;
+  extraContactLink?: string;
+  supportNote?: string;
   publisherId: string;
   isDemo: true;
   status: 'open' | 'ongoing' | 'finished';

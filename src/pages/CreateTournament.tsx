@@ -22,6 +22,7 @@ export const CreateTournamentPage = ({
   isDemo?: boolean;
 }) => {
   const initialHostLink = profile?.fbUrl || profile?.messengerLink || '';
+  const initialWhatsapp = profile?.whatsappNumber || '';
 
   const [formData, setFormData] = useState({
     title: '',
@@ -33,6 +34,8 @@ export const CreateTournamentPage = ({
     prizePool: '',
     rewardType: 'winner_only' as 'winner_only' | 'top3',
     messengerGroupLink: initialHostLink,
+    whatsappContact: initialWhatsapp,
+    discordLink: '',
     deploymentKey: '',
     activationKey: '', // This will be the same as deploymentKey for consistency
     firstPrize: 0,
@@ -49,7 +52,8 @@ export const CreateTournamentPage = ({
       setFormData(prev => ({
         ...prev,
         organizerName: prev.organizerName || profile.inGameName || profile.leagueName || '',
-        messengerGroupLink: prev.messengerGroupLink || profile.fbUrl || profile.messengerLink || ''
+        messengerGroupLink: prev.messengerGroupLink || profile.fbUrl || profile.messengerLink || '',
+        whatsappContact: prev.whatsappContact || profile.whatsappNumber || ''
       }));
     }
   }, [profile]);
@@ -144,6 +148,8 @@ export const CreateTournamentPage = ({
             third: Number(formData.thirdPrize) || 0
           } : null,
           messengerGroupLink: formData.messengerGroupLink.trim(),
+          whatsappContact: formData.whatsappContact.trim() || undefined,
+          discordLink: formData.discordLink.trim() || undefined,
           publisherId: auth.currentUser.uid,
           isDemo: true,
           status: 'open',
@@ -211,6 +217,8 @@ export const CreateTournamentPage = ({
         invitationKey: formData.entryType === 'invited' ? formData.invitationKey.trim() : null,
         activationKey: formData.deploymentKey.trim(),
         messengerGroupLink: formData.messengerGroupLink.trim(),
+        whatsappContact: formData.whatsappContact.trim() || null,
+        discordLink: formData.discordLink.trim() || null,
         prizePool: normalizedPrizePool,
         rewardType: formData.rewardType,
         prizes: formData.rewardType === 'top3' ? {
@@ -522,15 +530,15 @@ export const CreateTournamentPage = ({
             </div>
           )}
 
-          {/* Host Facebook / Messenger Link Field */}
+          {/* Host Facebook / Messenger Link Field (Required) */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between ml-2">
               <label className="text-[9px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
                 <MessageCircle size={13} className="text-blue-600" />
-                Your Facebook / Messenger Link
+                Your Facebook / Messenger Link *
               </label>
               <span className="text-[8px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                Host Direct Contact
+                Required • Host Contact
               </span>
             </div>
             <Input 
@@ -543,6 +551,51 @@ export const CreateTournamentPage = ({
             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-2">
               Pre-filled from your registered account. Participants can click this to contact you directly.
             </p>
+          </div>
+
+          {/* Optional Host WhatsApp & Discord Contact Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-2">
+                <label className="text-[9px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                  <MessageCircle size={13} className="text-emerald-600" />
+                  WhatsApp Link / Number
+                </label>
+                <span className="text-[8px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  Optional
+                </span>
+              </div>
+              <Input 
+                placeholder="https://wa.me/... or +8801XXXXXXXXX" 
+                value={formData.whatsappContact}
+                onChange={(e) => setFormData({...formData, whatsappContact: e.target.value})}
+                className="h-14 font-medium"
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-2">
+                Enter your WhatsApp link, group link, or phone number
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-2">
+                <label className="text-[9px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                  <Send size={13} className="text-indigo-600" />
+                  Discord Link
+                </label>
+                <span className="text-[8px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  Optional
+                </span>
+              </div>
+              <Input 
+                placeholder="https://discord.gg/... or Discord link" 
+                value={formData.discordLink}
+                onChange={(e) => setFormData({...formData, discordLink: e.target.value})}
+                className="h-14 font-medium"
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider ml-2">
+                Add your Discord server invite or profile link
+              </p>
+            </div>
           </div>
         </div>
 
@@ -587,18 +640,18 @@ export const CreateTournamentPage = ({
               </div>
             </div>
 
-            {/* Buy Key Card with Telegram and Facebook */}
+            {/* Buy Key Card with Telegram, Facebook, and WhatsApp */}
             <div className="p-5 rounded-[2rem] bg-gradient-to-br from-indigo-50/70 via-sky-50/40 to-slate-50 border border-indigo-100/80 space-y-4">
               <div className="flex flex-col text-center">
                 <h4 className="text-[11px] font-black text-indigo-950 uppercase italic tracking-wide">
                   Buy Tournament Activation Key
                 </h4>
                 <p className="text-[8px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">
-                  Contact admin on Telegram or Facebook to purchase your key
+                  Contact admin on Telegram, Facebook, or WhatsApp to purchase your key
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <button 
                   type="button" 
                   onClick={() => window.open(telegramLink, '_blank')}
@@ -615,6 +668,15 @@ export const CreateTournamentPage = ({
                 >
                   <MessageCircle size={15} />
                   Contact (Facebook)
+                </button>
+
+                <button 
+                  type="button" 
+                  onClick={() => window.open('https://wa.me/message/O2TKFEMZWACCI1', '_blank')}
+                  className="h-13 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                >
+                  <MessageCircle size={15} />
+                  Contact (WhatsApp)
                 </button>
               </div>
             </div>
