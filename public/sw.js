@@ -1,7 +1,7 @@
 // FC Arena VS standalone service worker
 importScripts('/sw-push-handler.js');
 
-const CACHE_NAME = 'fc-arena-cache-v3';
+const CACHE_NAME = 'fc-arena-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

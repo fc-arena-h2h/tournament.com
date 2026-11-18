@@ -117,11 +117,11 @@ export const Header = ({
             </button>
           ) : (
             <div className="relative group">
-              <div className="w-14 h-14 rounded-[1.2rem] bg-[#0c1445] border-2 border-white shadow-2xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
+              <div className="w-14 h-14 rounded-[1.2rem] bg-white border-2 border-slate-200/80 shadow-xl flex items-center justify-center overflow-hidden relative active:scale-95 transition-all duration-300">
                 <Logo size={52} variant="color" className="relative z-10 w-full h-full rounded-none" />
                 
-                {/* Neon Accent Line */}
-                <div className="absolute inset-0 border border-indigo-500/20 rounded-[1.1rem] pointer-events-none z-20" />
+                {/* Subtle Accent Border */}
+                <div className="absolute inset-0 border border-slate-900/5 rounded-[1.1rem] pointer-events-none z-20" />
               </div>
             </div>
           )}
@@ -311,11 +311,11 @@ export const Header = ({
                 {/* Developer Image */}
                 <div className="flex flex-col items-center gap-4">
                    <div className="w-36 h-36 rounded-[2.5rem] p-1.5 nm-flat bg-white border-4 border-white shadow-2xl relative">
-                      <div className="w-full h-full rounded-[2rem] overflow-hidden bg-slate-100 flex items-center justify-center">
+                      <div className="w-full h-full rounded-[2rem] overflow-hidden bg-white flex items-center justify-center">
                         <img 
-                          src="/fc_arena_icon.jpg" 
+                          src="/fc_arena_icon.jpg?v=3" 
                           alt="Developer" 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       </div>
                       <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg border-4 border-[#f0f1f5]">

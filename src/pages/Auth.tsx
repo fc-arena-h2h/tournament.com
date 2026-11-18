@@ -5,6 +5,7 @@ import {
   ArrowRight, Sparkles, ChevronRight, UserPlus, LogIn, Key, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { Logo } from '@/src/components/ui/Logo';
 import { auth } from '@/src/lib/firebase';
 import {
   saveUserProfileToDb,
@@ -220,11 +221,10 @@ export const AuthPage = () => {
       >
         <div className="flex flex-col items-center text-center space-y-4">
           <motion.div 
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            className="w-24 h-24 rounded-[2.5rem] bg-slate-900 dark:bg-gradient-to-br dark:from-[#1b1f38] dark:to-[#0f1224] flex items-center justify-center text-white shadow-2xl shadow-slate-900/20 dark:shadow-[0_0_30px_-5px_rgba(168,85,247,0.4)] dark:border dark:border-white/15 relative overflow-hidden"
+            whileHover={{ scale: 1.05, rotate: 2 }}
+            className="w-24 h-24 rounded-[2.2rem] bg-white flex items-center justify-center shadow-2xl shadow-slate-900/15 border-2 border-slate-200/80 dark:border-white/20 relative overflow-hidden p-1.5"
           >
-             <div className="hidden dark:block absolute inset-0 bg-gradient-to-tr from-cyan-500/15 via-purple-500/15 to-pink-500/15 pointer-events-none" />
-             <Shield size={44} fill="currentColor" className="opacity-90 relative z-10" />
+             <Logo size={84} className="w-full h-full rounded-[1.8rem]" />
           </motion.div>
           <div className="space-y-1">
             <h1 className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
