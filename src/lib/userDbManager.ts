@@ -315,6 +315,14 @@ export async function saveUserProfileToDb(
   const cleanUid = (uid || '').trim();
   if (!cleanUid) throw new Error('Invalid user UID');
 
+  const candidateEmail = (options?.email || data.email || '').trim().toLowerCase();
+  if (options?.merge === false && candidateEmail) {
+    const gmailRegex = /^[a-z0-9]+(\.[a-z0-9]+)*@gmail\.com$/;
+    if (!gmailRegex.test(candidateEmail)) {
+      throw new Error('Only valid @gmail.com addresses are allowed for registration.');
+    }
+  }
+
   const isAdminAccount =
     Boolean(options?.isAdmin) ||
     data.role === 'admin' ||

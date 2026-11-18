@@ -45,6 +45,30 @@ export const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [emailChecked, setEmailChecked] = useState(false);
+
+  const validateGmailAddress = (rawEmail: string): { valid: boolean; message: string } => {
+    const trimmed = rawEmail.trim().toLowerCase();
+    if (!trimmed || trimmed.includes(' ')) {
+      return { valid: false, message: 'Non-Valid' };
+    }
+    const parts = trimmed.split('@');
+    if (parts.length !== 2) {
+      return { valid: false, message: 'Non-Valid' };
+    }
+    const [localPart, domainPart] = parts;
+    if (!localPart || domainPart !== 'gmail.com') {
+      return { valid: false, message: 'Non-Valid' };
+    }
+    if (localPart.length < 3 || localPart.length > 30) {
+      return { valid: false, message: 'Non-Valid' };
+    }
+    const validLocalRegex = /^[a-z0-9]+(\.[a-z0-9]+)*$/;
+    if (!validLocalRegex.test(localPart)) {
+      return { valid: false, message: 'Non-Valid' };
+    }
+    return { valid: true, message: 'Valid' };
+  };
 
   const validateFacebookLink = (rawUrl: string): { valid: boolean; message: string } => {
     const trimmed = rawUrl.trim();
@@ -82,6 +106,7 @@ export const AuthPage = () => {
     setUidHint('');
     setSuccessInfo('');
     setFailedAttempts(0);
+    setEmailChecked(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -118,11 +143,17 @@ export const AuthPage = () => {
 
     try {
       if (isSignUp) {
+        setEmailChecked(true);
+        const cleanEmail = formData.email.trim().toLowerCase();
+        const gmailCheck = validateGmailAddress(cleanEmail);
+        if (!gmailCheck.valid) {
+          throw new Error('Non-Valid Gmail address. Please enter a valid @gmail.com address.');
+        }
+
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Passwords do not match');
         }
 
-        const cleanEmail = formData.email.trim().toLowerCase();
         const isSystemAdmin = isSystemAdminEmail(cleanEmail);
         const effectiveRole: 'player' | 'publisher' | 'admin' = isSystemAdmin ? 'admin' : role;
 
@@ -204,6 +235,10 @@ export const AuthPage = () => {
   };
 
   const fbStatus = formData.fbUrl.trim() ? validateFacebookLink(formData.fbUrl) : null;
+  const gmailStatus =
+    isSignUp && emailChecked && formData.email.trim()
+      ? validateGmailAddress(formData.email)
+      : null;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0d0f1d] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
@@ -298,10 +333,10 @@ export const AuthPage = () => {
                       )}
 
                       <div className="space-y-3">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Registered Email</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Registered Gmail</label>
                         <Input 
                           type="email" 
-                          placeholder="player@fcarena.pro" 
+                          placeholder="yourname@gmail.com" 
                           required
                           value={formData.email}
                           onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -367,18 +402,54 @@ export const AuthPage = () => {
                       </div>
                     )}
                     
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
                         <Mail size={12} className="text-indigo-500 dark:text-cyan-400" /> EMAIL
                       </label>
                       <Input 
                         type="email" 
-                        placeholder="player@fcarena.pro" 
+                        placeholder="yourname@gmail.com" 
                         required
                         value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="h-16 auth-rgb-input"
+                        onChange={(e) => {
+                          setFormData({...formData, email: e.target.value});
+                          setEmailChecked(false);
+                          if (error) setError('');
+                        }}
+                        onBlur={() => {
+                          if (isSignUp && formData.email.trim()) {
+                            setEmailChecked(true);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && isSignUp && formData.email.trim()) {
+                            setEmailChecked(true);
+                          }
+                        }}
+                        className={cn(
+                          "h-16 auth-rgb-input",
+                          gmailStatus && !gmailStatus.valid ? "border-rose-300 focus:ring-rose-500/20" : "",
+                          gmailStatus && gmailStatus.valid ? "border-emerald-300 focus:ring-emerald-500/20" : ""
+                        )}
                       />
+                      {gmailStatus && (
+                        <div className={cn(
+                          "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider ml-2 pt-0.5",
+                          gmailStatus.valid ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
+                        )}>
+                          {gmailStatus.valid ? (
+                            <>
+                              <CheckCircle size={13} />
+                              <span>Valid</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle size={13} />
+                              <span>Non-Valid</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -402,6 +473,11 @@ export const AuthPage = () => {
                           placeholder="••••••••" 
                           required
                           value={formData.password}
+                          onFocus={() => {
+                            if (isSignUp && formData.email.trim()) {
+                              setEmailChecked(true);
+                            }
+                          }}
                           onChange={(e) => setFormData({...formData, password: e.target.value})}
                           className={cn(
                             "h-16 pr-14 transition-all duration-300 auth-rgb-input",
@@ -442,6 +518,11 @@ export const AuthPage = () => {
                               placeholder="Confirm password" 
                               required
                               value={formData.confirmPassword}
+                              onFocus={() => {
+                                if (isSignUp && formData.email.trim()) {
+                                  setEmailChecked(true);
+                                }
+                              }}
                               onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                               className="h-16 auth-rgb-input"
                             />

@@ -282,7 +282,9 @@ export const ArenaPage: React.FC<ArenaProps> = ({
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100/90 dark:bg-[#13162b]/90 border border-slate-200/60 dark:border-white/16 text-slate-600 dark:text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
               <Hash size={10} className="text-indigo-500 dark:text-[#ff7a45]" />
               <span>
-                {profile?.inGameUID || profile?.uid?.slice(0, 8).toUpperCase() || 'PLAYER'}
+                {profile?.role === 'publisher' || profile?.role === 'admin'
+                  ? profile?.leagueName || 'OFFICIAL HOST'
+                  : profile?.inGameUID || profile?.uid?.slice(0, 8).toUpperCase() || 'PLAYER'}
               </span>
             </div>
           </div>
@@ -313,10 +315,14 @@ export const ArenaPage: React.FC<ArenaProps> = ({
                   <h2 className="text-lg sm:text-2xl font-black text-[#0f172a] dark:text-white uppercase italic tracking-tight truncate leading-tight">
                     {profile?.inGameName || 'Player Name'}
                   </h2>
-                  {profile?.inGameName && profile?.inGameUID && profile?.fbUrl && (
+                  {profile?.inGameName &&
+                    ((profile?.role === 'publisher' || profile?.role === 'admin')
+                      ? Boolean(profile?.leagueName)
+                      : Boolean(profile?.inGameUID)) &&
+                    profile?.fbUrl && (
                     <div
                       className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 dark:bg-[#ff7a45] flex items-center justify-center text-white shadow-sm shrink-0"
-                      title="Verified Player"
+                      title="Verified Account"
                     >
                       <CheckCircle size={10} fill="white" />
                     </div>

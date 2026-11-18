@@ -1623,11 +1623,21 @@ export const MatchesPage = ({ profile }: { profile: UserProfile | null }) => {
 
                   <div className="w-full grid grid-cols-1 gap-3">
                     <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
-                        <span className="text-xs font-black text-slate-800">
-                          {selectedPlayerProfile.inGameUID || 'Not Set'}
-                          {selectedPlayerProfile.ovr ? ` • OVR ${selectedPlayerProfile.ovr}` : ''}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+                          {selectedPlayerProfile.role === 'publisher' || selectedPlayerProfile.role === 'admin'
+                            ? 'Organization / League'
+                            : 'In-Game ID'}
+                        </span>
+                        <span className="text-xs font-black text-slate-800 text-right truncate">
+                          {selectedPlayerProfile.role === 'publisher' || selectedPlayerProfile.role === 'admin' ? (
+                            selectedPlayerProfile.leagueName || selectedPlayerProfile.inGameName || 'Not Set'
+                          ) : (
+                            <>
+                              {selectedPlayerProfile.inGameUID || 'Not Set'}
+                              {selectedPlayerProfile.ovr ? ` • OVR ${selectedPlayerProfile.ovr}` : ''}
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>

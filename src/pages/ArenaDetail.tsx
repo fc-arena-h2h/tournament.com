@@ -323,8 +323,26 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const openPlayerProfile = async (userId?: string | null, fallbackName?: string) => {
     if (!userId && !fallbackName) return;
 
+    const hostUid = currentTournament?.publisherId || tournament.publisherId;
+    const isHostTarget = Boolean(userId && hostUid && userId.trim() === hostUid.trim());
+    const fallbackLeagueName =
+      currentTournament?.organizationName ||
+      currentTournament?.organizerName ||
+      tournament.organizationName ||
+      tournament.organizerName ||
+      '';
+
     if (userId && profiles[userId]) {
-      setSelectedPlayerProfile(profiles[userId]);
+      const cachedProf = profiles[userId];
+      if (isHostTarget || cachedProf.role === 'publisher' || cachedProf.role === 'admin') {
+        setSelectedPlayerProfile({
+          ...cachedProf,
+          role: cachedProf.role === 'admin' ? 'admin' : 'publisher',
+          leagueName: cachedProf.leagueName || fallbackLeagueName || cachedProf.inGameName || fallbackName || 'Official Host'
+        });
+      } else {
+        setSelectedPlayerProfile(cachedProf);
+      }
       return;
     }
 
@@ -336,8 +354,21 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
       try {
         const fetched = await getUserProfileById(userId.trim());
         if (fetched) {
-          setProfiles((prev) => ({ ...prev, [userId]: fetched }));
-          setSelectedPlayerProfile(fetched);
+          const enriched: UserProfile =
+            isHostTarget || fetched.role === 'publisher' || fetched.role === 'admin'
+              ? {
+                  ...fetched,
+                  role: fetched.role === 'admin' ? 'admin' : 'publisher',
+                  leagueName:
+                    fetched.leagueName ||
+                    fallbackLeagueName ||
+                    fetched.inGameName ||
+                    fallbackName ||
+                    'Official Host'
+                }
+              : fetched;
+          setProfiles((prev) => ({ ...prev, [userId]: enriched }));
+          setSelectedPlayerProfile(enriched);
           return;
         }
       } catch (e) {
@@ -348,14 +379,15 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
     setSelectedPlayerProfile({
       uid: userId || 'unknown',
       email: reg?.email || '',
-      role: 'player',
-      inGameName: reg?.gameName || fallbackName || 'Player',
+      role: isHostTarget ? 'publisher' : 'player',
+      inGameName: reg?.gameName || fallbackName || (isHostTarget ? 'Official Host' : 'Player'),
       inGameUID: reg?.gameUid || reg?.inGameUID || 'N/A',
+      leagueName: isHostTarget ? (fallbackLeagueName || fallbackName || 'Official League') : '',
       ovr: reg?.ovr || '',
       clubId: reg?.clubId || '',
-      fbUrl: reg?.fbUrl || '',
+      fbUrl: reg?.fbUrl || (isHostTarget ? (currentTournament?.messengerGroupLink || tournament.messengerGroupLink || '') : ''),
       messengerLink: reg?.messengerLink || '',
-      whatsappNumber: reg?.whatsappNumber || '',
+      whatsappNumber: reg?.whatsappNumber || (isHostTarget ? (currentTournament?.whatsappContact || '') : ''),
       status: 'active'
     });
   };
@@ -4098,6 +4130,22 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
   const renderPlayerModal = () => {
     if (!selectedPlayerProfile) return null;
 
+    const hostUid = currentTournament?.publisherId || tournament.publisherId;
+    const isHostOrAdminProfile =
+      selectedPlayerProfile.role === 'publisher' ||
+      selectedPlayerProfile.role === 'admin' ||
+      Boolean(hostUid && selectedPlayerProfile.uid === hostUid);
+
+    const hostOrganizationOrLeague =
+      selectedPlayerProfile.leagueName ||
+      (Boolean(hostUid && selectedPlayerProfile.uid === hostUid)
+        ? currentTournament?.organizationName ||
+          currentTournament?.organizerName ||
+          tournament.organizationName ||
+          tournament.organizerName
+        : '') ||
+      'Not Set';
+
     return createPortal(
       <div
         onClick={() => setSelectedPlayerProfile(null)}
@@ -4137,7 +4185,7 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
                     <h3 className="text-2xl font-black text-slate-800 uppercase italic tracking-tight leading-none">
                       {selectedPlayerProfile.inGameName}
                     </h3>
-                    {selectedPlayerProfile.ovr && (
+                    {!isHostOrAdminProfile && selectedPlayerProfile.ovr && (
                       <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black uppercase italic tracking-wider">
                         OVR {selectedPlayerProfile.ovr}
                       </span>
@@ -4155,11 +4203,19 @@ export const ArenaDetail = ({ tournament, profile, onBack }: ArenaDetailProps) =
 
                 <div className="w-full grid grid-cols-1 gap-3">
                   <div className="nm-inset rounded-2xl p-4 bg-slate-50 border border-white">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">In-Game ID</span>
-                      <span className="text-xs font-black text-slate-800">
-                        {selectedPlayerProfile.inGameUID || 'Not Set'}
-                        {selectedPlayerProfile.ovr ? ` • OVR ${selectedPlayerProfile.ovr}` : ''}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+                        {isHostOrAdminProfile ? 'Organization / League' : 'In-Game ID'}
+                      </span>
+                      <span className="text-xs font-black text-slate-800 text-right truncate">
+                        {isHostOrAdminProfile ? (
+                          hostOrganizationOrLeague
+                        ) : (
+                          <>
+                            {selectedPlayerProfile.inGameUID || 'Not Set'}
+                            {selectedPlayerProfile.ovr ? ` • OVR ${selectedPlayerProfile.ovr}` : ''}
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>

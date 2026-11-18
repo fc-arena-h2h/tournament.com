@@ -70,6 +70,8 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.uid == request.auth.uid 
         && data.email == request.auth.token.email
+        && data.email is string
+        && data.email.matches('^[a-zA-Z0-9]+(\\.[a-zA-Z0-9]+)*@gmail\\.com$')
         && data.role in ['player', 'publisher', 'admin']
         && (data.inGameName is string && data.inGameName.size() <= 100)
         && (!('inGameUID' in data) || (data.inGameUID is string && data.inGameUID.size() <= 100))
@@ -79,6 +81,8 @@ service cloud.firestore {
         && (!('whatsappNumber' in data) || (data.whatsappNumber is string && data.whatsappNumber.size() <= 60))
         && (!('leagueName' in data) || (data.leagueName is string && data.leagueName.size() <= 100))
         && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40))
+        && (!('ovr' in data) || (data.ovr is number || data.ovr is string))
+        && (!('clubId' in data) || (data.clubId is string && data.clubId.size() <= 100))
         && (!('themePreference' in data) || (data.themePreference in ['light', 'dark']));
     }
 
@@ -174,7 +178,7 @@ service cloud.firestore {
       );
       allow update: if (isOwner(userId) && isNotFrozen() && isValidUser(incoming()) && (
         // Action: Update Profile (strictly forbid changing role, isFrozen, or status)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'leagueMessengerGroupLink', 'whatsappNumber', 'phone', 'pushEnabled', 'fcmTokens', 'themePreference', 'updatedAt']))
+        (incoming().diff(existing()).affectedKeys().hasOnly(['inGameName', 'inGameUID', 'leagueName', 'fbUrl', 'messengerLink', 'leagueMessengerGroupLink', 'whatsappNumber', 'phone', 'ovr', 'clubId', 'pushEnabled', 'fcmTokens', 'themePreference', 'updatedAt']))
         && incoming().role == existing().role
       )) || isAdmin();
     }
